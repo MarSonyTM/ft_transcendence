@@ -22,3 +22,4 @@ GitHub Actions workflow runs on PRs and pushes to long-lived branches. It condit
 ## Run locally
 
 - To be documented by the team as the project evolves.
+# Trigger CI
