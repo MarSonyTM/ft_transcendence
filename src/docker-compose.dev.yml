@@ -1,0 +1,35 @@
+services:
+  backend:
+    container_name: backend
+    build: ./backend/.
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/package.json:/app/package.json
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - transcendence_db:/app/database
+    environment:
+      - NODE_ENV=development
+      - FORCE_COLOR=1
+      - DATABASE_PATH=/app/database/database.db
+    tty: true
+    restart: unless-stopped
+    network_mode: "host"
+
+  frontend:
+    build: 
+      context: ./frontend/
+      dockerfile: Dockerfile.dev
+    container_name: frontend
+    volumes:
+      - ./frontend/src:/app/src
+    restart: unless-stopped
+    network_mode: "host"
+
+volumes:
+  transcendence_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: database/
+

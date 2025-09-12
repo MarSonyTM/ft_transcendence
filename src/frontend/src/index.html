@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ft_transcendence - Pong Prototype</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script type="module" src="/main.ts"></script>
+</head>
+<body>
+
+    <!-- Header -->
+    <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+
+    <!-- Game Status Info -->
+    <div class="game-status">
+        <div>
+            Status: <span id="gameStatus" class="status-text">Initializing...</span>
+        </div>
+        <div>
+            WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+        </div>
+        <div>
+            FPS: <span id="fpsCounter" class="fps-text">0</span>
+        </div>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="controls-container">
+        <button id="startBtn" onclick="startGame()" class="btn btn-start">
+            Start Game
+        </button>
+        <button id="stopBtn" onclick="stopGame()" disabled class="btn btn-stop">
+            Stop Game
+        </button>
+        <button onclick="reconnectWS()" class="btn btn-reconnect">
+            Reconnect WebSocket
+        </button>
+    </div>
+
+    <!-- Player Info -->
+    <div class="player-info">
+        <div class="player-names">
+            <span id="player1Name" class="player1-name">Player 1</span> 
+            <span class="vs-text">vs</span> 
+            <span id="player2Name" class="player2-name">Player 2</span>
+        </div>
+        <div class="score-container">
+            <span id="leftScore" class="left-score">0</span> 
+            <span class="score-separator">-</span> 
+            <span id="rightScore" class="right-score">0</span>
+        </div>
+    </div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameScreen" width="400" height="200"></canvas>
+
+    <!-- Controls Info -->
+    <div class="controls-info">
+        <p>Player 1 - Up/Down W/S</p>
+        <p>Player 2 - Up/Down O/L</p>
+    </div>
+
+</body>
+</html>

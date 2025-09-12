@@ -1,0 +1,121 @@
+import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import path from 'path';
+import userRoutes from './routes/users';
+import gameRoutes from './routes/game';
+import gameStateRoutes from './routes/gameState';
+import playerRoutes from './routes/players';
+import webSocketRoutes  from './websocket/websocketHandler';
+import { database } from './database';
+
+const PORT = 3000;
+const HOST = '0.0.0.0';
+
+const server: FastifyInstance = fastify({
+  logger: {
+    level: 'info',
+    transport: process.env.NODE_ENV === 'development' ? {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid',
+        colorize: true
+      }
+    } : undefined
+  }
+});
+
+// Start server
+const start = async (): Promise<void> => {
+  try {
+    // Enable CORS for frontend communication
+    await server.register(require('@fastify/cors'), {
+      origin: [
+        'http://localhost:8080',
+        'http://frontend:8080',
+        'http://localhost:3000',
+        /^http:\/\/localhost:\d+$/
+      ],
+      credentials: true
+    });
+
+
+    // Register API routes
+    await webSocketRoutes(server);
+    await server.register(userRoutes, { prefix: '/api/users' });
+    await server.register(gameRoutes, { prefix: '/api/game' });
+    await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
+    await server.register(playerRoutes, { prefix: '/api/players' });
+
+    // API Routes
+    await server.register(async function (fastify: FastifyInstance) {
+      // Basic API info route
+      fastify.get('/api', async (request: FastifyRequest, reply: FastifyReply) => {
+        return {
+          message: 'Transcendence API',
+          version: '0.0.2',
+          endpoints: {
+            users: '/api/users',
+            userById: '/api/users/:id',
+            games: '/api/game',
+            gamesById: '/api/game/:id',
+            joinGame: '/api/game/:id/join',
+            gameState: '/api/gamestate',
+            gameStateById: '/api/gamestate/:id',
+            players: '/api/players',
+            playerById: '/api/players/:id',
+            playersByGame: '/api/players/game/:gameId',
+            playersByUser: '/api/players/user/:userId',
+            playerStats: '/api/players/:id/stats',
+            ping: '/api/ping',
+            health: '/health',
+            webSocket: '/game/:gameid/ws'
+          }
+        };
+      });
+
+      fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
+        return { 
+          server: "active",
+          websocket: "enabled",
+          message: "ft_transcendence WebSocket Server"
+        };
+      });
+
+      // Health check endpoint
+      fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
+        try {
+          return {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            database: 'sqlite connected',
+            websocket: 'enabled',
+            database_path: process.env.DATABASE_PATH || '/app/database/database.db'
+          };
+        } catch (error) {
+          reply.code(503);
+          return {
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+        }
+      });
+
+      // Witty Route
+      fastify.get('/ping', async (request: FastifyRequest, reply: FastifyReply) => {
+        return { pong: 'it worked!' };
+      });
+    });
+
+    // Start listening
+    await server.listen({ port: PORT, host: HOST });
+    console.log(`🚀 Backend server with WebSocket listening on http://${HOST}:${PORT}`);
+    console.log(`🔌 WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
+    console.log(`📊 Health check available at http://${HOST}:${PORT}/health`);
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
