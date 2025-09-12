@@ -23,7 +23,6 @@ GitHub Actions workflow runs on PRs and pushes to long-lived branches. It condit
 
 - To be documented by the team as the project evolves.
 
-## Repository setup (what’s already configured)
 
 - Branches created: `MAIN`, `DEV`, `PRE`, `PROD`.
 - Protections:
@@ -47,3 +46,4 @@ GitHub Actions workflow runs on PRs and pushes to long-lived branches. It condit
 
 - Add npm scripts: `lint`, `test`, optionally `typecheck` and we’ll enforce them in CI.
 - Optionally split CI into jobs (node checks, docker build) and mark required checks in branch protections.
+
