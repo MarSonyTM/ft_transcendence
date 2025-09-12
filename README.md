@@ -1,3 +1,4 @@
+[![CI](https://github.com/MarSonyTM/ft_transcendence/actions/workflows/ci.yml/badge.svg?branch=DEV)](https://github.com/MarSonyTM/ft_transcendence/actions/workflows/ci.yml)
 # ft_transcendence
 
 Pong platform with SPA frontend and optional backend, containerized with Docker.
@@ -21,4 +22,4 @@ GitHub Actions workflow runs on PRs and pushes to long-lived branches. It condit
 ## Run locally
 
 - To be documented by the team as the project evolves.
-- 
+
