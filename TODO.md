@@ -25,7 +25,7 @@
 - [ ] Single-page application (SPA) implementation
 - [ ] Firefox compatibility verification
 - [ ] Error handling and validation
-- [ ] HTTPS setup for all connections (including WebSocket)
+- [X] HTTPS setup for all connections (including WebSocket)
 
 ### Game Features
 - [ ] Complete tournament system
@@ -33,7 +33,7 @@
   - [ ] Tournament matchmaking
   - [ ] Display of player matchups
   - [ ] Match order management
-- [ ] Equal paddle speeds for all players
+- [x] Equal paddle speeds for all players
 - [ ] Original Pong (1972) look and feel verification
 
 ### Security
@@ -47,9 +47,9 @@
 ## 🎯 Modules to Choose (Need 7 Major)
 
 ### Web (Choose from)
-- [ ] Backend Framework (Fastify + Node.js) - Major
-- [ ] Frontend Framework (Typescript + Tailwind) - Minor
-- [ ] Database (SQLite) - Minor
+- [x] Backend Framework (Fastify + Node.js) - Major
+- [x] Frontend Framework (Typescript + Tailwind) - Minor
+- [x] Database (SQLite) - Minor
 - [ ] Blockchain Score Storage - Major
 
 ### User Management
@@ -91,7 +91,7 @@
 - [ ] SSR Integration - Minor
 
 ### Server-Side Features
-- [ ] Server-side Pong + API - Major
+- [x] Server-side Pong + API - Major
 - [ ] CLI Gaming Support - Major
 
 ## Next Steps

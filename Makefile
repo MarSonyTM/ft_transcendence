@@ -69,16 +69,6 @@ dev-logs:
 dev-logs-f:
 	@docker compose -f ./src/docker-compose.dev.yml logs -f
 
-# Fixed development command for Arch Linux networking issues
-dev-fixed:
-	@docker compose -f ./src/docker-compose.dev-fixed.yml up
-
-dev-fixed-d:
-	@docker compose -f ./src/docker-compose.dev-fixed.yml up -d
-
-dev-fixed-down:
-	@docker compose -f ./src/docker-compose.dev-fixed.yml down
-
 status: 
 	@docker ps
 
