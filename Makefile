@@ -1,4 +1,8 @@
-all: setup up
+all: up
+
+setup:
+	@echo "Setting up project..."
+	@mkdir -p database
 
 # Production commands (nginx)
 up: 

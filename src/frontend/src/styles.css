@@ -67,6 +67,21 @@ body {
   transition: background-color 150ms; /* transition-colors */
   border: none;
   cursor: pointer;
+  display: flex
+}
+
+.centre {
+  margin: auto;
+  padding: 10px;
+  text-align: center;
+}
+
+.bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  text-align: center;
 }
 
 .btn-start {

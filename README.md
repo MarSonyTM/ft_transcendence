@@ -155,3 +155,16 @@ Web interface built with Vite, TypeScript, and Tailwind CSS.
 - Docker issues: `make clean && make rebuild`
 - WebSocket issues: Check backend is running on port 3000
 
+
+## Python CLI
+
+**WARNING!!**
+
+This application is incomplete and needs fixing, however if you want to test it, youll need to install some packages. I have created a bash script to help solve this issue. Its creates a venv in the '~' dir, aptly named "fuckpy". Running the script creates said venv and installs the necessary packages (i.e httpx, websocket etc")
+
+
+To use PongCLI:
+
+- Start the server through make (dev or prod)
+- Start the pong_cli.py script
+- .....That's it

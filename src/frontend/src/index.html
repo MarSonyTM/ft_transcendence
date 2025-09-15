@@ -9,56 +9,78 @@
 </head>
 <body>
 
-    <!-- Header -->
-    <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+    <div id="landingPage"> <!-- First page seen-->
+        <h1 class="main-title">Welcome to Pong!</h1>
+        
+        <div id="credits" class="bottom">
+            Created By:<br>
+            <a href="https://www.linkedin.com/in/michael-naysmith-839aa1255/">Michael</a>
+            <a href="https://www.linkedin.com/in/marian-furnic%C4%83-85b70a191/">Marian</a>
+            <a href="https://www.linkedin.com/in/lillybaumeister/">Lilly</a>
+            <a href="Not%20found">Ivan</a>
+            <a href="https://www.linkedin.com/in/bassem-mahdi-28419616a/">Bassem</a>
+        </div>
 
-    <!-- Game Status Info -->
-    <div class="game-status">
         <div>
-            Status: <span id="gameStatus" class="status-text">Initializing...</span>
-        </div>
-        <div>
-            WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
-        </div>
-        <div>
-            FPS: <span id="fpsCounter" class="fps-text">0</span>
+            <button id="playPong" onclick="goToGame()" class="btn btn-start centre">Play Pong</button>
         </div>
     </div>
 
-    <!-- Control Buttons -->
-    <div class="controls-container">
-        <button id="startBtn" onclick="startGame()" class="btn btn-start">
-            Start Game
-        </button>
-        <button id="stopBtn" onclick="stopGame()" disabled class="btn btn-stop">
-            Stop Game
-        </button>
-        <button onclick="reconnectWS()" class="btn btn-reconnect">
-            Reconnect WebSocket
-        </button>
-    </div>
+    <div id="gameView"> <!-- Game screen to play game-->
+        <!-- Header -->
+        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
 
-    <!-- Player Info -->
-    <div class="player-info">
-        <div class="player-names">
-            <span id="player1Name" class="player1-name">Player 1</span> 
-            <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">Player 2</span>
+        <!-- Game Status Info -->
+        <div class="game-status">
+            <div>
+                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+            </div>
+            <div>
+                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            </div>
+            <div>
+                FPS: <span id="fpsCounter" class="fps-text">0</span>
+            </div>
         </div>
-        <div class="score-container">
-            <span id="leftScore" class="left-score">0</span> 
-            <span class="score-separator">-</span> 
-            <span id="rightScore" class="right-score">0</span>
+
+        <!-- Control Buttons -->
+        <div class="controls-container">
+            <button id="home" onclick="goToLanding()" class="btn btn-start">
+                Home
+            </button>
+            <button id="startBtn" onclick="startGame()" class="btn btn-start">
+                Start Game
+            </button>
+            <button id="stopBtn" onclick="stopGame()" disabled class="btn btn-stop">
+                Stop Game
+            </button>
+            <button onclick="reconnectWS()" class="btn btn-reconnect">
+                Reconnect WebSocket
+            </button>
         </div>
-    </div>
 
-    <!-- Game Canvas -->
-    <canvas id="gameScreen" width="400" height="200"></canvas>
+        <!-- Player Info -->
+        <div class="player-info">
+            <div class="player-names">
+                <span id="player1Name" class="player1-name">Player 1</span> 
+                <span class="vs-text">vs</span> 
+                <span id="player2Name" class="player2-name">Player 2</span>
+            </div>
+            <div class="score-container">
+                <span id="leftScore" class="left-score">0</span> 
+                <span class="score-separator">-</span> 
+                <span id="rightScore" class="right-score">0</span>
+            </div>
+        </div>
 
-    <!-- Controls Info -->
-    <div class="controls-info">
-        <p>Player 1 - Up/Down W/S</p>
-        <p>Player 2 - Up/Down O/L</p>
+        <!-- Game Canvas -->
+        <canvas id="gameScreen" width="400" height="200"></canvas>
+
+        <!-- Controls Info -->
+        <div class="controls-info">
+            <p>Player 1 - Up/Down W/S</p>
+            <p>Player 2 - Up/Down O/L</p>
+        </div>
     </div>
 
 </body>

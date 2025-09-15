@@ -1,7 +1,9 @@
 services:
   backend:
-    container_name: backend
+    container_name: backend_dev
     build: ./backend/.
+    ports:
+      - "3000:3000"
     volumes:
       - ./backend/src:/app/src
       - ./backend/package.json:/app/package.json
@@ -13,17 +15,21 @@ services:
       - DATABASE_PATH=/app/database/database.db
     tty: true
     restart: unless-stopped
-    network_mode: "host"
+    networks:
+      - transcendence_dev
 
   frontend:
     build: 
       context: ./frontend/
       dockerfile: Dockerfile.dev
-    container_name: frontend
+    container_name: frontend_dev
+    ports:
+      - "5173:5173"  # Vite dev server port
     volumes:
       - ./frontend/src:/app/src
     restart: unless-stopped
-    network_mode: "host"
+    networks:
+      - transcendence_dev
 
 volumes:
   transcendence_db:
@@ -33,3 +39,6 @@ volumes:
       o: bind
       device: database/
 
+networks:
+  transcendence_dev:
+    driver: bridge

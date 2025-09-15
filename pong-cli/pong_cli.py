@@ -9,7 +9,7 @@ import threading
 import time
 from typing import Dict, Any, Optional
 
-class SmoothPongCLI:
+class PongCLI:
     def __init__(self):
         self.game_id: Optional[int] = None
         self.websocket = None
@@ -25,6 +25,8 @@ class SmoothPongCLI:
         }
         self.player_id = 1
         self.paddle_position = 80
+        self.score_player1 = 0
+        self.score_player2 = 0
         self.websocket_thread = None
         self.win_score = 3
         self.loop = None
@@ -128,6 +130,8 @@ class SmoothPongCLI:
         elif message_type == "score":
             self.game_state["scorePlayer1"] = message.get("scorePlayer1", 0)
             self.game_state["scorePlayer2"] = message.get("scorePlayer2", 0)
+            self.score_player1 = message.get("scorePlayer1", 0)
+            self.score_player2 = message.get("scorePlayer2", 0)
             
             # Check win condition
             if (self.game_state["scorePlayer1"] >= self.win_score or 
@@ -158,7 +162,7 @@ class SmoothPongCLI:
             while self.is_active:
                 self.handle_input()
                 self.render()
-                time.sleep(0.05)  # 20 FPS to prevent ghosting
+                time.sleep(0.05)  # 20 FPS
         except KeyboardInterrupt:
             print("\nGame interrupted by user")
         finally:
@@ -179,7 +183,7 @@ class SmoothPongCLI:
             
             if key == ord('w') and self.paddle_position > 0:
                 new_position = max(0, self.paddle_position - paddle_speed)
-            elif key == ord('s') and self.paddle_position < 160:
+            elif key == ord('s') and self.paddle_position < 150:
                 new_position = min(160, self.paddle_position + paddle_speed)
             elif key == ord('q'):
                 self.is_active = False
@@ -303,10 +307,16 @@ class SmoothPongCLI:
 
 # Main execution
 if __name__ == "__main__":
-    game = SmoothPongCLI()
+    game = PongCLI()
     try:
         game.init()
     except KeyboardInterrupt:
         print("\nExiting...")
     except Exception as e:
         print(f"Error: {e}")
+    finally:
+        print("\nGame Over!")
+        if (game.score_player1 == 3):
+            print("Player 1 Wins!")
+        else:
+            print("Player 2 Wins!")

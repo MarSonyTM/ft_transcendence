@@ -1,7 +1,9 @@
 // Import CSS for Vite
 import './styles.css';
 
-// Type definitions
+// ===============================
+// TYPE DEFINITIONS
+// ===============================
 interface GameState {
     ballPosX: number;
     ballPosY: number;
@@ -22,6 +24,9 @@ interface WebSocketMessage {
     winner?: number;
 }
 
+// ===============================
+// PONG GAME CLASS
+// ===============================
 class PongGame {
     gameId: number | null = null;
     canvas: HTMLCanvasElement | null = null;
@@ -386,22 +391,11 @@ class PongGame {
             this.connectWebSocket();
         }
     }
-
-    switchLang(): void {
-        // TODO: add language switching later
-    }
 }
 
-// Global game instance
-let pongGame: PongGame | null = null;
-
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', async () => {
-    pongGame = new PongGame();
-    await pongGame.init();
-});
-
-// Control functions
+// ===============================
+// GAME CONTROL FUNCTIONS
+// ===============================
 async function startGame(): Promise<void> {
     if (pongGame) {
         await pongGame.init();
@@ -420,12 +414,80 @@ async function reconnectWS(): Promise<void> {
     }
 }
 
-function switchLang(): void {
-    // Language switching not implemented yet
+// ===============================
+// ELEMENT MANAGEMENT
+// ===============================
+function hideElement(elementId: string) {
+    const element = document.getElementById(elementId);
+    if (element) 
+        element.style.display = 'none';
 }
 
-// Make functions globally accessible for HTML onclick attributes
+// Show an element
+function showElement(elementId: string) {
+    const element = document.getElementById(elementId);
+    if (element) 
+        element.style.display = 'block';
+}
+
+// ===============================
+// ROUTING & NAVIGATION
+// ===============================
+function goToGame() {
+    hideElement("landingPage");
+    showElement("gameView");
+    // Update URL without page reload
+    history.pushState({ page: 'game' }, 'Game', '/pong');
+}
+
+function goToLanding() {
+    hideElement("gameView");
+    showElement("landingPage");
+    // Update URL without page reload
+    history.pushState({ page: 'landing' }, 'Landing', '/');
+}
+
+// Router function to handle different routes
+function router() {
+    const path = window.location.pathname;
+    
+    switch (path) {
+        case '/game':
+            hideElement("landingPage");
+            showElement("gameView");
+            break;
+        case '/':
+        default:
+            hideElement("gameView");
+            showElement("landingPage");
+            break;
+    }
+}
+
+// Handle browser back/forward buttons
+window.addEventListener('popstate', (event) => {
+    router();
+});
+
+// Initialize router on page load
+router();
+
+// ===============================
+// GAME INITIALIZATION
+// ===============================
+let pongGame: PongGame | null = null;
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    pongGame = new PongGame();
+    await pongGame.init();
+});
+
+// ===============================
+// GLOBAL EXPORTS
+// ===============================
 (window as any).startGame = startGame;
 (window as any).stopGame = stopGame;
 (window as any).reconnectWS = reconnectWS;
-(window as any).switchLang = switchLang;
+(window as any).goToGame = goToGame;
+(window as any).goToLanding = goToLanding;
