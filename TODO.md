@@ -15,24 +15,41 @@
 - [x] Canvas rendering with proper paddle movement
 
 ## 🚧 In Progress
-- [ ] Tournament system implementation
-- [ ] Basic matchmaking system
-- [ ] Player alias registration for tournaments
+- [ ] Tournament system implementation (MVP)
+  - [ ] Data model: tournaments, participants (aliases), matches, rounds
+  - [ ] Endpoints: create tournament, register alias, generate bracket
+  - [ ] Endpoints: get next match, report result, advance round
+  - [ ] UI: alias entry form, bracket view, "Next match" announcement
+  - [ ] Matchmaking logic: fair seeding and deterministic progression
+- [ ] Basic matchmaking system (covered by Tournament MVP)
+- [ ] Player alias registration for tournaments (covered by Tournament MVP)
 
 ## ❌ Required (Mandatory Part)
 
 ### Technical Requirements
 - [ ] Single-page application (SPA) implementation
+  - [ ] Back/Forward navigation works within app
+  - [ ] 404 handling and fallback route
 - [ ] Firefox compatibility verification
+  - [ ] Canvas render, keyboard input, WebSocket work on latest stable Firefox
+  - [ ] No console errors/warnings in gameplay flow
 - [ ] Error handling and validation
+  - [ ] Centralized error handler (server)
+  - [ ] User-friendly error UI (client)
+  - [ ] Fastify JSON schemas for all routes (validation)
+  - [ ] Parameterized DB access to prevent SQLi
+  - [ ] Output encoding/sanitization to prevent XSS
 - [ ] HTTPS setup for all connections (including WebSocket)
+  - [ ] Nginx TLS in production (self-signed or mkcert for local)
+  - [ ] Frontend uses https and wss in production
+  - [ ] README documents certificate setup and trust instructions
 
 ### Game Features
 - [ ] Complete tournament system
-  - [ ] Player registration with aliases
-  - [ ] Tournament matchmaking
-  - [ ] Display of player matchups
-  - [ ] Match order management
+  - [ ] Player registration with aliases (per tournament)
+  - [ ] Tournament matchmaking / bracket generation
+  - [ ] Display of player matchups and progression
+  - [ ] Match order management and next-match announcement
 - [ ] Equal paddle speeds for all players
 - [ ] Original Pong (1972) look and feel verification
 
@@ -91,7 +108,10 @@
 - [ ] SSR Integration - Minor
 
 ### Server-Side Features
-- [ ] Server-side Pong + API - Major
+- [ ] Server-side Pong + API - Major (partially implemented)
+  - [ ] Document existing API endpoints in README
+  - [ ] Confirm all gameplay flows are available via API
+  - [ ] Stabilize response contracts used by frontend
 - [ ] CLI Gaming Support - Major
 
 ## Next Steps
