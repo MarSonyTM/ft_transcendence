@@ -36,7 +36,7 @@
 - [ ] Equal paddle speeds for all players
 - [ ] Original Pong (1972) look and feel verification
 
-### Security
+### Security - @mafurnic
 - [ ] Password hashing implementation
 - [ ] SQL injection protection
 - [ ] XSS attack protection
