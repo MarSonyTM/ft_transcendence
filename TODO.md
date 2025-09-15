@@ -102,10 +102,22 @@
 5. Test thoroughly on Firefox
 
 ## Team Task Distribution
-- Create issues for each major task
-- Assign team members to specific modules
+
+### Current Assignments
+Format: [Task] - @username - Status - Branch
+
+#### In Progress
+- None yet
+
+#### Available Tasks
+- All tasks from above sections are available for assignment
+
+### Task Management Rules
+- Add your name to a task before starting work
+- Create a GitHub issue for tracking
+- Create feature branch following naming convention
 - Regular progress updates via PRs
-- Code review requirements per branch protection rules
+- Code review required for all PRs
 
 Remember:
 - Mandatory part must be perfect before bonus evaluation
