@@ -39,7 +39,7 @@ class PongGame {
         scorePlayer1: 0,
         scorePlayer2: 0
     };
-    heartbeatInterval: NodeJS.Timeout | null = null;
+    heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
     playerId: number = 1;
     player2Id: number = 2;
@@ -329,7 +329,7 @@ class PongGame {
     updatePlayerInfo(): void {
         const player1Name = document.getElementById('player1Name');
         const player2Name = document.getElementById('player2Name');
-        if (player1Name) player1Name.textContent = "Michael";
+        if (player1Name) player1Name.textContent = currentUsername || "Player 1";
         if (player2Name) player2Name.textContent = "Marvin";
     }
 
@@ -341,7 +341,6 @@ class PongGame {
     updateWSStatus(status: string, connected: boolean): void {
         const element = document.getElementById('wsStatus');
         if (element) {
-            element.textContent = status;
             if (connected) {
                 element.className = 'text-green-400';
             } else {
@@ -392,16 +391,217 @@ class PongGame {
     }
 }
 
-// Global game instance
-let pongGame: PongGame | null = null;
+// SPA State
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', async () => {
-    pongGame = new PongGame();
-    await pongGame.init();
+type AppPage = 'landing' | 'login' | 'game';
+let currentPage: AppPage = 'landing';
+let pongGame: PongGame | null = null;
+let currentUsername: string = '';
+
+function renderLandingPage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <div class="landing-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h1 class="main-title" style="font-weight: bold; text-align: center; font-size: 4em;">PING PONG</h1>
+            <button id="loginBtn" class="btn btn-login" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Login</button>
+            <button id="registerBtn" class="btn btn-register" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Register</button>
+            <button id="quickPlayBtn" class="btn btn-quickplay" style="font-weight: bold; margin: 8px 0; font-size: 2em; background: #4ade80; color: #222;">Quick Play</button>
+        </div>
+    `;
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            history.pushState({ page: 'login' }, '', '#login');
+            currentPage = 'login';
+            renderApp();
+        });
+    }
+    const registerBtn = document.getElementById('registerBtn');
+    if (registerBtn) {
+        registerBtn.addEventListener('click', () => {
+            // Placeholder: No registration logic, just a button
+            alert('Registration coming soon!');
+        });
+    }
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
+    if (quickPlayBtn) {
+        quickPlayBtn.addEventListener('click', () => {
+            currentUsername = 'Never lucky';
+            history.pushState({ page: 'game' }, '', '#game');
+            currentPage = 'game';
+            renderApp();
+        });
+    }
+}
+
+async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
+    //(replace with real API call in future)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Accept any username/password for now
+    if (username) {
+        return { success: true, username };
+    } else {
+        return { success: false, error: 'Username required' };
+    }
+}
+
+function renderLoginPage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <div class="login-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h2 style="font-size: 2em; margin-bottom: 1em;">Login</h2>
+            <form id="loginForm" style="display: flex; flex-direction: column; gap: 1em; min-width: 250px;">
+                <input id="usernameInput" type="text" placeholder="Username" required style="padding: 0.5em; font-size: 1.2em;" />
+                <input id="passwordInput" type="password" placeholder="Password" required style="padding: 0.5em; font-size: 1.2em;" />
+                <button type="submit" class="btn btn-login" style="font-size: 1.2em;">Login</button>
+                <div id="loginError" style="color: red; margin-top: 0.5em;"></div>
+            </form>
+            <button id="backToLandingBtn" class="btn btn-home" style="margin-top: 2em; font-size: 1.1em;">Back</button>
+        </div>
+    `;
+    const loginForm = document.getElementById('loginForm') as HTMLFormElement;
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameInput = document.getElementById('usernameInput') as HTMLInputElement;
+            const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
+            const loginError = document.getElementById('loginError');
+            if (loginError) loginError.textContent = '';
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const result = await loginUser(username, password);
+            if (result.success && result.username) {
+                currentUsername = result.username;
+                history.pushState({ page: 'game' }, '', '#game');
+                currentPage = 'game';
+                renderApp();
+            } else if (loginError) {
+                loginError.textContent = result.error || 'Login failed';
+            }
+        });
+    }
+    const backBtn = document.getElementById('backToLandingBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'landing' }, '', '#');
+            currentPage = 'landing';
+            renderApp();
+        });
+    }
+}
+
+function renderGamePage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+        <div class="game-status">
+            <div>
+                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+            </div>
+            <div>
+                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            </div>
+            <div>
+                FPS: <span id="fpsCounter" class="fps-text">0</span>
+            </div>
+        </div>
+        <div class="controls-container">
+            <button id="startBtn" class="btn btn-start">Start Game</button>
+            <button id="stopBtn" class="btn btn-stop" disabled>Stop Game</button>
+            <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+        </div>
+        <div class="player-info">
+            <div class="player-names">
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> 
+                <span class="vs-text">vs</span> 
+                <span id="player2Name" class="player2-name">Player 2</span>
+            </div>
+            <div class="score-container">
+                <span id="leftScore" class="left-score">0</span> 
+                <span class="score-separator">-</span> 
+                <span id="rightScore" class="right-score">0</span>
+            </div>
+        </div>
+        <canvas id="gameScreen" width="400" height="200"></canvas>
+        <div class="controls-info">
+            <p>Player 1 - Up/Down W/S</p>
+            <p>Player 2 - Up/Down O/L</p>
+        </div>
+    `;
+    // Attach button handlers
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    if (startBtn) startBtn.addEventListener('click', startGame);
+    if (stopBtn) stopBtn.addEventListener('click', stopGame);
+    if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+
+    // Initialize game logic
+    if (!pongGame) {
+        pongGame = new PongGame();
+        pongGame.init();
+    }
+}
+
+function renderApp() {
+    if (currentPage === 'landing') {
+        renderLandingPage();
+    } else if (currentPage === 'login') {
+        renderLoginPage();
+    } else {
+        renderGamePage();
+    }
+}
+
+// Handle browser navigation (back/forward)
+window.addEventListener('popstate', (event) => {
+    if (location.hash === '#game') {
+        // If navigating back to game, reset state and go to landing
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'landing';
+        history.replaceState({ page: 'landing' }, '', '#');
+        renderApp();
+    } else if (location.hash === '#login') {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'login';
+        renderApp();
+    } else {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'landing';
+        renderApp();
+    }
 });
 
-// Control functions
+// SPA entry
+document.addEventListener('DOMContentLoaded', () => {
+    // Set initial page based on URL
+    if (location.hash === '#game') {
+        // If no username, force login and reset state
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'login';
+        history.replaceState({ page: 'login' }, '', '#login');
+        renderApp();
+    } else if (location.hash === '#login') {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'login';
+        renderApp();
+    } else {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'landing';
+        renderApp();
+    }
+});
+
+// Control functions for game page
 async function startGame(): Promise<void> {
     if (pongGame) {
         await pongGame.init();
@@ -419,13 +619,3 @@ async function reconnectWS(): Promise<void> {
         pongGame.reconnectWebSocket();
     }
 }
-
-function switchLang(): void {
-    // Language switching not implemented yet
-}
-
-// Make functions globally accessible for HTML onclick attributes
-(window as any).startGame = startGame;
-(window as any).stopGame = stopGame;
-(window as any).reconnectWS = reconnectWS;
-(window as any).switchLang = switchLang;
