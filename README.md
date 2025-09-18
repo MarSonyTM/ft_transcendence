@@ -160,7 +160,7 @@ Web interface built with Vite, TypeScript, and Tailwind CSS.
 
 **WARNING!!**
 
-This application is incomplete and needs fixing, however if you want to test it, youll need to install some packages. I have created a bash script to help solve this issue. Its creates a venv in the '~' dir, aptly named "fuckpy". Running the script creates said venv and installs the necessary packages (i.e httpx, websocket etc")
+This application is incomplete and needs fixing, however if you want to test it, you'll need to install some packages. I have created a bash script to help solve this issue. It creates a venv in the '~' dir, aptly named "fuckpy". Running the script creates said venv and installs the necessary packages (i.e httpx, websocket etc")
 
 
 To use PongCLI:
