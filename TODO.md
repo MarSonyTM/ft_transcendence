@@ -15,19 +15,36 @@
 - [x] Canvas rendering with proper paddle movement
 
 ## 🚧 In Progress
-- [ ] Tournament system implementation
-- [ ] Basic matchmaking system
-- [ ] Player alias registration for tournaments
+- [ ] Tournament system implementation (MVP)
+  - [ ] Data model: tournaments, participants (aliases), matches, rounds
+  - [ ] Endpoints: create tournament, register alias, generate bracket
+  - [ ] Endpoints: get next match, report result, advance round
+  - [ ] UI: alias entry form, bracket view, "Next match" announcement
+  - [ ] Matchmaking logic: fair seeding and deterministic progression
+- [ ] Basic matchmaking system (covered by Tournament MVP)
+- [ ] Player alias registration for tournaments (covered by Tournament MVP)
 
 ## ❌ Required (Mandatory Part)
 
 ### Technical Requirements
 - [ ] Single-page application (SPA) implementation
+  - [ ] Back/Forward navigation works within app
+  - [ ] 404 handling and fallback route
 - [ ] Firefox compatibility verification
+  - [ ] Canvas render, keyboard input, WebSocket work on latest stable Firefox
+  - [ ] No console errors/warnings in gameplay flow
 - [ ] Error handling and validation
+  - [ ] Centralized error handler (server)
+  - [ ] User-friendly error UI (client)
+  - [ ] Fastify JSON schemas for all routes (validation)
+  - [ ] Parameterized DB access to prevent SQLi
+  - [ ] Output encoding/sanitization to prevent XSS
 - [X] HTTPS setup for all connections (including WebSocket)
+  - [ ] Nginx TLS in production (self-signed or mkcert for local)
+  - [ ] Frontend uses https and wss in production
+  - [ ] README documents certificate setup and trust instructions
 
-### Game Features
+### Game Features @lbaumeis
 - [ ] Complete tournament system
   - [ ] Player registration with aliases
   - [ ] Tournament matchmaking
@@ -36,7 +53,7 @@
 - [x] Equal paddle speeds for all players
 - [ ] Original Pong (1972) look and feel verification
 
-### Security
+### Security - @mafurnic
 - [ ] Password hashing implementation
 - [ ] SQL injection protection
 - [ ] XSS attack protection
@@ -92,6 +109,9 @@
 
 ### Server-Side Features
 - [x] Server-side Pong + API - Major
+  - [ ] Document existing API endpoints in README
+  - [ ] Confirm all gameplay flows are available via API
+  - [ ] Stabilize response contracts used by frontend
 - [ ] CLI Gaming Support - Major
 
 ## Next Steps
@@ -102,10 +122,22 @@
 5. Test thoroughly on Firefox
 
 ## Team Task Distribution
-- Create issues for each major task
-- Assign team members to specific modules
+
+### Current Assignments
+Format: [Task] - @username - Status - Branch
+
+#### In Progress
+- None yet
+
+#### Available Tasks
+- All tasks from above sections are available for assignment
+
+### Task Management Rules
+- Add your name to a task before starting work
+- Create a GitHub issue for tracking
+- Create feature branch following naming convention
 - Regular progress updates via PRs
-- Code review requirements per branch protection rules
+- Code review required for all PRs
 
 Remember:
 - Mandatory part must be perfect before bonus evaluation
