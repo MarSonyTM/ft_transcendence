@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from 'fs';
 
 async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
   
-  // Path to the built frontend files
+  // Path to the built frontend files from Vite
   const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
   const indexPath = path.join(frontendDistPath, 'index.html');
 
@@ -20,7 +20,9 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
   fastify.get('/favicon.ico', async (request, reply) => {
     const faviconPath = path.join(frontendDistPath, 'favicon.ico');
     if (existsSync(faviconPath)) {
-      return reply.sendFile('favicon.ico', frontendDistPath);
+      const favicon = readFileSync(faviconPath);
+      reply.type('image/x-icon');
+      return reply.send(favicon);
     } else {
       reply.code(404);
       return { error: 'Favicon not found' };
@@ -55,7 +57,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
     );
   }
 
-  // Generic function to serve HTML with game state injection
+  // Serve HTML with game state injection
   async function servePageWithGameState(
     request: any, 
     reply: any, 
@@ -98,10 +100,10 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
               scorePlayer1: dbGameState.scorePlayer1 || 0,
               scorePlayer2: dbGameState.scorePlayer2 || 0
             };
-            fastify.log.info(`Loaded game state for game ${gameId}:`, gameState);
+            fastify.log.info(`Loaded game state for game ${gameId}: ${JSON.stringify(gameState)}`);
           }
         } catch (error) {
-          fastify.log.warn(`Failed to load game state for game ${gameId}:`, error);
+          fastify.log.warn(`Failed to load game state for game ${gameId}: ${error}`);
         }
       }
 
@@ -124,7 +126,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
       return reply.send(htmlWithGameData);
       
     } catch (error) {
-      fastify.log.error(`SSR Error for ${pageType}:`, error);
+      fastify.log.error(`SSR Error for ${pageType}: ${error}`);
       reply.code(500);
       return {
         error: 'Server-side rendering failed',
@@ -150,7 +152,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
     );
   });
 
-  // Game-specific SSR route - preserves your existing game state logic
+  // Game-specific SSR route
   fastify.get('/game/:gameId?', async (request, reply) => {
     const params = request.params as { gameId?: string };
     const query = request.query as { username?: string };
@@ -167,7 +169,6 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
   });
 
   // Catch-all route for SPA client-side routing
-  // This handles any routes that your colleague's SPA might navigate to
   fastify.setNotFoundHandler(async (request, reply) => {
     // Only handle HTML requests, not API or WebSocket requests
     const acceptsHtml = request.headers.accept?.includes('text/html');

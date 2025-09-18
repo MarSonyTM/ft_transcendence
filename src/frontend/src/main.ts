@@ -374,7 +374,6 @@ class PongGame {
     updatePlayerInfo(): void {
         const player1Name = document.getElementById('player1Name');
         const player2Name = document.getElementById('player2Name');
-        // Use SSR injected username if available
         const username = window.__USERNAME__ || currentUsername || "Player 1";
         if (player1Name) player1Name.textContent = username;
         if (player2Name) player2Name.textContent = "Marvin";
@@ -452,8 +451,6 @@ if (window.__INITIAL_STATE__) {
     console.log('👤 SSR: Username:', currentUsername);
 }
 
-// ... (keep all your colleague's existing SPA rendering functions)
-
 function renderLandingPage() {
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -476,14 +473,14 @@ function renderLandingPage() {
     const registerBtn = document.getElementById('registerBtn');
     if (registerBtn) {
         registerBtn.addEventListener('click', () => {
-            // Placeholder: No registration logic, just a button
+            // TODO: add registration function
             alert('Registration coming soon!');
         });
     }
     const quickPlayBtn = document.getElementById('quickPlayBtn');
     if (quickPlayBtn) {
         quickPlayBtn.addEventListener('click', () => {
-            currentUsername = 'Never lucky';
+            currentUsername = 'You';
             history.pushState({ page: 'game' }, '', '#game');
             currentPage = 'game';
             renderApp();
@@ -492,7 +489,7 @@ function renderLandingPage() {
 }
 
 async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-    //(replace with real API call in future)
+    // TODO: Add backend logic to log user in
     await new Promise((resolve) => setTimeout(resolve, 500));
     // Accept any username/password for now
     if (username) {
@@ -571,9 +568,9 @@ function renderGamePage() {
         </div>
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> 
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> // TODO: currentUsername will be 1st PLayer
                 <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">Player 2</span>
+                <span id="player2Name" class="player2-name">Player 2</span> // TODO: PLayer2 is AI or matched player
             </div>
             <div class="score-container">
                 <span id="leftScore" class="left-score">0</span> 
@@ -587,7 +584,7 @@ function renderGamePage() {
             <p>Player 2 - Up/Down O/L</p>
         </div>
     `;
-    // Attach button handlers
+    // Button handlers
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
@@ -640,14 +637,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Log SSR data if available
     if (window.__INITIAL_STATE__) {
-        console.log('📡 SSR data available:', window.__INITIAL_STATE__);
-        
+
         // Initialize from SSR data
         currentPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
         currentUsername = window.__USERNAME__ || '';
         
-        console.log(`🎯 Starting on page: ${currentPage}`);
-        console.log(`👤 Username: ${currentUsername}`);
     } else {
         // Fallback to URL-based routing if no SSR data
         console.log('⚠️ No SSR data found, using URL-based routing');
