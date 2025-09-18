@@ -26,7 +26,8 @@ COPY tsconfig.json ./
 # Copy source code
 COPY src/ ./src/
 
-# Create directory for SQLite database with proper permissions
+# Create directories for frontend build files and database
+RUN mkdir -p /app/frontend/dist && chmod 777 /app/frontend/dist
 RUN mkdir -p /app/database && chmod 777 /app/database
 
 # Expose port

@@ -39,13 +39,7 @@ const start = async (): Promise<void> => {
       ],
       credentials: true
     });
-
-    // Register static file serving for assets (favicon, etc.)
-    await server.register(require('@fastify/static'), {
-      root: path.join(__dirname, '../public'),
-      prefix: '/public/'
-    });
-
+    
     // Register WebSocket support first
     await webSocketRoutes(server);
 

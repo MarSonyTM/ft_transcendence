@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
   
   // Path to the built frontend files from Vite
-  const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+  const frontendDistPath = path.resolve('/app/frontend/dist');
   const indexPath = path.join(frontendDistPath, 'index.html');
 
   // Register static asset serving for Vite build output
@@ -169,6 +169,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
   });
 
   // Catch-all route for SPA client-side routing
+
   fastify.setNotFoundHandler(async (request, reply) => {
     // Only handle HTML requests, not API or WebSocket requests
     const acceptsHtml = request.headers.accept?.includes('text/html');

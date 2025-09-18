@@ -9,8 +9,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "type-check": "tsc --noEmit",
-    "build:ssr": "tsc && npm run copy-assets",
-    "copy-assets": "mkdir -p dist/public && cp -r public/* dist/public/ 2>/dev/null || true"
+    "build:ssr": "tsc && npm run copy-assets"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
