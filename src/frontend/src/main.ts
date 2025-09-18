@@ -207,7 +207,7 @@ class PongGame {
             throw error;
         }
     }
-
+// TODO: start here
     startRenderLoop(): void {
         const renderFrame = () => {
             this.updateFPS();
@@ -223,7 +223,7 @@ class PongGame {
         if (!this.isActive) return;
         
         let newPosition = this.paddlePosition;
-        const paddleSpeed = 4;
+        const paddleSpeed = 4;//TODO: put into database because it will always have to be const?
         
         if (this.keys['KeyW'] && this.paddlePosition > 0) {
             newPosition = Math.max(0, this.paddlePosition - paddleSpeed);
