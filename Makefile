@@ -2,7 +2,7 @@ all: up
 
 setup:
 	@echo "Setting up project..."
-	@mkdir -p database
+	@mkdir -p src/database
 
 # Production commands (nginx)
 up: 
