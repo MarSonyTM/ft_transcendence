@@ -4,7 +4,8 @@ import userRoutes from './routes/users';
 import gameRoutes from './routes/game';
 import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
-import webSocketRoutes  from './websocket/websocketHandler';
+import ssrRoutes from './routes/ssr';
+import webSocketRoutes from './websocket/websocketHandler';
 import { database } from './database';
 
 const PORT = 3000;
@@ -33,14 +34,22 @@ const start = async (): Promise<void> => {
         'http://localhost:8080',
         'http://frontend:8080',
         'http://localhost:3000',
+        'http://localhost:5173', // Vite dev server
         /^http:\/\/localhost:\d+$/
       ],
       credentials: true
     });
 
+    // Register static file serving for assets (favicon, etc.)
+    await server.register(require('@fastify/static'), {
+      root: path.join(__dirname, '../public'),
+      prefix: '/public/'
+    });
 
-    // Register API routes
+    // Register WebSocket support first
     await webSocketRoutes(server);
+
+    // Register API routes (these must come before SSR routes)
     await server.register(userRoutes, { prefix: '/api/users' });
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
@@ -51,8 +60,9 @@ const start = async (): Promise<void> => {
       // Basic API info route
       fastify.get('/api', async (request: FastifyRequest, reply: FastifyReply) => {
         return {
-          message: 'Transcendence API',
-          version: '0.0.2',
+          message: 'Transcendence API with SSR',
+          version: '0.0.3',
+          features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
           endpoints: {
             users: '/api/users',
             userById: '/api/users/:id',
@@ -69,15 +79,13 @@ const start = async (): Promise<void> => {
             ping: '/api/ping',
             health: '/health',
             webSocket: '/game/:gameid/ws'
+          },
+          pages: {
+            landing: '/',
+            login: '/login',
+            game: '/game',
+            gameWithId: '/game/:gameId'
           }
-        };
-      });
-
-      fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
-        return { 
-          server: "active",
-          websocket: "enabled",
-          message: "ft_transcendence WebSocket Server"
         };
       });
 
@@ -89,6 +97,7 @@ const start = async (): Promise<void> => {
             timestamp: new Date().toISOString(),
             database: 'sqlite connected',
             websocket: 'enabled',
+            ssr: 'enabled',
             database_path: process.env.DATABASE_PATH || '/app/database/database.db'
           };
         } catch (error) {
@@ -107,11 +116,15 @@ const start = async (): Promise<void> => {
       });
     });
 
+    // Register SSR routes
+    await server.register(ssrRoutes);
+
     // Start listening
     await server.listen({ port: PORT, host: HOST });
-    console.log(`🚀 Backend server with WebSocket listening on http://${HOST}:${PORT}`);
+    console.log(`🚀 Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
     console.log(`🔌 WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
     console.log(`📊 Health check available at http://${HOST}:${PORT}/health`);
+    console.log(`📡 API docs available at http://${HOST}:${PORT}/api`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);

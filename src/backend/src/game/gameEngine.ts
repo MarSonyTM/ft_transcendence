@@ -277,11 +277,6 @@ export class GameEngine {
             this.updateDatabaseState();
         }
 
-        // Debug info every 60 frames
-        if (this.frameCount % 60 === 0 && DEBUG) {
-            // Could add debug info here if needed
-        }
-
         // Continue loop at 60 FPS
         this.gameTimer = setTimeout(this.gameLoop, 16);
     }
