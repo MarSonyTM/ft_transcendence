@@ -44,7 +44,7 @@
   - [ ] Frontend uses https and wss in production
   - [ ] README documents certificate setup and trust instructions
 
-### Game Features
+### Game Features @lbaumeis
 - [ ] Complete tournament system
   - [ ] Player registration with aliases (per tournament)
   - [ ] Tournament matchmaking / bracket generation
