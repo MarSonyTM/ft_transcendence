@@ -62,7 +62,8 @@ class PongGame {
     keys: { [key: string]: boolean } = {};
     playerId: number = 1;
     player2Id: number = 2;
-    paddlePosition: number = 80;
+    paddlePositionLeft: number = 80;
+    paddlePositionRight: number = 80;
     
     constructor() {
         this.setupKeyboardControls();
@@ -268,27 +269,43 @@ class PongGame {
     handleInput(): void {
         if (!this.isActive) return;
         
-        let newPosition = this.paddlePosition;
+        // Left paddle (W/S)
+        let newLeft = this.paddlePositionLeft;
         const paddleSpeed = 4;
         
-        if (this.keys['KeyW'] && this.paddlePosition > 0) {
-            newPosition = Math.max(0, this.paddlePosition - paddleSpeed);
+        if (this.keys['KeyW'] && this.paddlePositionLeft > 0) {
+            newLeft = Math.max(0, this.paddlePositionLeft - paddleSpeed);
         }
-        if (this.keys['KeyS'] && this.paddlePosition < 160) {
-            newPosition = Math.min(160, this.paddlePosition + paddleSpeed);
-        }        
-        
-        if (newPosition !== this.paddlePosition) {
-            this.paddlePosition = newPosition;
-            this.sendPlayerMove(newPosition);
+        if (this.keys['KeyS'] && this.paddlePositionLeft < 160) {
+            newLeft = Math.min(160, this.paddlePositionLeft + paddleSpeed);
+        }
+
+        if (newLeft !== this.paddlePositionLeft) {
+            this.paddlePositionLeft = newLeft;
+            this.sendPlayerMove(newLeft, 1);
+        }
+
+        // Right paddle (O/L)
+        let newRight = this.paddlePositionRight;
+        if (this.keys['KeyO'] && this.paddlePositionRight > 0) {
+            newRight = Math.max(0, this.paddlePositionRight - paddleSpeed);
+        }
+        if (this.keys['KeyL'] && this.paddlePositionRight < 160) {
+            newRight = Math.min(160, this.paddlePositionRight + paddleSpeed);
+        }
+
+        if (newRight !== this.paddlePositionRight) {
+            this.paddlePositionRight = newRight;
+            this.sendPlayerMove(newRight, 2);
         }
     }
 
-    sendPlayerMove(position: number): void {
+    sendPlayerMove(position: number, playerId: number): void {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
-                position: position
+                position: position,
+                playerId: playerId
             }));
         }
     }
@@ -318,11 +335,11 @@ class PongGame {
         this.ctx.fillStyle = "grey";
         
         // Left paddle (player 1)
-        const leftPaddleY = this.playerId === 1 ? this.paddlePosition : player1Pos;
+        const leftPaddleY = this.playerId === 1 ? this.paddlePositionLeft : player1Pos;
         this.ctx.fillRect(0, leftPaddleY, 10, 40);
         
         // Right paddle (player 2)
-        const rightPaddleY = this.playerId === 2 ? this.paddlePosition : player2Pos;
+        const rightPaddleY = this.playerId === 2 ? this.paddlePositionRight : player2Pos;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
         // Draw ball
