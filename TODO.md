@@ -41,7 +41,7 @@
   - [ ] Output encoding/sanitization to prevent XSS
 - [X] HTTPS setup for all connections (including WebSocket)
   - [ ] Nginx TLS in production (self-signed or mkcert for local)
-  - [ ] Frontend uses https and wss in production
+  - [X] Frontend uses https and wss in production
   - [ ] README documents certificate setup and trust instructions
 
 ### Game Features @lbaumeis
@@ -78,7 +78,7 @@
   - [ ] Match history
 - [ ] OAuth Authentication - Major
 
-### Gameplay & UX
+### Gameplay & UX - @mgeiger-
 - [ ] Remote Players - Major
 - [ ] Multiple Players (3+ players) - Major
 - [ ] Additional Game - Major
@@ -105,7 +105,7 @@
 - [ ] Browser Compatibility - Minor
 - [ ] Multi-language Support - Minor
 - [ ] Accessibility Features - Minor
-- [ ] SSR Integration - Minor
+- [X] SSR Integration - Minor
 
 ### Server-Side Features
 - [x] Server-side Pong + API - Major
