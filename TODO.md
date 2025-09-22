@@ -89,7 +89,7 @@
 - [ ] AI Opponent - Major
 - [ ] Stats Dashboard - Minor
 
-### Security
+### Security - @bmahdi
 - [ ] WAF/ModSecurity + HashiCorp Vault - Major
 - [ ] GDPR Compliance - Minor
 - [ ] 2FA & JWT - Major
