@@ -38,3 +38,7 @@ src/frontend/node_modules/
 *.db-shm
 *.db-wal
 /package-lock.json
+
+# SQLite database files
+*.db
+src/backend/database/transcendence.db
