@@ -33,3 +33,8 @@ Thumbs.db
 # Backend and Frontend node_modules
 src/backend/node_modules/
 src/frontend/node_modules/
+
+# Database
+*.db-shm
+*.db-wal
+/package-lock.json
