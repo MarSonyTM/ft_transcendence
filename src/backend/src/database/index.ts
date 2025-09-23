@@ -567,18 +567,27 @@ export class DatabaseManager extends BaseDatabaseManager {
         gameId INTEGER NOT NULL,
         player1Id INTEGER NOT NULL,
         player2Id INTEGER NOT NULL,
+        player3Id INTEGER NOT NULL,
+        player4Id INTEGER NOT NULL,
         ballPosX INTEGER NOT NULL DEFAULT 0,
         ballPosY INTEGER NOT NULL DEFAULT 0,
         ballVelX INTEGER NOT NULL DEFAULT 0,
         ballVelY INTEGER NOT NULL DEFAULT 0,
         player1Pos INTEGER NOT NULL DEFAULT 0,
         player2Pos INTEGER NOT NULL DEFAULT 0,
+        player3Pos INTEGER NOT NULL DEFAULT 0,
+        player4Pos INTEGER NOT NULL DEFAULT 0,
         scorePlayer1 INTEGER NOT NULL DEFAULT 0,
         scorePlayer2 INTEGER NOT NULL DEFAULT 0,
+        scorePlayer3 INTEGER NOT NULL DEFAULT 0,
+        scorePlayer4 INTEGER NOT NULL DEFAULT 0,
+        gameMode TEXT NOT NULL DEFAULT '1v1',
         lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
         FOREIGN KEY (player1Id) REFERENCES users(id),
-        FOREIGN KEY (player2Id) REFERENCES users(id)
+        FOREIGN KEY (player2Id) REFERENCES users(id),
+        FOREIGN KEY (player3Id) REFERENCES users(id),
+        FOREIGN KEY (player4Id) REFERENCES users(id)
       )
     `;
     

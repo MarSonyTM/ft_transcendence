@@ -26,8 +26,13 @@ interface GameState {
     ballPosY: number;
     player1Pos: number;
     player2Pos: number;
+    player3Pos: number;
+    player4Pos: number;
     scorePlayer1: number;
     scorePlayer2: number;
+    scorePlayer3: number;
+    scorePlayer4: number;
+    gameMode: string;
 }
 
 interface WebSocketMessage {
@@ -37,6 +42,8 @@ interface WebSocketMessage {
     state?: GameState;
     scorePlayer1?: number;
     scorePlayer2?: number;
+    scorePlayer3?: number;
+    scorePlayer4?: number;
     message?: string;
     winner?: number;
 }
@@ -55,13 +62,21 @@ class PongGame {
         ballPosY: 100,
         player1Pos: 80,
         player2Pos: 80,
+        player3Pos: 80,
+        player4Pos: 80,
         scorePlayer1: 0,
-        scorePlayer2: 0
+        scorePlayer2: 0,
+        scorePlayer3: 0,
+        scorePlayer4: 0,
+        gameMode: "",
+
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
     playerId: number = 1;
     player2Id: number = 2;
+    player3Id: number = 3;
+    player4Id: number = 4;
     paddlePosition: number = 80;
     
     constructor() {
@@ -196,7 +211,12 @@ class PongGame {
                         player1Pos: message.state.player1Pos || this.gameState.player1Pos,
                         player2Pos: message.state.player2Pos || this.gameState.player2Pos,
                         scorePlayer1: message.state.scorePlayer1 || 0,
-                        scorePlayer2: message.state.scorePlayer2 || 0
+                        scorePlayer2: message.state.scorePlayer2 || 0,
+                        scorePlayer3: message.state.scorePlayer3 || 0,
+                        scorePlayer4: message.state.scorePlayer4 || 0,
+                        player3Pos: message.state.player3Pos || this.gameState.player3Pos,
+                        player4Pos: message.state.player4Pos || this.gameState.player4Pos,
+                        gameMode: message.state.gameMode || this.gameState.gameMode
                     };
                     
                     this.updateScoreDisplay();
@@ -437,12 +457,15 @@ class PongGame {
 }
 
 // SPA State
-type AppPage = 'landing' | 'login' | 'game';
+type AppPage = 'landing' | 'login' | 'game' | 'gameSelect';
 
 // Initialize from SSR if available, otherwise use defaults
 let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
 let pongGame: PongGame | null = null;
 let currentUsername: string = window.__USERNAME__ || '';
+
+// Add a global variable to store the current game mode
+let currentGameMode: string = '1v1'; // Add this line after line 465
 
 // Log SSR initialization
 if (window.__INITIAL_STATE__) {
@@ -459,7 +482,7 @@ function renderLandingPage() {
             <h1 class="main-title" style="font-weight: bold; text-align: center; font-size: 4em;">PING PONG</h1>
             <button id="loginBtn" class="btn btn-login" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Login</button>
             <button id="registerBtn" class="btn btn-register" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Register</button>
-            <button id="quickPlayBtn" class="btn btn-quickplay" style="font-weight: bold; margin: 8px 0; font-size: 2em; background: #4ade80; color: #222;">Quick Play</button>
+            <button id="playBtn" class="btn btn-play" style="font-weight: bold; margin: 8px 0; font-size: 2em; background: #4ade80; color: #222;">Play</button>
         </div>
     `;
     const loginBtn = document.getElementById('loginBtn');
@@ -477,12 +500,57 @@ function renderLandingPage() {
             alert('Registration coming soon!');
         });
     }
-    const quickPlayBtn = document.getElementById('quickPlayBtn');
-    if (quickPlayBtn) {
-        quickPlayBtn.addEventListener('click', () => {
-            currentUsername = 'You';
-            history.pushState({ page: 'game' }, '', '#game');
+    const playBtn = document.getElementById('playBtn');
+    if (playBtn) {
+        playBtn.addEventListener('click', () => {
+            history.pushState({ page: 'gameSelect' }, '', '#gameSelect');
+            currentPage = 'gameSelect';
+            renderApp();
+        });
+    }
+}
+
+function renderGameSelectPage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <div class="game-select-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h2 class="select-title" style="font-weight: bold; text-align: center; font-size: 3em; margin-bottom: 1em;">Choose Game Mode</h2>
+            <div class="game-mode-options" style="display: flex; flex-direction: column; gap: 1em;">
+                <button id="1v1Btn" class="btn btn-game-mode" style="font-weight: bold; padding: 1em 2em; font-size: 2em; background: #4ade80; color: #222; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s;">1v1 Match</button>
+                <button id="4PlayerBtn" class="btn btn-game-mode" style="font-weight: bold; padding: 1em 2em; font-size: 2em; background: #4ade80; color: #222; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s;">4 Player Match</button>
+            </div>
+            <button id="backToLandingBtn" class="btn btn-back" style="margin-top: 2em; font-size: 1.2em; background: #6b7280; color: white; border: none; border-radius: 8px; padding: 0.5em 1.5em; cursor: pointer;">Back</button>
+        </div>
+    `;
+    
+    const oneVsOneBtn = document.getElementById('1v1Btn');
+    if (oneVsOneBtn) {
+        oneVsOneBtn.addEventListener('click', () => {
+            currentUsername = currentUsername || 'Player 1';
+            currentGameMode = '1v1'; // Store the game mode
+            history.pushState({ page: 'game', mode: '1v1' }, '', '#game');
             currentPage = 'game';
+            renderApp();
+        });
+    }
+    
+    const fourPlayerBtn = document.getElementById('4PlayerBtn');
+    if (fourPlayerBtn) {
+        fourPlayerBtn.addEventListener('click', () => {
+            currentUsername = currentUsername || 'Player 1';
+            currentGameMode = '4player'; // Store the game mode
+            history.pushState({ page: 'game', mode: '4player' }, '', '#game');
+            currentPage = 'game';
+            renderApp();
+        });
+    }
+    
+    const backBtn = document.getElementById('backToLandingBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'landing' }, '', '#');
+            currentPage = 'landing';
             renderApp();
         });
     }
@@ -511,7 +579,7 @@ function renderLoginPage() {
                 <button type="submit" class="btn btn-login" style="font-size: 1.2em;">Login</button>
                 <div id="loginError" style="color: red; margin-top: 0.5em;"></div>
             </form>
-            <button id="backToLandingBtn" class="btn btn-home" style="margin-top: 2em; font-size: 1.1em;">Back</button>
+            <button id="backToLandingBtn" class="btn btn-back" style="margin-top: 2em; font-size: 1.2em; background: #6b7280; color: white; border: none; border-radius: 8px; padding: 0.5em 1.5em; cursor: pointer;">Back</button>
         </div>
     `;
     const loginForm = document.getElementById('loginForm') as HTMLFormElement;
@@ -546,6 +614,18 @@ function renderLoginPage() {
 }
 
 function renderGamePage() {
+    if (currentGameMode === "1v1") {
+        renderTwoPlayerGame();
+    } else if (currentGameMode === "4player") { // Fix the case sensitivity
+        renderFourPlayerGame();
+    } else {
+        console.log("Unrecognized game mode:", currentGameMode);
+        // Default to 2-player
+        renderTwoPlayerGame();
+    }
+}
+
+function renderTwoPlayerGame() {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
@@ -568,9 +648,9 @@ function renderGamePage() {
         </div>
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> // TODO: currentUsername will be 1st PLayer
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span>
                 <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">Player 2</span> // TODO: PLayer2 is AI or matched player
+                <span id="player2Name" class="player2-name">Player 2</span>
             </div>
             <div class="score-container">
                 <span id="leftScore" class="left-score">0</span> 
@@ -599,11 +679,75 @@ function renderGamePage() {
     }
 }
 
+function renderFourPlayerGame() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+        <div class="game-status">
+            <div>
+                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+            </div>
+            <div>
+                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            </div>
+            <div>
+                FPS: <span id="fpsCounter" class="fps-text">0</span>
+            </div>
+        </div>
+        <div class="controls-container">
+            <button id="startBtn" class="btn btn-start">Start Game</button>
+            <button id="stopBtn" class="btn btn-stop">Stop Game</button>
+            <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+        </div>
+        <div class="player-info">
+            <div class="player-names">
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span>
+                <span class="vs-text">vs</span> 
+                <span id="player2Name" class="player2-name">Player 2</span>
+                <span class="vs-text">vs</span> 
+                <span id="player3Name" class="player3-name">Player 3</span>
+                <span class="vs-text">vs</span> 
+                <span id="player4Name" class="player4-name">Player 4</span>
+            </div>
+            <div class="score-container">
+                <span id="player1score" class="player1score">0</span> 
+                <span class="score-separator">-</span> 
+                <span id="player2score" class="player2score">0</span>
+                <span class="score-separator">-</span> 
+                <span id="player3score" class="player3score">0</span>
+                <span class="score-separator">-</span> 
+                <span id="player4score" class="player4score">0</span>
+            </div>
+        </div>
+        <canvas id="gameScreen" width="400" height="400"></canvas>
+        <div class="controls-info">
+            <p>Player 1 - Up/Down W/S</p>
+            <p>Player 2 - Up/Down O/L</p>
+        </div>
+    `;
+    // Button handlers
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    if (startBtn) startBtn.addEventListener('click', startGame);
+    if (stopBtn) stopBtn.addEventListener('click', stopGame);
+    if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+
+    // Initialize game logic
+    if (!pongGame) {
+        pongGame = new PongGame();
+        pongGame.init();
+    }
+}
+
 function renderApp() {
     if (currentPage === 'landing') {
         renderLandingPage();
     } else if (currentPage === 'login') {
         renderLoginPage();
+    } else if (currentPage === 'gameSelect') {
+        renderGameSelectPage();
     } else {
         renderGamePage();
     }
@@ -612,16 +756,13 @@ function renderApp() {
 // Handle browser navigation (back/forward)
 window.addEventListener('popstate', (event) => {
     if (location.hash === '#game') {
-        // If navigating back to game, reset state and go to landing
-        pongGame = null;
-        currentUsername = '';
-        currentPage = 'landing';
-        history.replaceState({ page: 'landing' }, '', '#');
+        currentPage = 'game';
         renderApp();
     } else if (location.hash === '#login') {
-        pongGame = null;
-        currentUsername = '';
         currentPage = 'login';
+        renderApp();
+    } else if (location.hash === '#gameSelect') {
+        currentPage = 'gameSelect';
         renderApp();
     } else {
         pongGame = null;
@@ -635,35 +776,23 @@ window.addEventListener('popstate', (event) => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 App starting with SSR support...');
     
-    // Log SSR data if available
     if (window.__INITIAL_STATE__) {
-
-        // Initialize from SSR data
         currentPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
         currentUsername = window.__USERNAME__ || '';
-        
     } else {
-        // Fallback to URL-based routing if no SSR data
         console.log('⚠️ No SSR data found, using URL-based routing');
         
         if (location.hash === '#game') {
-            // If no username, force login and reset state
-            pongGame = null;
-            currentUsername = '';
-            currentPage = 'login';
-            history.replaceState({ page: 'login' }, '', '#login');
+            currentPage = 'game';
         } else if (location.hash === '#login') {
-            pongGame = null;
-            currentUsername = '';
             currentPage = 'login';
+        } else if (location.hash === '#gameSelect') {
+            currentPage = 'gameSelect';
         } else {
-            pongGame = null;
-            currentUsername = '';
             currentPage = 'landing';
         }
     }
     
-    // Render the app
     renderApp();
 });
 

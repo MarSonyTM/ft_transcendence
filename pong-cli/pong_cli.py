@@ -53,7 +53,7 @@ class PongCLI:
         """Create a new game via REST API"""
         try:
             with httpx.Client() as client:
-                response = client.post("http://localhost:3000/api/game/new", 
+                response = client.post("http://0.0.0.0:3000/api/game/new", 
                     json={"mode": "1v1", "difficulty": "normal"})
                 data = response.json()
                 if data["success"]:
@@ -69,7 +69,7 @@ class PongCLI:
         """Start the game on server via REST API"""
         try:
             with httpx.Client() as client:
-                response = client.post(f"http://localhost:3000/api/game/{self.game_id}/start")
+                response = client.post(f"http://0.0.0.0:3000/api/game/{self.game_id}/start")
                 data = response.json()
                 if data["success"]:
                     self.is_active = True
@@ -89,7 +89,7 @@ class PongCLI:
     async def connect_websocket(self):
         """Connect to WebSocket for real-time updates"""
         try:
-            ws_url = f"ws://localhost:3000/game/{self.game_id}/ws"
+            ws_url = f"ws://0.0.0.0:3000/game/{self.game_id}/ws"
             print(f"Connecting to WebSocket: {ws_url}")
             
             async with websockets.connect(ws_url) as websocket:

@@ -3,7 +3,7 @@ import { broadcastToGame, getGameConnectionCount } from "../websocket/websocketH
 
 const DEBUG = false;
 
-// Global Env (linked to canvas settings!)
+// Global constants
 const maxX = 400;
 const minX = 0;
 const maxY = 200;
@@ -19,38 +19,116 @@ interface GameEngineOptions {
     minY?: number;
 }
 
-export class GameEngine {
-    private gameTimer: NodeJS.Timeout | null = null;
-    private frameCount: number = 0;
+// Base abstract class with shared functionality
+export abstract class BaseGameEngine {
+    protected gameTimer: NodeJS.Timeout | null = null;
+    protected frameCount: number = 0;
+    protected gameState: GameState;
     
-    // Game boundaries 
-    private readonly maxX: number = maxX - ballRadius; // 400 - 10
-    private readonly minX: number = minX + ballRadius;   // 0 + 10
-    private readonly maxY: number = maxY - ballRadius;  // 200 - 10
-    private readonly minY: number = minY + ballRadius;   // 0 + 10
+    // Game boundaries
+    protected readonly maxX: number;
+    protected readonly minX: number;
+    protected readonly maxY: number;
+    protected readonly minY: number;
     
-    // Direction for ball movement
-    private xDir: number = 1;
-    private yDir: number = 1;
-
-    // GameState
-    private gameState: GameState;
-
-    // Player score
-    private scorePlayer1 = 0;
-    private scorePlayer2 = 0;
+    // Ball movement
+    protected xDir: number = 1;
+    protected yDir: number = 1;
 
     constructor(gameState: GameState, options?: GameEngineOptions) {
         this.gameState = gameState;
         
-        // Apply custom boundaries if provided
-        if (options) {
-            this.maxX = (options.maxX ?? maxX) - ballRadius;
-            this.minX = (options.minX ?? minX) + ballRadius;
-            this.maxY = (options.maxY ?? maxY) - ballRadius;
-            this.minY = (options.minY ?? minY) + ballRadius;
+        this.maxX = (options?.maxX ?? maxX) - ballRadius;
+        this.minX = (options?.minX ?? minX) + ballRadius;
+        this.maxY = (options?.maxY ?? maxY) - ballRadius;
+        this.minY = (options?.minY ?? minY) + ballRadius;
+        
+        this.initializeGame();
+    }
+
+    // Abstract methods that each game mode must implement
+    abstract initializeGame(): void;
+    abstract updateBallPosition(): number;
+    abstract broadcastGameState(): void;
+    abstract updatePlayerPosition(playerId: number, position: number): void;
+    abstract resetGame(): void;
+
+    // Shared methods
+    protected updateDatabaseState(): void {
+        // Common database update logic
+        try {
+            const updateData = this.getUpdateData();
+            database.gameState.updateGameState(this.gameState.id, updateData);
+        } catch (error) {
+            // DB update failed, but game continues
+        }
+    }
+
+    protected abstract getUpdateData(): any;
+
+    public startGame(): void {
+        this.gameLoop();
+    }
+
+    public stopGame(): void {
+        if (this.gameTimer) {
+            clearTimeout(this.gameTimer);
+            this.gameTimer = null;
+            
+            broadcastToGame(this.gameState.gameId, {
+                type: 'gameStop',
+                gameId: this.gameState.gameId
+            });
+            
+            this.updateDatabaseState();
+        }
+    }
+
+    protected gameLoop = (): void => {
+        const resetSignal = this.updateBallPosition();
+        
+        if (resetSignal === 1) {
+            this.resetBall();
+        }
+        
+        if (this.checkGameEnd()) {
+            this.endGame();
+            return;
+        }
+        
+        this.frameCount++;
+        this.broadcastGameState();
+
+        if (this.frameCount % 30 === 0) {
+            this.updateDatabaseState();
         }
 
+        this.gameTimer = setTimeout(this.gameLoop, 16);
+    }
+
+    protected abstract checkGameEnd(): boolean;
+    protected abstract endGame(): void;
+    protected abstract resetBall(): void;
+
+    public getCurrentState(): GameState {
+        return { ...this.gameState };
+    }
+
+    public getGameId(): number {
+        return this.gameState.gameId;
+    }
+
+    public isRunning(): boolean {
+        return this.gameTimer !== null;
+    }
+}
+
+// 2-Player Game Engine
+export class TwoPlayerGameEngine extends BaseGameEngine {
+    private scorePlayer1 = 0;
+    private scorePlayer2 = 0;
+
+    initializeGame(): void {
         // Initialize ball in center if not set
         if (!this.gameState.ballPosX)
             this.gameState.ballPosX = (this.maxX + this.minX) / 2;
@@ -61,82 +139,15 @@ export class GameEngine {
         if (!this.gameState.player2Pos)
             this.gameState.player2Pos = (this.maxY + this.minY) / 2 - 20;
 
-        // Initialize scores if not already
+        // Initialize scores
         if (!this.gameState.scorePlayer1)
             this.gameState.scorePlayer1 = 0;
         if (!this.gameState.scorePlayer2)
             this.gameState.scorePlayer2 = 0;
     }
 
-    // Get current ball position
-    public getBallX(): number {
-        return this.gameState.ballPosX;
-    }
-
-    public getBallY(): number {
-        return this.gameState.ballPosY;
-    }
-
-    // Get player positions
-    public getPlayer1Position(): number {
-        return this.gameState.player1Pos;
-    }
-
-    public getPlayer2Position(): number {
-        return this.gameState.player2Pos;
-    }
-
-    // Update game state in database
-    private updateDatabaseState(): void {
-        try {
-            const updateData = {
-                ballPosX: this.gameState.ballPosX,
-                ballPosY: this.gameState.ballPosY,
-                ballVelX: this.gameState.ballVelX,
-                ballVelY: this.gameState.ballVelY,
-                player1Pos: this.gameState.player1Pos,
-                player2Pos: this.gameState.player2Pos,
-                scorePlayer1: this.gameState.scorePlayer1,
-                scorePlayer2: this.gameState.scorePlayer2
-            };
-            
-            database.gameState.updateGameState(this.gameState.id, updateData);
-        } catch (error) {
-            // DB update failed, but game continues
-        }
-    }
-
-    // Broadcast game state to all connected clients
-    private broadcastGameState(): void {
-        const gameState = {
-            type: 'gameState',
-            gameId: this.gameState.gameId,
-            state: {
-                ballPosX: this.gameState.ballPosX,
-                ballPosY: this.gameState.ballPosY,
-                ballVelX: this.gameState.ballVelX,
-                ballVelY: this.gameState.ballVelY,
-                player1Pos: this.gameState.player1Pos,
-                player2Pos: this.gameState.player2Pos,
-                scorePlayer1: this.gameState.scorePlayer1,
-                scorePlayer2: this.gameState.scorePlayer2,
-                frameCount: this.frameCount,
-                timestamp: Date.now()
-            }
-        };
-
-        broadcastToGame(this.gameState.gameId, gameState);
-    }
-
-    // Start the game
-    public startGame(): void {
-        this.gameLoop();
-    }
-
-    // Update ball position with physics
-    private updateBallPosition(): number {
-        
-        // Check X boundaries and paddle collisions
+    updateBallPosition(): number {
+        // Your existing 2-player collision detection logic
         // Right paddle collision (Player 2)
         if (this.gameState.ballPosX >= (maxX - paddleWidth - ballRadius) && this.xDir > 0) {
             const rightPaddleTop = this.gameState.player2Pos;
@@ -163,7 +174,7 @@ export class GameEngine {
             }
         }
 
-        // Check Y boundaries and reverse direction
+        // Y boundaries
         if (this.gameState.ballPosY >= this.maxY) {
             this.yDir = -1;
         } else if (this.gameState.ballPosY <= this.minY) {
@@ -175,11 +186,41 @@ export class GameEngine {
         this.gameState.ballPosX += speed * this.xDir;
         this.gameState.ballPosY += speed * this.yDir;
 
-        // Update velocity in gameState
         this.gameState.ballVelX = speed * this.xDir;
         this.gameState.ballVelY = speed * this.yDir;
 
         return 0;
+    }
+
+    broadcastGameState(): void {
+        const gameState = {
+            type: 'gameState',
+            gameId: this.gameState.gameId,
+            state: {
+                ballPosX: this.gameState.ballPosX,
+                ballPosY: this.gameState.ballPosY,
+                ballVelX: this.gameState.ballVelX,
+                ballVelY: this.gameState.ballVelY,
+                player1Pos: this.gameState.player1Pos,
+                player2Pos: this.gameState.player2Pos,
+                scorePlayer1: this.gameState.scorePlayer1,
+                scorePlayer2: this.gameState.scorePlayer2,
+                frameCount: this.frameCount,
+                timestamp: Date.now()
+            }
+        };
+
+        broadcastToGame(this.gameState.gameId, gameState);
+    }
+
+    updatePlayerPosition(playerId: number, position: number): void {
+        const clampedPos = Math.max(0, Math.min(position, (this.maxY + this.minY) - paddleHeight + 20));
+        
+        if (playerId === 1) {
+            this.gameState.player1Pos = clampedPos;
+        } else if (playerId === 2) {
+            this.gameState.player2Pos = clampedPos;
+        }
     }
 
     private updateScoreBoard(player: number): void {
@@ -189,11 +230,8 @@ export class GameEngine {
         } else if (player === 2) {
             this.scorePlayer2 += 1;
             this.gameState.scorePlayer2 = this.scorePlayer2;
-        } else {
-            return;
         }
 
-        // Broadcast score update
         this.broadcastScoreUpdate();
         this.updateDatabaseState();
     }
@@ -210,16 +248,34 @@ export class GameEngine {
         broadcastToGame(this.gameState.gameId, scoreUpdate);
     }
 
-    private resetBall(): void {
-        // Reset ball to center
+    protected checkGameEnd(): boolean {
+        return this.scorePlayer1 >= 3 || this.scorePlayer2 >= 3;
+    }
+
+    protected endGame(): void {
+        const winner = this.scorePlayer1 >= 3 ? 1 : 2;
+        
+        const gameEndMessage = {
+            type: 'gameEnd',
+            gameId: this.gameState.gameId,
+            winner: winner,
+            finalScore: {
+                player1: this.scorePlayer1,
+                player2: this.scorePlayer2
+            },
+            timestamp: Date.now()
+        };
+        broadcastToGame(this.gameState.gameId, gameEndMessage);
+        
+        this.stopGame();
+    }
+
+    protected resetBall(): void {
         this.gameState.ballPosX = (this.maxX + this.minX) / 2;
         this.gameState.ballPosY = (this.maxY + this.minY) / 2;
-        
-        // Reset velocities
         this.gameState.ballVelX = 0;
         this.gameState.ballVelY = 0;
         
-        // Reset direction (random)
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
         
@@ -239,106 +295,7 @@ export class GameEngine {
         }, 1000);
     }
 
-    // Main game loop
-    private gameLoop = (): void => {
-        const resetSignal = this.updateBallPosition();
-        
-        // Check if we need to reset (someone scored)
-        if (resetSignal === 1) {
-            this.resetBall();
-        }
-        
-        if (this.scorePlayer1 >= 3 || this.scorePlayer2 >= 3) {
-            const winner = this.scorePlayer1 >= 3 ? 1 : 2;
-            
-            const gameEndMessage = {
-                type: 'gameEnd',
-                gameId: this.gameState.gameId,
-                winner: winner,
-                finalScore: {
-                    player1: this.scorePlayer1,
-                    player2: this.scorePlayer2
-                },
-                timestamp: Date.now()
-            };
-            broadcastToGame(this.gameState.gameId, gameEndMessage);
-            
-            this.stopGame();
-            return;
-        }
-        
-        this.frameCount++;
-
-        // Broadcast to clients every frame (60 FPS)
-        this.broadcastGameState();
-
-        // Update database (every 30 frames)
-        if (this.frameCount % 30 === 0) {
-            this.updateDatabaseState();
-        }
-
-        // Continue loop at 60 FPS
-        this.gameTimer = setTimeout(this.gameLoop, 16);
-    }
-
-    // Stop the game
-    public stopGame(): void {
-        if (this.gameTimer) {
-            clearTimeout(this.gameTimer);
-            this.gameTimer = null;
-            
-            broadcastToGame(this.gameState.gameId, {
-                type: 'gameStop',
-                gameId: this.gameState.gameId
-            });
-            
-            this.updateDatabaseState();
-        }
-    }
-
-    // Get current game state
-    public getCurrentState(): GameState {
-        return { ...this.gameState };
-    }
-
-    // Update player positions
-    public updatePlayer1Position(newPos: number): void {
-        const paddleHeight = 40;
-        newPos = Math.max(0, Math.min(newPos, (this.maxY + this.minY) - paddleHeight + 20));
-        this.gameState.player1Pos = newPos;
-    }
-
-    public updatePlayer2Position(newPos: number): void {
-        const paddleHeight = 40;
-        newPos = Math.max(0, Math.min(newPos, (this.maxY + this.minY) - paddleHeight + 20));
-        this.gameState.player2Pos = newPos;
-    }
-
-    public updatePlayerScore(score1: number, score2: number): void {
-        this.gameState.scorePlayer1 += score1;
-        this.gameState.scorePlayer2 += score2;
-    }
-
-    public getScore() {
-        return {
-            type: "score",
-            scorePlayer1: this.gameState.scorePlayer1,
-            scorePlayer2: this.gameState.scorePlayer2
-        }
-    }
-
-    // Get game ID
-    public getGameId(): number {
-        return this.gameState.gameId;
-    }
-
-    // Check if game is running
-    public isRunning(): boolean {
-        return this.gameTimer !== null;
-    }
-
-    // Reset game state to initial values
-    public resetGame(): void {
+    resetGame(): void {
         this.gameState.ballPosX = (this.maxX + this.minX) / 2;
         this.gameState.ballPosY = (this.maxY + this.minY) / 2;
         this.gameState.ballVelX = 0;
@@ -352,4 +309,165 @@ export class GameEngine {
         this.updateDatabaseState();
         this.broadcastGameState();
     }
+
+    protected getUpdateData(): any {
+        return {
+            ballPosX: this.gameState.ballPosX,
+            ballPosY: this.gameState.ballPosY,
+            ballVelX: this.gameState.ballVelX,
+            ballVelY: this.gameState.ballVelY,
+            player1Pos: this.gameState.player1Pos,
+            player2Pos: this.gameState.player2Pos,
+            scorePlayer1: this.gameState.scorePlayer1,
+            scorePlayer2: this.gameState.scorePlayer2
+        };
+    }
 }
+
+// 4-Player Game Engine
+export class FourPlayerGameEngine extends BaseGameEngine {
+    private scores: number[] = [0, 0, 0, 0];
+    private playerPositions: number[] = [0, 0, 0, 0];
+
+    initializeGame(): void {
+        // Initialize ball in center
+        this.gameState.ballPosX = (this.maxX + this.minX) / 2;
+        this.gameState.ballPosY = (this.maxY + this.minY) / 2;
+        
+        // Initialize 4 player positions (top, right, bottom, left)
+        this.playerPositions = [
+            (this.maxX + this.minX) / 2 - 20, // Top player
+            (this.maxY + this.minY) / 2 - 20, // Right player  
+            (this.maxX + this.minX) / 2 - 20, // Bottom player
+            (this.maxY + this.minY) / 2 - 20  // Left player
+        ];
+        
+        this.scores = [0, 0, 0, 0];
+    }
+
+    updateBallPosition(): number {
+        // 4-player collision detection logic
+        // You'll need to implement collision with 4 paddles around the perimeter
+        
+        // Top paddle (Player 1)
+        if (this.gameState.ballPosY <= (paddleWidth + ballRadius) && this.yDir < 0) {
+            // Check collision with top paddle
+            // Implementation needed
+        }
+        
+        // Right paddle (Player 2)  
+        if (this.gameState.ballPosX >= (maxX - paddleWidth - ballRadius) && this.xDir > 0) {
+            // Check collision with right paddle
+            // Implementation needed
+        }
+        
+        // Bottom paddle (Player 3)
+        if (this.gameState.ballPosY >= (maxY - paddleWidth - ballRadius) && this.yDir > 0) {
+            // Check collision with bottom paddle
+            // Implementation needed
+        }
+        
+        // Left paddle (Player 4)
+        if (this.gameState.ballPosX <= (paddleWidth + ballRadius) && this.xDir < 0) {
+            // Check collision with left paddle
+            // Implementation needed
+        }
+
+        // Move ball
+        const speed = 3;
+        this.gameState.ballPosX += speed * this.xDir;
+        this.gameState.ballPosY += speed * this.yDir;
+
+        return 0;
+    }
+
+    broadcastGameState(): void {
+        const gameState = {
+            type: 'gameState',
+            gameId: this.gameState.gameId,
+            state: {
+                ballPosX: this.gameState.ballPosX,
+                ballPosY: this.gameState.ballPosY,
+                ballVelX: this.gameState.ballVelX,
+                ballVelY: this.gameState.ballVelY,
+                playerPositions: this.playerPositions,
+                scores: this.scores,
+                frameCount: this.frameCount,
+                timestamp: Date.now()
+            }
+        };
+
+        broadcastToGame(this.gameState.gameId, gameState);
+    }
+
+    updatePlayerPosition(playerId: number, position: number): void {
+        if (playerId >= 1 && playerId <= 4) {
+            this.playerPositions[playerId - 1] = position;
+        }
+    }
+
+    protected checkGameEnd(): boolean {
+        return this.scores.some(score => score >= 3);
+    }
+
+    protected endGame(): void {
+        const winnerIndex = this.scores.findIndex(score => score >= 3);
+        
+        const gameEndMessage = {
+            type: 'gameEnd',
+            gameId: this.gameState.gameId,
+            winner: winnerIndex + 1,
+            finalScores: this.scores,
+            timestamp: Date.now()
+        };
+        broadcastToGame(this.gameState.gameId, gameEndMessage);
+        
+        this.stopGame();
+    }
+
+    protected resetBall(): void {
+        // Reset ball to center
+        this.gameState.ballPosX = (this.maxX + this.minX) / 2;
+        this.gameState.ballPosY = (this.maxY + this.minY) / 2;
+        
+        // Random direction
+        this.xDir = Math.random() > 0.5 ? 1 : -1;
+        this.yDir = Math.random() > 0.5 ? 1 : -1;
+    }
+
+    resetGame(): void {
+        this.initializeGame();
+        this.frameCount = 0;
+        this.updateDatabaseState();
+        this.broadcastGameState();
+    }
+
+    protected getUpdateData(): any {
+        return {
+            ballPosX: this.gameState.ballPosX,
+            ballPosY: this.gameState.ballPosY,
+            ballVelX: this.gameState.ballVelX,
+            ballVelY: this.gameState.ballVelY,
+            // For now, map the 4-player positions to the database fields
+            player1Pos: this.playerPositions[0] || 0,
+            player2Pos: this.playerPositions[1] || 0,
+            scorePlayer1: this.scores[0] || 0,
+            scorePlayer2: this.scores[1] || 0,
+            // TODO: Add player3Pos, player4Pos, scorePlayer3, scorePlayer4 when database is extended
+        };
+    }
+}
+
+// Factory function to create the appropriate game engine
+export function createGameEngine(gameState: GameState, mode: string, options?: GameEngineOptions): BaseGameEngine {
+    switch (mode) {
+        case '1v1':
+            return new TwoPlayerGameEngine(gameState, options);
+        case '4player':
+            return new FourPlayerGameEngine(gameState, options);
+        default:
+            throw new Error(`Unsupported game mode: ${mode}`);
+    }
+}
+
+export const GameEngine = TwoPlayerGameEngine;

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, Game, Player } from '../database/index';
-import { GameEngine } from '../game/gameEngine';
+import { createGameEngine } from '../game/gameEngine';
+import type { BaseGameEngine } from '../game/gameEngine';
 
 // Types
 export interface CreateGameInput {
@@ -9,7 +10,7 @@ export interface CreateGameInput {
 }
 
 // Store active game engines
-const activeGames = new Map<number, GameEngine>();
+const activeGames = new Map<number, BaseGameEngine>();
 
 // Plugin function that registers all game routes
 async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -92,10 +93,11 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Check if game engine is active (live data)
             const gameEngine = activeGames.get(gameId);
             if (gameEngine) {
+                const currentState = gameEngine.getCurrentState();
                 return {
                     success: true,
-                    ballX: gameEngine.getBallX(),
-                    ballY: gameEngine.getBallY(),
+                    ballX: currentState.ballPosX,
+                    ballY: currentState.ballPosY,
                     isLive: true
                 };
             }
@@ -285,7 +287,10 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             // Start game engine
             try {
-                const gameEngine = new GameEngine(gameState);
+                // Get the game mode from the database
+                const gameMode = game.mode || '1v1'; // Default to 1v1 if no mode specified
+                
+                const gameEngine = createGameEngine(gameState, gameMode);
                 activeGames.set(gameId, gameEngine);
                 gameEngine.startGame();
                 
@@ -298,7 +303,8 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return {
                     success: true,
                     message: 'WebSocket game started successfully',
-                    gameId: gameId
+                    gameId: gameId,
+                    mode: gameMode
                 };
             } catch (engineError) {
                 console.error('Failed to start WebSocket game engine:', engineError);
