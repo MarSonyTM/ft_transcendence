@@ -4,10 +4,6 @@ setup:
 	@echo "Setting up project..."
 	@mkdir -p src/database
 
-setup:
-	@echo "Setting up project..."
-	@mkdir -p src/database
-
 # Production commands (nginx)
 up: 
 	@docker compose -f ./src/docker-compose.yml up
