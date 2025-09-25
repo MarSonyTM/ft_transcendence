@@ -39,18 +39,18 @@
   - [ ] Fastify JSON schemas for all routes (validation)
   - [ ] Parameterized DB access to prevent SQLi
   - [ ] Output encoding/sanitization to prevent XSS
-- [ ] HTTPS setup for all connections (including WebSocket)
+- [X] HTTPS setup for all connections (including WebSocket)
   - [ ] Nginx TLS in production (self-signed or mkcert for local)
-  - [ ] Frontend uses https and wss in production
+  - [X] Frontend uses https and wss in production
   - [ ] README documents certificate setup and trust instructions
 
 ### Game Features @lbaumeis
 - [ ] Complete tournament system
-  - [ ] Player registration with aliases (per tournament)
-  - [ ] Tournament matchmaking / bracket generation
-  - [ ] Display of player matchups and progression
-  - [ ] Match order management and next-match announcement
-- [ ] Equal paddle speeds for all players
+  - [ ] Player registration with aliases
+  - [ ] Tournament matchmaking
+  - [ ] Display of player matchups
+  - [ ] Match order management
+- [x] Equal paddle speeds for all players
 - [ ] Original Pong (1972) look and feel verification
 
 ### Security - @mafurnic
@@ -64,9 +64,9 @@
 ## 🎯 Modules to Choose (Need 7 Major)
 
 ### Web (Choose from)
-- [ ] Backend Framework (Fastify + Node.js) - Major
-- [ ] Frontend Framework (Typescript + Tailwind) - Minor
-- [ ] Database (SQLite) - Minor
+- [x] Backend Framework (Fastify + Node.js) - Major
+- [x] Frontend Framework (Typescript + Tailwind) - Minor
+- [x] Database (SQLite) - Minor
 - [ ] Blockchain Score Storage - Major
 
 ### User Management
@@ -78,7 +78,7 @@
   - [ ] Match history
 - [ ] OAuth Authentication - Major
 
-### Gameplay & UX
+### Gameplay & UX - @mgeiger-
 - [ ] Remote Players - Major
 - [ ] Multiple Players (3+ players) - Major
 - [ ] Additional Game - Major
@@ -89,7 +89,7 @@
 - [ ] AI Opponent - Major
 - [ ] Stats Dashboard - Minor
 
-### Security
+### Security - @bmahdi
 - [ ] WAF/ModSecurity + HashiCorp Vault - Major
 - [ ] GDPR Compliance - Minor
 - [ ] 2FA & JWT - Major
@@ -105,10 +105,10 @@
 - [ ] Browser Compatibility - Minor
 - [ ] Multi-language Support - Minor
 - [ ] Accessibility Features - Minor
-- [ ] SSR Integration - Minor
+- [X] SSR Integration - Minor
 
 ### Server-Side Features
-- [ ] Server-side Pong + API - Major (partially implemented)
+- [x] Server-side Pong + API - Major
   - [ ] Document existing API endpoints in README
   - [ ] Confirm all gameplay flows are available via API
   - [ ] Stabilize response contracts used by frontend

@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Layout and base styles */
 body {
@@ -163,7 +165,6 @@ body {
   margin-bottom: 0;
 }
 
-/* Custom button states */
 button:disabled {
   background-color: rgb(75 85 99); /* bg-gray-600 */
   color: rgb(209 213 219); /* text-gray-300 */
@@ -175,7 +176,6 @@ button:not(:disabled):hover {
   transition: transform 150ms;
 }
 
-/* Status classes for dynamic updates */
 .connected {
   color: rgb(74 222 128); /* text-green-400 */
 }

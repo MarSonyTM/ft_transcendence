@@ -1,6 +1,25 @@
 // Import CSS for Vite
 import './styles.css';
 
+declare global {
+  interface Window {
+    __INITIAL_STATE__?: {
+      gameState: any;
+      gameId: number | null;
+      currentUsername: string;
+      currentPage: string;
+      timestamp: number;
+      apiEndpoint: string;
+      wsEndpoint: string;
+      environment: string;
+    };
+    __GAME_STATE__?: any;
+    __GAME_ID__?: number | null;
+    __USERNAME__?: string;
+    __CURRENT_PAGE__?: string;
+  }
+}
+
 // Type definitions
 interface GameState {
     ballPosX: number;
@@ -39,14 +58,27 @@ class PongGame {
         scorePlayer1: 0,
         scorePlayer2: 0
     };
-    heartbeatInterval: NodeJS.Timeout | null = null;
+    heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
     playerId: number = 1;
     player2Id: number = 2;
-    paddlePosition: number = 80;
+    paddlePositionLeft: number = 80;
+    paddlePositionRight: number = 80;
     
     constructor() {
         this.setupKeyboardControls();
+        
+        // Initialize with SSR injected game state if available
+        if (window.__GAME_STATE__) {
+            this.gameState = { ...this.gameState, ...window.__GAME_STATE__ };
+            console.log('🏓 Initialized with SSR game state:', this.gameState);
+        }
+        
+        // Use SSR injected game ID if available
+        if (window.__GAME_ID__) {
+            this.gameId = window.__GAME_ID__;
+            console.log('🎮 Using SSR game ID:', this.gameId);
+        }
     }
 
     async init(): Promise<void> {
@@ -56,7 +88,10 @@ class PongGame {
         this.updateStatus("Initializing...");
         
         try {
-            await this.createGame();
+            // If we don't have a game ID from SSR, create a new game
+            if (!this.gameId) {
+                await this.createGame();
+            }
             
             if (this.gameId) {
                 await this.connectWebSocket();
@@ -70,7 +105,9 @@ class PongGame {
 
     async createGame(): Promise<void> {
         try {
-            const response = await fetch("/api/game/new", {
+            // Use SSR endpoint if available, otherwise default
+            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+            const response = await fetch(`${apiEndpoint}/api/game/new`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -84,6 +121,7 @@ class PongGame {
             const data = await response.json();
             if (data.success && data.data && data.data.id) {
                 this.gameId = data.data.id;
+                console.log('🎮 Created new game:', this.gameId);
             } else {
                 throw new Error(data.message || "Failed to create game");
             }
@@ -94,10 +132,15 @@ class PongGame {
 
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const wsUrl = `ws://localhost:3000/game/${this.gameId}/ws`;
+            // Use SSR WebSocket endpoint if available, otherwise default
+            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || 'ws://localhost:3000';
+            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
+            
+            console.log('🔌 Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
             
             this.websocket.onopen = () => {
+                console.log('✅ WebSocket connected');
                 this.updateWSStatus("Connected", true);
                 this.startHeartbeat();
                 resolve();
@@ -108,23 +151,26 @@ class PongGame {
                     const message = JSON.parse(event.data);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
-                    // Ignore malformed messages
+                    // Do something
                 }
             };
             
             this.websocket.onclose = (event) => {
+                console.log('❌ WebSocket disconnected');
                 this.updateWSStatus("Disconnected", false);
                 this.isActive = false;
                 
                 // Auto-reconnect after 3 seconds
                 setTimeout(() => {
                     if (this.gameId && (!this.websocket || this.websocket.readyState === WebSocket.CLOSED)) {
+                        console.log('🔄 Attempting WebSocket reconnection...');
                         this.connectWebSocket();
                     }
                 }, 3000);
             };
             
             this.websocket.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
                 this.updateWSStatus("Error", false);
                 reject(error);
             };
@@ -187,7 +233,8 @@ class PongGame {
 
     async startServerGame(): Promise<void> {
         try {
-            const response = await fetch(`/api/game/${this.gameId}/start`, {
+            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+            const response = await fetch(`${apiEndpoint}/api/game/${this.gameId}/start`, {
                 method: "POST"
             });
 
@@ -222,27 +269,43 @@ class PongGame {
     handleInput(): void {
         if (!this.isActive) return;
         
-        let newPosition = this.paddlePosition;
-        const paddleSpeed = 4;//TODO: put into database because it will always have to be const?
+        // Left paddle (W/S)
+        let newLeft = this.paddlePositionLeft;
+        const paddleSpeed = 4;
         
-        if (this.keys['KeyW'] && this.paddlePosition > 0) {
-            newPosition = Math.max(0, this.paddlePosition - paddleSpeed);
+        if (this.keys['KeyW'] && this.paddlePositionLeft > 0) {
+            newLeft = Math.max(0, this.paddlePositionLeft - paddleSpeed);
         }
-        if (this.keys['KeyS'] && this.paddlePosition < 160) {
-            newPosition = Math.min(160, this.paddlePosition + paddleSpeed);
-        }        
-        
-        if (newPosition !== this.paddlePosition) {
-            this.paddlePosition = newPosition;
-            this.sendPlayerMove(newPosition);
+        if (this.keys['KeyS'] && this.paddlePositionLeft < 160) {
+            newLeft = Math.min(160, this.paddlePositionLeft + paddleSpeed);
+        }
+
+        if (newLeft !== this.paddlePositionLeft) {
+            this.paddlePositionLeft = newLeft;
+            this.sendPlayerMove(newLeft, 1);
+        }
+
+        // Right paddle (O/L)
+        let newRight = this.paddlePositionRight;
+        if (this.keys['KeyO'] && this.paddlePositionRight > 0) {
+            newRight = Math.max(0, this.paddlePositionRight - paddleSpeed);
+        }
+        if (this.keys['KeyL'] && this.paddlePositionRight < 160) {
+            newRight = Math.min(160, this.paddlePositionRight + paddleSpeed);
+        }
+
+        if (newRight !== this.paddlePositionRight) {
+            this.paddlePositionRight = newRight;
+            this.sendPlayerMove(newRight, 2);
         }
     }
 
-    sendPlayerMove(position: number): void {
+    sendPlayerMove(position: number, playerId: number): void {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
-                position: position
+                position: position,
+                playerId: playerId
             }));
         }
     }
@@ -272,11 +335,11 @@ class PongGame {
         this.ctx.fillStyle = "grey";
         
         // Left paddle (player 1)
-        const leftPaddleY = this.playerId === 1 ? this.paddlePosition : player1Pos;
+        const leftPaddleY = this.playerId === 1 ? this.paddlePositionLeft : player1Pos;
         this.ctx.fillRect(0, leftPaddleY, 10, 40);
         
         // Right paddle (player 2)
-        const rightPaddleY = this.playerId === 2 ? this.paddlePosition : player2Pos;
+        const rightPaddleY = this.playerId === 2 ? this.paddlePositionRight : player2Pos;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
         // Draw ball
@@ -290,7 +353,6 @@ class PongGame {
         this.ctx.fillStyle = "white";
         this.ctx.textAlign = "center";
         this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
-
     }
 
     setupKeyboardControls(): void {
@@ -329,7 +391,8 @@ class PongGame {
     updatePlayerInfo(): void {
         const player1Name = document.getElementById('player1Name');
         const player2Name = document.getElementById('player2Name');
-        if (player1Name) player1Name.textContent = "Michael";
+        const username = window.__USERNAME__ || currentUsername || "Player 1";
+        if (player1Name) player1Name.textContent = username;
         if (player2Name) player2Name.textContent = "Marvin";
     }
 
@@ -341,11 +404,10 @@ class PongGame {
     updateWSStatus(status: string, connected: boolean): void {
         const element = document.getElementById('wsStatus');
         if (element) {
-            element.textContent = status;
             if (connected) {
-                element.className = 'text-green-400';
+                element.className = 'connected';
             } else {
-                element.className = 'text-red-400';
+                element.className = 'disconnected';
             }
         }
     }
@@ -363,7 +425,8 @@ class PongGame {
 
         if (this.gameId) {
             try {
-                await fetch(`/api/game/${this.gameId}/stop`, {
+                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+                await fetch(`${apiEndpoint}/api/game/${this.gameId}/stop`, {
                     method: "POST"
                 });
                 this.updateStatus("Game stopped");
@@ -374,8 +437,10 @@ class PongGame {
 
         const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
         const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
-        if (startBtn) startBtn.disabled = false;
-        if (stopBtn) stopBtn.disabled = true;
+        if (startBtn) 
+            startBtn.disabled = false;
+        if (stopBtn) 
+            stopBtn.disabled = true;
     }
 
     reconnectWebSocket(): void {
@@ -386,22 +451,240 @@ class PongGame {
             this.connectWebSocket();
         }
     }
+}
 
-    switchLang(): void {
-        // TODO: add language switching later
+// SPA State
+type AppPage = 'landing' | 'login' | 'game';
+
+// Initialize from SSR if available, otherwise use defaults
+let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
+let pongGame: PongGame | null = null;
+let currentUsername: string = window.__USERNAME__ || '';
+
+// Log SSR initialization
+if (window.__INITIAL_STATE__) {
+    console.log('🏓 SSR: Initialized with server data:', window.__INITIAL_STATE__);
+    console.log('📄 SSR: Current page:', currentPage);
+    console.log('👤 SSR: Username:', currentUsername);
+}
+
+function renderLandingPage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <div class="landing-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h1 class="main-title" style="font-weight: bold; text-align: center; font-size: 4em;">PING PONG</h1>
+            <button id="loginBtn" class="btn btn-login" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Login</button>
+            <button id="registerBtn" class="btn btn-register" style="font-weight: bold; margin: 8px 0; font-size: 2em;">Register</button>
+            <button id="quickPlayBtn" class="btn btn-quickplay" style="font-weight: bold; margin: 8px 0; font-size: 2em; background: #4ade80; color: #222;">Quick Play</button>
+        </div>
+    `;
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            history.pushState({ page: 'login' }, '', '#login');
+            currentPage = 'login';
+            renderApp();
+        });
+    }
+    const registerBtn = document.getElementById('registerBtn');
+    if (registerBtn) {
+        registerBtn.addEventListener('click', () => {
+            // TODO: add registration function
+            alert('Registration coming soon!');
+        });
+    }
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
+    if (quickPlayBtn) {
+        quickPlayBtn.addEventListener('click', () => {
+            currentUsername = 'You';
+            history.pushState({ page: 'game' }, '', '#game');
+            currentPage = 'game';
+            renderApp();
+        });
     }
 }
 
-// Global game instance
-let pongGame: PongGame | null = null;
+async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
+    // TODO: Add backend logic to log user in
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Accept any username/password for now
+    if (username) {
+        return { success: true, username };
+    } else {
+        return { success: false, error: 'Username required' };
+    }
+}
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', async () => {
-    pongGame = new PongGame();
-    await pongGame.init();
+function renderLoginPage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <div class="login-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h2 style="font-size: 2em; margin-bottom: 1em;">Login</h2>
+            <form id="loginForm" style="display: flex; flex-direction: column; gap: 1em; min-width: 250px;">
+                <input id="usernameInput" type="text" placeholder="Username" required style="padding: 0.5em; font-size: 1.2em;" />
+                <input id="passwordInput" type="password" placeholder="Password" required style="padding: 0.5em; font-size: 1.2em;" />
+                <button type="submit" class="btn btn-login" style="font-size: 1.2em;">Login</button>
+                <div id="loginError" style="color: red; margin-top: 0.5em;"></div>
+            </form>
+            <button id="backToLandingBtn" class="btn btn-home" style="margin-top: 2em; font-size: 1.1em;">Back</button>
+        </div>
+    `;
+    const loginForm = document.getElementById('loginForm') as HTMLFormElement;
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameInput = document.getElementById('usernameInput') as HTMLInputElement;
+            const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
+            const loginError = document.getElementById('loginError');
+            if (loginError) loginError.textContent = '';
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const result = await loginUser(username, password);
+            if (result.success && result.username) {
+                currentUsername = result.username;
+                history.pushState({ page: 'game' }, '', '#game');
+                currentPage = 'game';
+                renderApp();
+            } else if (loginError) {
+                loginError.textContent = result.error || 'Login failed';
+            }
+        });
+    }
+    const backBtn = document.getElementById('backToLandingBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'landing' }, '', '#');
+            currentPage = 'landing';
+            renderApp();
+        });
+    }
+}
+
+function renderGamePage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    root.innerHTML = `
+        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+        <div class="game-status">
+            <div>
+                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+            </div>
+            <div>
+                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            </div>
+            <div>
+                FPS: <span id="fpsCounter" class="fps-text">0</span>
+            </div>
+        </div>
+        <div class="controls-container">
+            <button id="startBtn" class="btn btn-start">Start Game</button>
+            <button id="stopBtn" class="btn btn-stop">Stop Game</button>
+            <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+        </div>
+        <div class="player-info">
+            <div class="player-names">
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> // TODO: currentUsername will be 1st PLayer
+                <span class="vs-text">vs</span> 
+                <span id="player2Name" class="player2-name">Player 2</span> // TODO: PLayer2 is AI or matched player
+            </div>
+            <div class="score-container">
+                <span id="leftScore" class="left-score">0</span> 
+                <span class="score-separator">-</span> 
+                <span id="rightScore" class="right-score">0</span>
+            </div>
+        </div>
+        <canvas id="gameScreen" width="400" height="200"></canvas>
+        <div class="controls-info">
+            <p>Player 1 - Up/Down W/S</p>
+            <p>Player 2 - Up/Down O/L</p>
+        </div>
+    `;
+    // Button handlers
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    if (startBtn) startBtn.addEventListener('click', startGame);
+    if (stopBtn) stopBtn.addEventListener('click', stopGame);
+    if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+
+    // Initialize game logic
+    if (!pongGame) {
+        pongGame = new PongGame();
+        pongGame.init();
+    }
+}
+
+function renderApp() {
+    if (currentPage === 'landing') {
+        renderLandingPage();
+    } else if (currentPage === 'login') {
+        renderLoginPage();
+    } else {
+        renderGamePage();
+    }
+}
+
+// Handle browser navigation (back/forward)
+window.addEventListener('popstate', (event) => {
+    if (location.hash === '#game') {
+        // If navigating back to game, reset state and go to landing
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'landing';
+        history.replaceState({ page: 'landing' }, '', '#');
+        renderApp();
+    } else if (location.hash === '#login') {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'login';
+        renderApp();
+    } else {
+        pongGame = null;
+        currentUsername = '';
+        currentPage = 'landing';
+        renderApp();
+    }
 });
 
-// Control functions
+// Enhanced SPA entry with SSR support
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 App starting with SSR support...');
+    
+    // Log SSR data if available
+    if (window.__INITIAL_STATE__) {
+
+        // Initialize from SSR data
+        currentPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
+        currentUsername = window.__USERNAME__ || '';
+        
+    } else {
+        // Fallback to URL-based routing if no SSR data
+        console.log('⚠️ No SSR data found, using URL-based routing');
+        
+        if (location.hash === '#game') {
+            // If no username, force login and reset state
+            pongGame = null;
+            currentUsername = '';
+            currentPage = 'login';
+            history.replaceState({ page: 'login' }, '', '#login');
+        } else if (location.hash === '#login') {
+            pongGame = null;
+            currentUsername = '';
+            currentPage = 'login';
+        } else {
+            pongGame = null;
+            currentUsername = '';
+            currentPage = 'landing';
+        }
+    }
+    
+    // Render the app
+    renderApp();
+});
+
+// Control functions for game page
 async function startGame(): Promise<void> {
     if (pongGame) {
         await pongGame.init();
@@ -419,13 +702,3 @@ async function reconnectWS(): Promise<void> {
         pongGame.reconnectWebSocket();
     }
 }
-
-function switchLang(): void {
-    // Language switching not implemented yet
-}
-
-// Make functions globally accessible for HTML onclick attributes
-(window as any).startGame = startGame;
-(window as any).stopGame = stopGame;
-(window as any).reconnectWS = reconnectWS;
-(window as any).switchLang = switchLang;

@@ -1,14 +1,15 @@
 {
   "name": "transcendence",
   "version": "1.0.0",
-  "description": "## Team Bloobers?",
-  "main": "index.js",
+  "description": "ft_transcendence with Server-Side Rendering",
+  "main": "dist/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:ssr": "tsc && npm run copy-assets"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

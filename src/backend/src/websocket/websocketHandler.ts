@@ -60,7 +60,8 @@ async function webSocketRoutes(fastify: FastifyInstance) {
                 
               case 'move':
                 if (typeof message.position === 'number') {
-                  handlePlayerMove(gameIdNum, message.position);
+                  const playerId = typeof message.playerId === 'number' ? message.playerId : 1;
+                  handlePlayerMove(gameIdNum, message.position, playerId);
                 }
                 break;
               
@@ -116,10 +117,14 @@ function removeSocketFromGame(gameId: number, socket: any) {
 }
 
 // Handle player movement
-function handlePlayerMove(gameId: number, position: number) {
+function handlePlayerMove(gameId: number, position: number, playerId: number) {
   const gameEngine = activeGames.get(gameId);
   if (gameEngine) {
-    gameEngine.updatePlayer1Position(position);
+    if (playerId === 2) {
+      gameEngine.updatePlayer2Position(position);
+    } else {
+      gameEngine.updatePlayer1Position(position);
+    }
   }
 }
 
