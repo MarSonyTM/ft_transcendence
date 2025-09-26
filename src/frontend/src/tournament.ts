@@ -327,7 +327,9 @@ export async function renderTournament(): Promise<void> {
 	const championAlias = state.championAlias ||
 	(state.championId ? state.players.find((p: SerializedPlayer) => p.id === state.championId)?.alias : null);
 
-	const showMatchAndQueue = state.status !== 'completed';
+	const showMatch = state.status !== 'completed';
+
+	const showQueue = state.queue.length > 0;
 
 	const showWinner = state.status == 'completed';
 
@@ -335,8 +337,8 @@ export async function renderTournament(): Promise<void> {
 		`<p style="margin:.2rem 0;"><strong>Tournament #</strong>${state.id}</p>
 		<p style="margin:.2rem 0;"><strong>Status:</strong> ${state.status}</p>
 		${showWinner ? `<p style="margin:.4rem 0;"><strong>Winner:</strong> ${championAlias}</p>` : ''}
-		${showMatchAndQueue ? `<p style=\"margin:.2rem 0;\"><strong>Current Match:</strong> ${curMatch}</p>` : ''}
-		${showMatchAndQueue ? `<p style=\"margin:.2rem 0;\"><strong>Queue:</strong> ${queueList}</p>` : ''}
+		${showMatch ? `<p style=\"margin:.2rem 0;\"><strong>Current Match:</strong> ${curMatch}</p>` : ''}
+		${showQueue ? `<p style=\"margin:.2rem 0;\"><strong>Queue:</strong> ${queueList}</p>` : ''}
 		${winnerButtons}
 		<details style="margin:.5rem; border-top:1px solid #666; padding:.5rem;">
 			<summary style="cursor:pointer;">Recent Results</summary>

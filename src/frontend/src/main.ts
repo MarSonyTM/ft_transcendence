@@ -1,6 +1,6 @@
 // Import CSS for Vite
 import './styles.css';
-import { toggleTournaments, currentMatchPlayers, registerScoreboardUpdater } from './tournament';
+import { toggleTournaments, currentMatchPlayers } from './tournament';
 
 declare global {
   interface Window {
