@@ -122,7 +122,9 @@ class TournamentManager {
     const winP = this.resolveWinner(winner, [p1, p2]);
     const loseP = winP.id === p1.id ? p2 : p1;
 
-    winP.wins++; loseP.losses++; loseP.eliminated = true;
+    winP.wins++;
+    loseP.losses++;
+    loseP.eliminated = true;
 
     t.matchHistory.push({
       id: matchId,
@@ -133,26 +135,21 @@ class TournamentManager {
       finishedAt: nowISO()
     });
 
-    // Remove both contestants from front (already shifted when match created)
-    // Winner re-enters queue end if tournament not finishing
     t.currentMatch = null;
     const alive = t.players.filter(p => !p.eliminated).map(p => p.id);
     if (alive.length === 1) {
       t.status = 'completed';
       t.championId = alive[0];
-      t.queue = [alive[0]];
+      // t.queue = [alive[0]];
     } else {
       t.queue.push(winP.id);
-      // Remove eliminated IDs from queue
-      t.queue = t.queue.filter(id => alive.includes(id));
+      // t.queue = t.queue.filter(id => alive.includes(id));
       t.currentMatch = this.createNextMatch(t.queue);
       if (!t.currentMatch) {
         t.status = 'completed';
         t.championId = winP.id;
-        t.queue = [winP.id];
-      } else {
-        t.status = 'in_progress';
-      }
+        // t.queue = [winP.id];
+      } else t.status = 'in_progress';
     }
     t.updatedAt = nowISO();
     return this.cloneState(t);
@@ -162,7 +159,6 @@ class TournamentManager {
     this.activeId = null;
   }
 
-  // ===== Internals =====
   private getActiveOrThrow(): TournamentState {
     const t = this.tournaments.find(x => x.id === this.activeId!);
     if (!t) throw new Error('No active tournament.');

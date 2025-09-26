@@ -75,7 +75,6 @@ const start = async (): Promise<void> => {
             tournamentStart: '/api/tournament/start',
             tournamentState: '/api/tournament/state',
             tournamentResult: '/api/tournament/result',
-
             ping: '/api/ping',
             health: '/health',
             webSocket: '/game/:gameid/ws'

@@ -50,7 +50,8 @@ interface SerializedTournamentState {
   queue: string[];
   nextMatches: SerializedNextMatchPreview[];
   matchHistory: SerializedMatchHistoryItem[];
-  champion?: string | null;
+  championId?: number;
+  championAlias?: string | null;
 }
 
 function serializeState(state: TournamentState): SerializedTournamentState {
@@ -105,7 +106,9 @@ function serializeState(state: TournamentState): SerializedTournamentState {
     finishedAt: match.finishedAt
   }));
 
-  const champion = state.championId ? playerMap.get(state.championId)?.alias || null : null;
+  const championAlias = state.championId
+    ? playerMap.get(state.championId)?.alias || null
+    : null;
 
   return {
     id: state.id,
@@ -117,7 +120,8 @@ function serializeState(state: TournamentState): SerializedTournamentState {
     queue: queueAliases,
     nextMatches,
     matchHistory,
-    champion
+    championId: state.championId,
+    championAlias
   };
 }
 
@@ -186,7 +190,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
       : null;
     if (!t) return reply.code(404).send({ success: false, message: 'Not found' });
 
-    // Enrich match history with alias strings
     const playerIndex = new Map(t.players.map(p => [p.id, p.alias]));
     const history = t.matchHistory.map(m => ({
       id: m.id,
