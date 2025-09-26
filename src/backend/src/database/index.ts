@@ -361,14 +361,20 @@ class GameStateDatabaseManager {
 
   createGameState(gameStateData: { gameId: number; player1Id: number; player2Id: number }): GameState {
     const stmt = this.db.prepare(`
-      INSERT INTO gameState (gameId, player1Id, player2Id, ballPosX, ballPosY, ballVelX, ballVelY, player1Pos, player2Pos, scorePlayer1, scorePlayer2) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO gameState (
+        gameId, player1Id, player2Id, player3Id, player4Id,
+        ballPosX, ballPosY, ballVelX, ballVelY, 
+        player1Pos, player2Pos, scorePlayer1, scorePlayer2
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       gameStateData.gameId,
       gameStateData.player1Id,
       gameStateData.player2Id,
+      gameStateData.player1Id,  // Use player1Id as default for player3Id
+      gameStateData.player2Id,  // Use player2Id as default for player4Id
       0, // Default ball X position
       0, // Default ball Y position
       0, // Default ball X velocity
@@ -382,7 +388,7 @@ class GameStateDatabaseManager {
     const newGameState = this.getGameStateById(result.lastInsertRowid as number);
     
     if (!newGameState) {
-      throw new Error('Failed to retrieve created game logic');
+      throw new Error('Failed to retrieve created game state');
     }
     
     return newGameState;

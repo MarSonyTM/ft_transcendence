@@ -17,10 +17,11 @@ declare global {
     __GAME_ID__?: number | null;
     __USERNAME__?: string;
     __CURRENT_PAGE__?: string;
+    game?: PongGame; // For testing 4-player mode
   }
 }
 
-// Type definitions
+// Enhanced Type definitions for 4-player support
 interface GameState {
     ballPosX: number;
     ballPosY: number;
@@ -33,6 +34,11 @@ interface GameState {
     scorePlayer3: number;
     scorePlayer4: number;
     gameMode: string;
+    // 4-player specific fields
+    mode?: string;
+    playerPositions?: number[];
+    scores?: number[];
+    lastContact?: number;
 }
 
 interface WebSocketMessage {
@@ -46,6 +52,11 @@ interface WebSocketMessage {
     scorePlayer4?: number;
     message?: string;
     winner?: number;
+    winnerName?: string;
+    mode?: string;
+    scores?: number[];
+    playerPositions?: number[];
+    finalScores?: number[];
 }
 
 class PongGame {
@@ -69,7 +80,10 @@ class PongGame {
         scorePlayer3: 0,
         scorePlayer4: 0,
         gameMode: "",
-
+        mode: "1v1",
+        playerPositions: [180, 80, 180, 80],
+        scores: [0, 0, 0, 0],
+        lastContact: 0
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
@@ -81,11 +95,13 @@ class PongGame {
     
     constructor() {
         this.setupKeyboardControls();
+
+        this.paddlePosition = 180; // Center position for 400px height
         
         // Initialize with SSR injected game state if available
         if (window.__GAME_STATE__) {
             this.gameState = { ...this.gameState, ...window.__GAME_STATE__ };
-            console.log('🏓 Initialized with SSR game state:', this.gameState);
+            console.log('🔍 Initialized with SSR game state:', this.gameState);
         }
         
         // Use SSR injected game ID if available
@@ -97,7 +113,9 @@ class PongGame {
 
     async init(): Promise<void> {
         this.canvas = document.getElementById("gameScreen") as HTMLCanvasElement;
-        this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+        this.ctx = this.canvas ? this.canvas.getContext("2d") : null;
+        
+        if (!this.canvas || !this.ctx) return;
         
         this.updateStatus("Initializing...");
         
@@ -119,6 +137,10 @@ class PongGame {
 
     async createGame(): Promise<void> {
         try {
+            // Get selected game mode from UI or use the global currentGameMode
+            const modeSelector = document.getElementById('gameModeSelect') as HTMLSelectElement;
+            const selectedMode = modeSelector ? modeSelector.value : currentGameMode;
+            
             // Use SSR endpoint if available, otherwise default
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/new`, {
@@ -127,7 +149,7 @@ class PongGame {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ 
-                    mode: "1v1", 
+                    mode: selectedMode, 
                     difficulty: "normal" 
                 }),
             });
@@ -135,7 +157,7 @@ class PongGame {
             const data = await response.json();
             if (data.success && data.data && data.data.id) {
                 this.gameId = data.data.id;
-                console.log('🎮 Created new game:', this.gameId);
+                console.log(`🎮 Created new ${selectedMode} game:`, this.gameId);
             } else {
                 throw new Error(data.message || "Failed to create game");
             }
@@ -165,7 +187,7 @@ class PongGame {
                     const message = JSON.parse(event.data);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
-                    // Do something
+                    // Handle parsing error
                 }
             };
             
@@ -198,9 +220,11 @@ class PongGame {
         });
     }
 
+    // Enhanced WebSocket message handler for 4-player
     handleWebSocketMessage(message: WebSocketMessage): void {
         switch (message.type) {
             case 'connected':
+                console.log('🔗 WebSocket connection confirmed');
                 break;
                 
             case 'gameState':
@@ -210,44 +234,91 @@ class PongGame {
                         ballPosY: message.state.ballPosY || this.gameState.ballPosY,
                         player1Pos: message.state.player1Pos || this.gameState.player1Pos,
                         player2Pos: message.state.player2Pos || this.gameState.player2Pos,
+                        player3Pos: message.state.player3Pos || this.gameState.player3Pos,
+                        player4Pos: message.state.player4Pos || this.gameState.player4Pos,
                         scorePlayer1: message.state.scorePlayer1 || 0,
                         scorePlayer2: message.state.scorePlayer2 || 0,
                         scorePlayer3: message.state.scorePlayer3 || 0,
                         scorePlayer4: message.state.scorePlayer4 || 0,
-                        player3Pos: message.state.player3Pos || this.gameState.player3Pos,
-                        player4Pos: message.state.player4Pos || this.gameState.player4Pos,
-                        gameMode: message.state.gameMode || this.gameState.gameMode
+                        gameMode: message.state.gameMode || this.gameState.gameMode,
+                        // 4-player specific fields
+                        mode: message.mode || message.state.mode || this.gameState.mode,
+                        playerPositions: message.state.playerPositions || this.gameState.playerPositions,
+                        scores: message.state.scores || this.gameState.scores,
+                        lastContact: message.state.lastContact || this.gameState.lastContact
                     };
                     
                     this.updateScoreDisplay();
                 }
                 break;
                 
+            case 'ballReset':
+                console.log('🏀 Ball reset:', message.message);
+                break;
+                
+            case 'score':
+                if (message.mode === '4player' && message.scores) {
+                    this.gameState.scores = message.scores;
+                    // Map to 2-player compatibility
+                    this.gameState.scorePlayer1 = message.scores[3] || 0; // Left player
+                    this.gameState.scorePlayer2 = message.scores[1] || 0; // Right player
+                    this.gameState.scorePlayer3 = message.scores[0] || 0; // Top player
+                    this.gameState.scorePlayer4 = message.scores[2] || 0; // Bottom player
+                } else {
+                    this.gameState.scorePlayer1 = message.scorePlayer1 || 0;
+                    this.gameState.scorePlayer2 = message.scorePlayer2 || 0;
+                    this.gameState.scorePlayer3 = message.scorePlayer3 || 0;
+                    this.gameState.scorePlayer4 = message.scorePlayer4 || 0;
+                }
+                this.updateScoreDisplay();
+                break;
+                
             case 'gameStop':
                 this.isActive = false;
                 this.updateStatus("Game stopped");
                 break;
-
-            case 'score':
-                this.gameState.scorePlayer1 = message.scorePlayer1 || 0;
-                this.gameState.scorePlayer2 = message.scorePlayer2 || 0;
-                this.updateScoreDisplay();
-                break;
-                
-            case 'ballReset':
-                break;
                 
             case 'gameEnd':
+                if (message.mode === '4player') {
+                    this.updateStatus(`Game Over! ${message.winnerName} wins!`);
+                    console.log(`🏆 4-Player Game Over! Winner: ${message.winnerName}`, message.finalScores);
+                } else {
+                    this.updateStatus(`Game Over! Player ${message.winner} wins!`);
+                    console.log(`🏆 Game Over! Winner: Player ${message.winner}`);
+                }
                 this.isActive = false;
                 break;
+                
+            default:
+                console.log("Unknown WebSocket message:", message);
         }
     }
 
+    // Enhanced score display for 4-player
     updateScoreDisplay(): void {
-        const leftScore = document.getElementById('leftScore');
-        const rightScore = document.getElementById('rightScore');
-        if (leftScore) leftScore.textContent = this.gameState.scorePlayer1.toString();
-        if (rightScore) rightScore.textContent = this.gameState.scorePlayer2.toString();
+        const is4Player = this.gameState.mode === '4player' || currentGameMode === '4player';
+        
+        if (is4Player && this.gameState.scores) {
+            // Update all 4 player scores for 4-player mode
+            const player1Score = document.getElementById("player1score");
+            const player2Score = document.getElementById("player2score");
+            const player3Score = document.getElementById("player3score");
+            const player4Score = document.getElementById("player4score");
+            
+            if (player1Score) player1Score.textContent = this.gameState.scores[3]?.toString() || "0"; // Left
+            if (player2Score) player2Score.textContent = this.gameState.scores[1]?.toString() || "0"; // Right
+            if (player3Score) player3Score.textContent = this.gameState.scores[0]?.toString() || "0"; // Top
+            if (player4Score) player4Score.textContent = this.gameState.scores[2]?.toString() || "0"; // Bottom
+            
+            console.log(`🏆 4P Scores - Top:${this.gameState.scores[0]} Right:${this.gameState.scores[1]} Bottom:${this.gameState.scores[2]} Left:${this.gameState.scores[3]}`);
+        } else {
+            // Standard 2-player score display
+            const player1score = document.getElementById('player1score');
+            const player2score = document.getElementById('player2score');
+            
+            if (player1score) player1score.textContent = this.gameState.scorePlayer1.toString();
+            if (player2score) player2score.textContent = this.gameState.scorePlayer2.toString();
+        }
     }
 
     async startServerGame(): Promise<void> {
@@ -291,39 +362,137 @@ class PongGame {
         let newPosition = this.paddlePosition;
         const paddleSpeed = 4;
         
-        if (this.keys['KeyW'] && this.paddlePosition > 0) {
-            newPosition = Math.max(0, this.paddlePosition - paddleSpeed);
-        }
-        if (this.keys['KeyS'] && this.paddlePosition < 160) {
-            newPosition = Math.min(160, this.paddlePosition + paddleSpeed);
-        }        
+        // Determine if we're in 4-player mode
+        const is4Player = this.gameState.mode === '4player' || currentGameMode === '4player';
         
+        if (is4Player) {
+            // 4-Player mode: You're Player 1 (left paddle) - vertical movement
+            // Canvas is 400x400, so paddle can move from 0 to (400 - paddleHeight)
+            const maxPos = 400 - 40 - 10; // canvas height - paddle height - margin = 350
+            const minPos = 10; // Small margin from top
+            
+            if (this.keys['KeyW'] && newPosition > minPos) {
+                newPosition = Math.max(minPos, newPosition - paddleSpeed);
+            }
+            if (this.keys['KeyS'] && newPosition < maxPos) {
+                newPosition = Math.min(maxPos, newPosition + paddleSpeed);
+            }
+        } else {
+            // 2-Player mode: Canvas is 400x200, paddle moves 0-160
+            if (this.keys['KeyW'] && newPosition > 0) {
+                newPosition = Math.max(0, newPosition - paddleSpeed);
+            }
+            if (this.keys['KeyS'] && newPosition < 160) {
+                newPosition = Math.min(160, newPosition + paddleSpeed);
+            }
+        }
+            
         if (newPosition !== this.paddlePosition) {
             this.paddlePosition = newPosition;
             this.sendPlayerMove(newPosition);
         }
     }
 
+    handle2PlayerInput(currentPosition: number, paddleSpeed: number): void {
+        let newPosition = currentPosition;
+        
+        // Standard 2-player controls (W/S for movement)
+        if (this.keys['KeyW'] && currentPosition > 0) {
+            newPosition = Math.max(0, currentPosition - paddleSpeed);
+        }
+        if (this.keys['KeyS'] && currentPosition < 160) {
+            newPosition = Math.min(160, currentPosition + paddleSpeed);
+        }
+            
+        if (newPosition !== this.paddlePosition) {
+            this.paddlePosition = newPosition;
+            this.sendPlayerMove(newPosition);
+        }
+    }
+
+    handle4PlayerInput(currentPosition: number, paddleSpeed: number): void {
+        let newPosition = currentPosition;
+        
+        if (this.playerId === 1 || this.playerId === 3) {
+            // Top/Bottom players move horizontally with A/D
+            const maxPos = this.canvas ? this.canvas.width - 50 : 350;
+            const minPos = 10;
+            
+            if (this.keys['KeyA'] && currentPosition > minPos) {
+                newPosition = Math.max(minPos, currentPosition - paddleSpeed);
+            }
+            if (this.keys['KeyD'] && currentPosition < maxPos) {
+                newPosition = Math.min(maxPos, currentPosition + paddleSpeed);
+            }
+        } else {
+            // Left/Right players move vertically with W/S  
+            const maxPos = this.canvas ? this.canvas.height - 50 : 150;
+            const minPos = 10;
+            
+            if (this.keys['KeyW'] && currentPosition > minPos) {
+                newPosition = Math.max(minPos, currentPosition - paddleSpeed);
+            }
+            if (this.keys['KeyS'] && currentPosition < maxPos) {
+                newPosition = Math.min(maxPos, currentPosition + paddleSpeed);
+            }
+        }
+            
+        if (newPosition !== this.paddlePosition) {
+            this.paddlePosition = newPosition;
+            this.sendPlayerMove(newPosition);
+        }
+    }
+
+    // Enhanced sendPlayerMove to include player ID
     sendPlayerMove(position: number): void {
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
-                position: position
+                playerId: 1, // Always Player 1
+                position: position,
+                timestamp: Date.now()
             }));
         }
     }
 
+    // Enhanced render method with 4-player support
     render(): void {
         if (!this.ctx || !this.canvas) return;
 
         // Use gameState with fallback values
         const ballPosX = this.gameState.ballPosX || 200;
         const ballPosY = this.gameState.ballPosY || 100;
-        const player1Pos = this.gameState.player1Pos || 80;
-        const player2Pos = this.gameState.player2Pos || 80;
 
         // Clear canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Determine game mode from WebSocket messages or global variable
+        const is4Player = this.gameState.mode === '4player' || currentGameMode === '4player';
+
+        if (is4Player) {
+            this.render4Player(ballPosX, ballPosY);
+        } else {
+            this.render2Player(ballPosX, ballPosY);
+        }
+
+        // Draw ball (same for both modes)
+        this.ctx.beginPath();
+        this.ctx.arc(ballPosX, ballPosY, 10, 0, 2 * Math.PI);
+        this.ctx.fillStyle = "white";
+        this.ctx.fill();
+
+        // Draw game info
+        this.ctx.font = "12px Arial";
+        this.ctx.fillStyle = "white";
+        this.ctx.textAlign = "center";
+        this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
+    }
+
+    render2Player(ballPosX: number, ballPosY: number): void {
+        if (!this.ctx || !this.canvas) return;
+
+        const player1Pos = this.gameState.player1Pos || 80;
+        const player2Pos = this.gameState.player2Pos || 80;
 
         // Draw center line
         this.ctx.strokeStyle = "white";
@@ -337,34 +506,70 @@ class PongGame {
         // Draw paddles
         this.ctx.fillStyle = "grey";
         
-        // Left paddle (player 1)
-        const leftPaddleY = this.playerId === 1 ? this.paddlePosition : player1Pos;
-        this.ctx.fillRect(0, leftPaddleY, 10, 40);
+        // Left paddle (YOU - Player 1) - use your input position
+        this.ctx.fillRect(0, this.paddlePosition, 10, 40);
         
-        // Right paddle (player 2)
-        const rightPaddleY = this.playerId === 2 ? this.paddlePosition : player2Pos;
+        // Right paddle (Player 2) - use server position
+        this.ctx.fillRect(this.canvas.width - 10, player2Pos, 10, 40);
+    }
+
+    render4Player(ballPosX: number, ballPosY: number): void {
+        if (!this.ctx || !this.canvas) return;
+
+        // Get all 4 player positions from gameState
+        const playerPositions = this.gameState.playerPositions || [180, 180, 180, 180]; // Default to center positions
+        
+        this.ctx.fillStyle = "grey";
+
+        // Draw Top paddle (Player 1) - horizontal
+        const topPaddleX = playerPositions[0] || 180;
+        this.ctx.fillRect(topPaddleX, 0, 40, 10);
+
+        // Draw Right paddle (Player 2) - vertical  
+        const rightPaddleY = playerPositions[1] || 180;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
-        // Draw ball
-        this.ctx.beginPath();
-        this.ctx.arc(ballPosX, ballPosY, 10, 0, 2 * Math.PI);
-        this.ctx.fillStyle = "white";
-        this.ctx.fill();
+        // Draw Bottom paddle (Player 3) - horizontal
+        const bottomPaddleX = playerPositions[2] || 180;
+        this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
 
-        // Draw game info
-        this.ctx.font = "12px Arial";
-        this.ctx.fillStyle = "white";
-        this.ctx.textAlign = "center";
-        this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
+        // Draw Left paddle (Player 4 - YOU) - vertical - this is controlled by your input
+        const leftPaddleY = this.paddlePosition; // Use your input position
+        this.ctx.fillRect(0, leftPaddleY, 10, 40);
+
+        // Draw center cross lines for 4-player
+        this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        this.ctx.setLineDash([3, 10]);
+        
+        // Vertical center line
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.canvas.width / 2, 0);
+        this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
+        this.ctx.stroke();
+        
+        // Horizontal center line  
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.canvas.height / 2);
+        this.ctx.lineTo(this.canvas.width, this.canvas.height / 2);
+        this.ctx.stroke();
+        
+        this.ctx.setLineDash([]);
     }
 
     setupKeyboardControls(): void {
-        document.addEventListener('keydown', (event) => {
-            this.keys[event.code] = true;
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
         });
-
-        document.addEventListener('keyup', (event) => {
-            this.keys[event.code] = false;
+        
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            const gameKeys = ['KeyW', 'KeyS'];
+            if (gameKeys.includes(e.code)) {
+                e.preventDefault();
+            }
         });
     }
 
@@ -464,12 +669,12 @@ let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
 let pongGame: PongGame | null = null;
 let currentUsername: string = window.__USERNAME__ || '';
 
-// Add a global variable to store the current game mode
-let currentGameMode: string = '1v1'; // Add this line after line 465
+// Global variable to store the current game mode
+let currentGameMode: string = '1v1';
 
 // Log SSR initialization
 if (window.__INITIAL_STATE__) {
-    console.log('🏓 SSR: Initialized with server data:', window.__INITIAL_STATE__);
+    console.log('🔍 SSR: Initialized with server data:', window.__INITIAL_STATE__);
     console.log('📄 SSR: Current page:', currentPage);
     console.log('👤 SSR: Username:', currentUsername);
 }
@@ -528,7 +733,7 @@ function renderGameSelectPage() {
     if (oneVsOneBtn) {
         oneVsOneBtn.addEventListener('click', () => {
             currentUsername = currentUsername || 'Player 1';
-            currentGameMode = '1v1'; // Store the game mode
+            currentGameMode = '1v1';
             history.pushState({ page: 'game', mode: '1v1' }, '', '#game');
             currentPage = 'game';
             renderApp();
@@ -539,7 +744,7 @@ function renderGameSelectPage() {
     if (fourPlayerBtn) {
         fourPlayerBtn.addEventListener('click', () => {
             currentUsername = currentUsername || 'Player 1';
-            currentGameMode = '4player'; // Store the game mode
+            currentGameMode = '4player';
             history.pushState({ page: 'game', mode: '4player' }, '', '#game');
             currentPage = 'game';
             renderApp();
@@ -616,7 +821,7 @@ function renderLoginPage() {
 function renderGamePage() {
     if (currentGameMode === "1v1") {
         renderTwoPlayerGame();
-    } else if (currentGameMode === "4player") { // Fix the case sensitivity
+    } else if (currentGameMode === "4player") {
         renderFourPlayerGame();
     } else {
         console.log("Unrecognized game mode:", currentGameMode);
@@ -629,7 +834,7 @@ function renderTwoPlayerGame() {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+        <h1 class="main-title">ft_transcendence - Pong 2-Player</h1>
         <div class="game-status">
             <div>
                 Status: <span id="gameStatus" class="status-text">Initializing...</span>
@@ -653,9 +858,9 @@ function renderTwoPlayerGame() {
                 <span id="player2Name" class="player2-name">Player 2</span>
             </div>
             <div class="score-container">
-                <span id="leftScore" class="left-score">0</span> 
+                <span id="player1score" class="player1-score">0</span> 
                 <span class="score-separator">-</span> 
-                <span id="rightScore" class="right-score">0</span>
+                <span id="player2score" class="player2-score">0</span>
             </div>
         </div>
         <canvas id="gameScreen" width="400" height="200"></canvas>
@@ -664,26 +869,16 @@ function renderTwoPlayerGame() {
             <p>Player 2 - Up/Down O/L</p>
         </div>
     `;
-    // Button handlers
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const reconnectBtn = document.getElementById('reconnectBtn');
-    if (startBtn) startBtn.addEventListener('click', startGame);
-    if (stopBtn) stopBtn.addEventListener('click', stopGame);
-    if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
-
-    // Initialize game logic
-    if (!pongGame) {
-        pongGame = new PongGame();
-        pongGame.init();
-    }
+    
+    setupGameButtons();
+    initializeGame();
 }
 
 function renderFourPlayerGame() {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <h1 class="main-title">ft_transcendence - Pong Prototype</h1>
+        <h1 class="main-title">ft_transcendence - Pong 4-Player Battle</h1>
         <div class="game-status">
             <div>
                 Status: <span id="gameStatus" class="status-text">Initializing...</span>
@@ -700,8 +895,9 @@ function renderFourPlayerGame() {
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
         </div>
-        <div class="player-info">
-            <div class="player-names">
+        
+        <!-- 4-Player Layout -->
+        <div class="player-names">
                 <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span>
                 <span class="vs-text">vs</span> 
                 <span id="player2Name" class="player2-name">Player 2</span>
@@ -711,34 +907,48 @@ function renderFourPlayerGame() {
                 <span id="player4Name" class="player4-name">Player 4</span>
             </div>
             <div class="score-container">
-                <span id="player1score" class="player1score">0</span> 
+                <span id="player1score" class="player1-score">0</span> 
                 <span class="score-separator">-</span> 
-                <span id="player2score" class="player2score">0</span>
+                <span id="player2score"" class="player2-score">0</span>
                 <span class="score-separator">-</span> 
-                <span id="player3score" class="player3score">0</span>
+                <span id="player3score"" class="player3-score">0</span>
                 <span class="score-separator">-</span> 
-                <span id="player4score" class="player4score">0</span>
+                <span id="player4score"" class="player4-score">0</span>
+            </div>
+        
+        <canvas id="gameScreen" width="400" height="400"></canvas>
+        
+        <div class="controls-info" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 5px; margin-top: 15px;">
+            <div class="four-player-controls">
+                <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
             </div>
         </div>
-        <canvas id="gameScreen" width="400" height="400"></canvas>
-        <div class="controls-info">
-            <p>Player 1 - Up/Down W/S</p>
-            <p>Player 2 - Up/Down O/L</p>
-        </div>
     `;
-    // Button handlers
+    
+    setupGameButtons();
+    initializeGame();
+}
+
+function setupGameButtons() {
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
+    
     if (startBtn) startBtn.addEventListener('click', startGame);
     if (stopBtn) stopBtn.addEventListener('click', stopGame);
     if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+}
 
-    // Initialize game logic
-    if (!pongGame) {
-        pongGame = new PongGame();
-        pongGame.init();
+function initializeGame() {
+    // Reset previous game instance
+    if (pongGame) {
+        pongGame.stopGame();
+        pongGame = null;
     }
+    
+    // Create new game instance
+    pongGame = new PongGame();
+    pongGame.init();
 }
 
 function renderApp() {
@@ -765,7 +975,10 @@ window.addEventListener('popstate', (event) => {
         currentPage = 'gameSelect';
         renderApp();
     } else {
-        pongGame = null;
+        if (pongGame) {
+            pongGame.stopGame();
+            pongGame = null;
+        }
         currentUsername = '';
         currentPage = 'landing';
         renderApp();
