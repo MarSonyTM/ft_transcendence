@@ -100,12 +100,12 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
             
             // Check if game exists
             const game = database.games.getGameById(gameIdNum);
-            fastify.log.info(`Game found:`, game ? 'YES' : 'NO');
+            fastify.log.info(`Game found: ${game ? 'YES' : 'NO'}`);
             
             if (!game) {
                 // Add more info about available games
                 const allGames = database.games.getAllGames ? database.games.getAllGames() : [];
-                fastify.log.info(`Available games:`, allGames.map(g => g.id));
+                fastify.log.info(`Available games: ${allGames.map(g => g.id).join(', ')}`);
                 
                 reply.code(404).send({
                     success: false,
@@ -115,7 +115,7 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
             }
             
             const gameState = database.gameState.getGameStateByGameId(gameIdNum);
-            fastify.log.info(`Game state found:`, gameState ? 'YES' : 'NO');
+            fastify.log.info(`Game state found: ${gameState ? 'YES' : 'NO'}`);
             
             if (!gameState) {
                 // Create a default game state if none exists
@@ -157,7 +157,7 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 data: gameState
             };
         } catch (error) {
-            fastify.log.error('Route error:', error);
+            fastify.log.error({ err: error }, 'Route error');
             reply.code(500).send({
                 success: false,
                 message: 'Failed to fetch game state for game'

@@ -1,5 +1,6 @@
 // Import CSS for Vite
 import './styles.css';
+import { toggleTournaments, currentMatchPlayers } from './tournament';
 
 declare global {
   interface Window {
@@ -41,6 +42,22 @@ interface WebSocketMessage {
     winner?: number;
 }
 
+// ---------------- Username helpers ----------------
+let curUsername: string = window.__USERNAME__ || '';
+
+function getDisplayNameForPlayer(side: 'left' | 'right'): string {
+    if (side === 'left') return currentMatchPlayers.left || curUsername || 'Player 1';
+    return currentMatchPlayers.right || 'Player 2';
+}
+
+function updateScoreboardNames(): void {
+    const p1 = document.getElementById('player1Name');
+    const p2 = document.getElementById('player2Name');
+    if (p1) p1.textContent = getDisplayNameForPlayer('left');
+    if (p2) p2.textContent = getDisplayNameForPlayer('right');
+}
+
+// ---------------- Pong Game Class ----------------
 class PongGame {
     gameId: number | null = null;
     canvas: HTMLCanvasElement | null = null;
@@ -64,7 +81,7 @@ class PongGame {
     player2Id: number = 2;
     paddlePositionLeft: number = 80;
     paddlePositionRight: number = 80;
-    
+
     constructor() {
         this.setupKeyboardControls();
         
@@ -582,16 +599,17 @@ function renderGamePage() {
             <button id="startBtn" class="btn btn-start">Start Game</button>
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span> // TODO: currentUsername will be 1st PLayer
-                <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">Player 2</span> // TODO: PLayer2 is AI or matched player
+                <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span>
+                <span class="vs-text">vs</span>
+                <span id="player2Name" class="player2-name">Player 2</span>
             </div>
             <div class="score-container">
-                <span id="leftScore" class="left-score">0</span> 
-                <span class="score-separator">-</span> 
+                <span id="leftScore" class="left-score">0</span>
+                <span class="score-separator">-</span>
                 <span id="rightScore" class="right-score">0</span>
             </div>
         </div>
@@ -600,14 +618,18 @@ function renderGamePage() {
             <p>Player 1 - Up/Down W/S</p>
             <p>Player 2 - Up/Down O/L</p>
         </div>
+        <hr>
+        <div id="tournamentRoot" class="t-section"></div>
     `;
     // Button handlers
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
+    const tournamentsBtn = document.getElementById('tournamentsBtn');
     if (startBtn) startBtn.addEventListener('click', startGame);
     if (stopBtn) stopBtn.addEventListener('click', stopGame);
     if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+    if (tournamentsBtn) tournamentsBtn.addEventListener('click', toggleTournaments);
 
     // Initialize game logic
     if (!pongGame) {

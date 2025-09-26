@@ -171,7 +171,7 @@ export class GameEngine {
         }
 
         // Move ball
-        const speed = 3;
+        const speed = 3;//TODO: maybe lateron increase speed as addon for 2 consecutive goals by one player?
         this.gameState.ballPosX += speed * this.xDir;
         this.gameState.ballPosY += speed * this.yDir;
 
@@ -219,7 +219,7 @@ export class GameEngine {
         this.gameState.ballVelX = 0;
         this.gameState.ballVelY = 0;
         
-        // Reset direction (random)
+        // Reset direction (random)//TODO: lateron during tounament set direction based on who won last
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
         

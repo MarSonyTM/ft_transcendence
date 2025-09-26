@@ -21,7 +21,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # Production stage with nginx
-FROM debian:bullseye
+FROM debian:bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
