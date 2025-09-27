@@ -10,6 +10,7 @@ export class GameState {
     player2Pos?: number = 0;
     scorePlayer1: number = 0;
     scorePlayer2: number = 0;
+    gameMode: string = "";
 
     getBallPosX() {
         return this.ballPosX;

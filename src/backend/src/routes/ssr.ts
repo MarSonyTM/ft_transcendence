@@ -37,8 +37,8 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
       currentUsername,
       currentPage,
       timestamp: Date.now(),
-      apiEndpoint: `http://localhost:${process.env.PORT || 3000}`,
-      wsEndpoint: `ws://localhost:${process.env.PORT || 3000}`,
+      apiEndpoint: `http://0.0.0.0:${process.env.PORT || 3000}`,
+      wsEndpoint: `ws://0.0.0.0:${process.env.PORT || 3000}`,
       environment: process.env.NODE_ENV || 'development'
     };
 

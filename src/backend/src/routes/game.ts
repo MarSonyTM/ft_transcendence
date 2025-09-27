@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, Game, Player } from '../database/index';
-import { GameEngine } from '../game/gameEngine';
+import { createGameEngine } from '../game/gameEngine';
+import type { BaseGameEngine } from '../game/gameEngine';
 
 // Types
 export interface CreateGameInput {
@@ -9,7 +10,7 @@ export interface CreateGameInput {
 }
 
 // Store active game engines
-const activeGames = new Map<number, GameEngine>();
+const activeGames = new Map<number, BaseGameEngine>();
 
 // Plugin function that registers all game routes
 async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -92,10 +93,11 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Check if game engine is active (live data)
             const gameEngine = activeGames.get(gameId);
             if (gameEngine) {
+                const currentState = gameEngine.getCurrentState();
                 return {
                     success: true,
-                    ballX: gameEngine.getBallX(),
-                    ballY: gameEngine.getBallY(),
+                    ballX: currentState.ballPosX,
+                    ballY: currentState.ballPosY,
                     isLive: true
                 };
             }
@@ -244,11 +246,12 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             // Check if game already running
             if (activeGames.has(gameId)) {
-                return {
+                reply.send({
                     success: true,
                     message: 'Game already running',
                     gameId: gameId
-                };
+                });
+                return;
             }
             
             // Check if game exists
@@ -275,6 +278,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 try {
                     gameState = database.gameState.createGameState(defaultGameStateData);
                 } catch (createError) {
+                    console.error('Failed to create game state:', createError);
                     reply.code(500).send({
                         success: false,
                         message: 'Failed to create game state'
@@ -285,7 +289,12 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             // Start game engine
             try {
-                const gameEngine = new GameEngine(gameState);
+                // Get the game mode from the database - NOW SUPPORTING 4PLAYER!
+                const gameMode = game.mode || '1v1'; // Default to 1v1 if no mode specified
+                
+                console.log(`🎮 Starting ${gameMode} game engine for game ${gameId}`);
+                
+                const gameEngine = createGameEngine(gameState, gameMode);
                 activeGames.set(gameId, gameEngine);
                 gameEngine.startGame();
                 
@@ -295,16 +304,18 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     startedAt: new Date().toISOString()
                 });
                 
-                return {
+                reply.send({
                     success: true,
-                    message: 'WebSocket game started successfully',
-                    gameId: gameId
-                };
+                    message: `${gameMode} game started successfully`,
+                    gameId: gameId,
+                    mode: gameMode
+                });
+                
             } catch (engineError) {
-                console.error('Failed to start WebSocket game engine:', engineError);
+                console.error('Failed to start game engine:', engineError);
                 reply.code(500).send({
                     success: false,
-                    message: 'Failed to start game engine'
+                    message: `Failed to start game engine: ${engineError instanceof Error ? engineError.message : 'Unknown error'}`
                 });
                 return;
             }
@@ -359,6 +370,49 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             reply.code(500).send({
                 success: false,
                 message: 'Failed to stop game'
+            });
+        }
+    });
+
+    fastify.get('/:id/mode', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+            const gameId = parseInt(id);
+            
+            if (isNaN(gameId)) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Invalid game ID'
+                });
+                return;
+            }
+            
+            const game = database.games.getGameById(gameId);
+            if (!game) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'Game not found'
+                });
+                return;
+            }
+            
+            const gameEngine = activeGames.get(gameId);
+            
+            reply.send({
+                success: true,
+                data: {
+                    gameId: gameId,
+                    mode: game.mode,
+                    isActive: !!gameEngine,
+                    isRunning: gameEngine ? gameEngine.isRunning() : false
+                }
+            });
+            
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to get game mode'
             });
         }
     });
