@@ -118,7 +118,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const userId = parseInt(id);
             const userData = request.body as Partial<CreateUserInput>;
             
-            if (isNaN(userId)) {
+            if (isNaN(userId)) {//TODO: add check for negative and 0 ids?
                 reply.code(400).send({
                     success: false,
                     message: 'Invalid user ID'

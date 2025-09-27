@@ -375,6 +375,7 @@ class PongGame {
     handleInput(): void {
         if (!this.isActive) return;
         
+        // Left paddle (W/S)
         let newPosition = this.paddlePosition;
         const paddleSpeed = 4;
         
