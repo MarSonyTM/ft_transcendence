@@ -120,6 +120,7 @@ body {
 }
 
 .score-container {
+  text-align: center;
   font-size: 1.875rem; /* text-3xl */
   font-weight: 700; /* font-bold */
 }
@@ -182,4 +183,262 @@ button:not(:disabled):hover {
 
 .disconnected {
   color: rgb(248 113 113); /* text-red-400 */
+}
+
+/* Tournament section */
+.t-section {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.t-section h2 {
+  margin: 0 0 0.5rem;
+}
+
+.t-content {
+  background-color: rgb(31 41 55);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.0rem;
+  color: rgb(209 213 219);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.btn-reset {
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  display: block;
+  margin: 0 auto;
+  transition: background-color 150ms;
+  border: none;
+  cursor: pointer;
+  background-color: rgb(196, 8, 8);
+  color: rgb(255, 255, 255);
+}
+
+.btn-tournaments {
+  background-color: rgb(0, 136, 160);
+  color: rgb(255 255 255);
+}
+
+.btn-tournaments:hover {
+  background-color: rgb(3, 74, 83);
+}
+
+.btn-submit {
+  background-color: rgb(22 163 74);
+  color: rgb(255 255 255);
+}
+
+.btn-submit:hover {
+  background-color: rgb(21 128 61);
+}
+
+.t-setup {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.t-alias-form {
+  display: flex;
+  gap: .5rem;
+}
+
+.t-alias-input {
+  flex: 1;
+  padding: .4rem .5rem;
+}
+
+.t-alias-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.t-alias-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: #1f1f1f;
+  padding: .35rem .6rem;
+  border-radius: 4px;
+}
+
+.t-alias-name {
+  flex: 1;
+}
+.btn-remove-alias {
+  background: #333;
+  color: #ddd;
+  border: none;
+  padding: .2rem .5rem;
+  cursor: pointer;
+}
+.btn-remove-alias:hover {
+  background: #444;
+}
+.t-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.t-msg {
+  margin: .3rem 0;
+  font-weight: 500;
+}
+.empty {
+  opacity: .6;
+  font-style: italic;
+}
+
+/* Tournament archive modal */
+.t-archive-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 9999;
+}
+
+.t-archive-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.t-archive-dialog {
+  position: relative;
+  width: min(1100px, 95vw);
+  height: min(80vh, 800px);
+  margin: 4vh auto;
+  background: #1e1f24;
+  border: 1px solid #333;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.t-archive-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid #333;
+}
+
+.t-archive-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  overflow: hidden;
+}
+
+.t-archive-list {
+  overflow-y: auto;
+  border-right: 1px solid #333;
+  padding: .5rem .75rem;
+}
+
+.t-archive-detail {
+  overflow-y: auto;
+  padding: .75rem 1rem;
+}
+
+.t-archive-ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.t-archive-item {
+  padding: .5rem;
+  border-bottom: 1px solid #333;
+}
+
+.t-archive-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 60px 90px 150px 90px 90px 30px;
+  gap: .4rem;
+  align-items: center;
+  background: #2a2c32;
+  border: 1px solid #3a3d44;
+  padding: .35rem .5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .75rem;
+  text-align: left;
+}
+
+.t-archive-row:hover {
+  background: #343740;
+}
+
+.t-arch-status.completed {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.t-arch-status.in_progress {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.t-arch-status.idle {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.t-archive-detail-inner h4 {
+  margin: .2rem 0 .6rem;
+}
+
+.t-archive-players, .t-archive-history {
+  margin: .4rem 0 .6rem;
+  padding-left: 1.2rem;
+}
+
+.btn-close-archive {
+  background: #444;
+  color: #eee;
+  border: none;
+  padding: .35rem .6rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.btn-close-archive:hover {
+  background: #555;
+}
+
+.t-archive-empty, .t-archive-loading, .t-archive-error, .t-archive-hint {
+  font-size: .85rem;
+  opacity: .8;
+}
+
+.t-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.t-header-actions {
+  display: flex;
+  gap: .5rem;
+}
+
+.btn-archive {
+  font-size: .75rem;
+  padding: .3rem .6rem;
 }

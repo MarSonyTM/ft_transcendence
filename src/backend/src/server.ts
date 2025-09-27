@@ -6,6 +6,7 @@ import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
+import tournamentRoutes from './routes/tournament';
 import { database } from './database';
 
 const PORT = 3000;
@@ -48,6 +49,7 @@ const start = async (): Promise<void> => {
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
     await server.register(playerRoutes, { prefix: '/api/players' });
+    await server.register(tournamentRoutes, { prefix: '/api/tournament' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -70,6 +72,9 @@ const start = async (): Promise<void> => {
             playersByGame: '/api/players/game/:gameId',
             playersByUser: '/api/players/user/:userId',
             playerStats: '/api/players/:id/stats',
+            tournamentStart: '/api/tournament/start',
+            tournamentState: '/api/tournament/state',
+            tournamentResult: '/api/tournament/result',
             ping: '/api/ping',
             health: '/health',
             webSocket: '/game/:gameid/ws'

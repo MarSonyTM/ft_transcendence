@@ -1,5 +1,5 @@
-// Import CSS for Vite
 import './styles.css';
+import { toggleTournaments, currentMatchPlayers } from './tournament';
 
 declare global {
   interface Window {
@@ -59,6 +59,21 @@ interface WebSocketMessage {
     finalScores?: number[];
 }
 
+// ---------------- Username helpers ----------------
+// let curUsername: string = window.__USERNAME__ || '';
+
+// function getDisplayNameForPlayer(side: 'left' | 'right'): string {
+//     if (side === 'left') return currentMatchPlayers.left || curUsername || 'Player 1';
+//     return currentMatchPlayers.right || 'Player 2';
+// }
+
+// function updateScoreboardNames(): void {
+//     const p1 = document.getElementById('player1Name');
+//     const p2 = document.getElementById('player2Name');
+//     if (p1) p1.textContent = getDisplayNameForPlayer('left');
+//     if (p2) p2.textContent = getDisplayNameForPlayer('right');
+// }
+
 class PongGame {
     gameId: number | null = null;
     canvas: HTMLCanvasElement | null = null;
@@ -114,7 +129,8 @@ class PongGame {
     async init(): Promise<void> {
         this.canvas = document.getElementById("gameScreen") as HTMLCanvasElement;
         this.ctx = this.canvas ? this.canvas.getContext("2d") : null;
-        
+        // this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D; MAYBE
+
         if (!this.canvas || !this.ctx) return;
         
         this.updateStatus("Initializing...");
@@ -413,18 +429,18 @@ class PongGame {
     handle4PlayerInput(currentPosition: number, paddleSpeed: number): void {
         let newPosition = currentPosition;
         
-        if (this.playerId === 1 || this.playerId === 3) {
-            // Top/Bottom players move horizontally with A/D
-            const maxPos = this.canvas ? this.canvas.width - 50 : 350;
-            const minPos = 10;
+        // if (this.playerId === 1 || this.playerId === 3) {
+        //     // Top/Bottom players move horizontally with A/D
+        //     const maxPos = this.canvas ? this.canvas.width - 50 : 350;
+        //     const minPos = 10;
             
-            if (this.keys['KeyA'] && currentPosition > minPos) {
-                newPosition = Math.max(minPos, currentPosition - paddleSpeed);
-            }
-            if (this.keys['KeyD'] && currentPosition < maxPos) {
-                newPosition = Math.min(maxPos, currentPosition + paddleSpeed);
-            }
-        } else {
+        //     if (this.keys['KeyA'] && currentPosition > minPos) {
+        //         newPosition = Math.max(minPos, currentPosition - paddleSpeed);
+        //     }
+        //     if (this.keys['KeyD'] && currentPosition < maxPos) {
+        //         newPosition = Math.min(maxPos, currentPosition + paddleSpeed);
+        //     }
+        // } else {
             // Left/Right players move vertically with W/S  
             const maxPos = this.canvas ? this.canvas.height - 50 : 150;
             const minPos = 10;
@@ -435,7 +451,7 @@ class PongGame {
             if (this.keys['KeyS'] && currentPosition < maxPos) {
                 newPosition = Math.min(maxPos, currentPosition + paddleSpeed);
             }
-        }
+        // }
             
         if (newPosition !== this.paddlePosition) {
             this.paddlePosition = newPosition;
@@ -599,9 +615,13 @@ class PongGame {
     updatePlayerInfo(): void {
         const player1Name = document.getElementById('player1Name');
         const player2Name = document.getElementById('player2Name');
+        const player3Name = document.getElementById('player3Name');
+        const player4Name = document.getElementById('player4Name');
         const username = window.__USERNAME__ || currentUsername || "Player 1";
         if (player1Name) player1Name.textContent = username;
         if (player2Name) player2Name.textContent = "Marvin";
+        if (player3Name) player3Name.textContent = "Ben";
+        if (player4Name) player4Name.textContent = "Jerry";
     }
 
     updateStatus(status: string): void {
@@ -850,6 +870,7 @@ function renderTwoPlayerGame() {
             <button id="startBtn" class="btn btn-start">Start Game</button>
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         <div class="player-info">
             <div class="player-names">
@@ -866,8 +887,9 @@ function renderTwoPlayerGame() {
         <canvas id="gameScreen" width="400" height="200"></canvas>
         <div class="controls-info">
             <p>Player 1 - Up/Down W/S</p>
-            <p>Player 2 - Up/Down O/L</p>
         </div>
+        <hr>
+        <div id="tournamentRoot" class="t-section"></div>
     `;
     
     setupGameButtons();
@@ -894,10 +916,11 @@ function renderFourPlayerGame() {
             <button id="startBtn" class="btn btn-start">Start Game</button>
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         
         <!-- 4-Player Layout -->
-        <div class="player-names">
+        <div class="player-info">
                 <span id="player1Name" class="player1-name">${currentUsername || 'Player 1'}</span>
                 <span class="vs-text">vs</span> 
                 <span id="player2Name" class="player2-name">Player 2</span>
@@ -923,6 +946,8 @@ function renderFourPlayerGame() {
                 <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
             </div>
         </div>
+        <hr>
+        <div id="tournamentRoot" class="t-section"></div>
     `;
     
     setupGameButtons();
@@ -933,10 +958,12 @@ function setupGameButtons() {
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
+    const tournamentsBtn = document.getElementById('tournamentsBtn');
     
     if (startBtn) startBtn.addEventListener('click', startGame);
     if (stopBtn) stopBtn.addEventListener('click', stopGame);
     if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
+    if (tournamentsBtn) tournamentsBtn.addEventListener('click', toggleTournaments);
 }
 
 function initializeGame() {
