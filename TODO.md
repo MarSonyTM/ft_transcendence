@@ -69,7 +69,7 @@
 - [x] Database (SQLite) - Minor
 - [ ] Blockchain Score Storage - Major
 
-### User Management
+### User Management- @bmahdi
 - [ ] Standard User Management - Major
   - [ ] User registration/login
   - [ ] Profile management
