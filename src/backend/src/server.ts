@@ -1,6 +1,7 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import path from 'path';
 import userRoutes from './routes/users';
+import auth from './routes/auth';
 import gameRoutes from './routes/game';
 import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
@@ -35,6 +36,7 @@ const start = async (): Promise<void> => {
         'http://0.0.0.0:8080',
         'http://frontend:8080',
         'http://0.0.0.0:3000',
+        'http://localhost:5173',
         'http://0.0.0.0:5173', // Vite dev server
         /^http:\/\/0.0.0.0:\d+$/
       ],
@@ -50,6 +52,7 @@ const start = async (): Promise<void> => {
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
     await server.register(playerRoutes, { prefix: '/api/players' });
     await server.register(tournamentRoutes, { prefix: '/api/tournament' });
+    await server.register(auth, { prefix: '/api/auth' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -60,6 +63,9 @@ const start = async (): Promise<void> => {
           version: '0.0.3',
           features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
           endpoints: {
+            auth: '/api/auth',
+            createUser: '/api/auth/create',
+            login: '/api/auth/login',
             users: '/api/users',
             userById: '/api/users/:id',
             games: '/api/game',

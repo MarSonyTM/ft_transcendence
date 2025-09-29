@@ -1,5 +1,7 @@
 import './styles.css';
 import { toggleTournaments, currentMatchPlayers } from './tournament';
+import renderRegisterPage from './pages/register';
+import renderLoginPage from './pages/login';
 
 declare global {
   interface Window {
@@ -683,7 +685,7 @@ class PongGame {
 }
 
 // SPA State
-type AppPage = 'landing' | 'login' | 'game' | 'gameSelect';
+type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'register';
 
 // Initialize from SSR if available, otherwise use defaults
 let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
@@ -714,16 +716,16 @@ function renderLandingPage() {
     const loginBtn = document.getElementById('loginBtn');
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
-            history.pushState({ page: 'login' }, '', '#login');
-            currentPage = 'login';
-            renderApp();
+            history.pushState({ page: 'login' }, '', '/login');
+            window.dispatchEvent(new PopStateEvent('popstate'));
         });
     }
     const registerBtn = document.getElementById('registerBtn');
     if (registerBtn) {
         registerBtn.addEventListener('click', () => {
-            // TODO: add registration function
-            alert('Registration coming soon!');
+            history.pushState({ page: 'register' }, '', '/register');
+            currentPage = 'register';
+            renderApp();
         });
     }
     const playBtn = document.getElementById('playBtn');
@@ -782,62 +784,7 @@ function renderGameSelectPage() {
     }
 }
 
-async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-    // TODO: Add backend logic to log user in
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    // Accept any username/password for now
-    if (username) {
-        return { success: true, username };
-    } else {
-        return { success: false, error: 'Username required' };
-    }
-}
 
-function renderLoginPage() {
-    const root = document.getElementById('app-root');
-    if (!root) return;
-    root.innerHTML = `
-        <div class="login-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
-            <h2 style="font-size: 2em; margin-bottom: 1em;">Login</h2>
-            <form id="loginForm" style="display: flex; flex-direction: column; gap: 1em; min-width: 250px;">
-                <input id="usernameInput" type="text" placeholder="Username" required style="padding: 0.5em; font-size: 1.2em;" />
-                <input id="passwordInput" type="password" placeholder="Password" required style="padding: 0.5em; font-size: 1.2em;" />
-                <button type="submit" class="btn btn-login" style="font-size: 1.2em;">Login</button>
-                <div id="loginError" style="color: red; margin-top: 0.5em;"></div>
-            </form>
-            <button id="backToLandingBtn" class="btn btn-back" style="margin-top: 2em; font-size: 1.2em; background: #6b7280; color: white; border: none; border-radius: 8px; padding: 0.5em 1.5em; cursor: pointer;">Back</button>
-        </div>
-    `;
-    const loginForm = document.getElementById('loginForm') as HTMLFormElement;
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const usernameInput = document.getElementById('usernameInput') as HTMLInputElement;
-            const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
-            const loginError = document.getElementById('loginError');
-            if (loginError) loginError.textContent = '';
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
-            const result = await loginUser(username, password);
-            if (result.success && result.username) {
-                currentUsername = result.username;
-                history.pushState({ page: 'game' }, '', '#game');
-                currentPage = 'game';
-                renderApp();
-            } else if (loginError) {
-                loginError.textContent = result.error || 'Login failed';
-            }
-        });
-    }
-    const backBtn = document.getElementById('backToLandingBtn');
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            history.pushState({ page: 'landing' }, '', '#');
-            currentPage = 'landing';
-            renderApp();
-        });
-    }
-}
 
 function renderGamePage() {
     if (currentGameMode === "1v1") {
@@ -980,37 +927,46 @@ function initializeGame() {
 }
 
 function renderApp() {
-    if (currentPage === 'landing') {
-        renderLandingPage();
-    } else if (currentPage === 'login') {
-        renderLoginPage();
-    } else if (currentPage === 'gameSelect') {
-        renderGameSelectPage();
-    } else {
-        renderGamePage();
+    switch (currentPage) {
+        case 'landing':
+            renderLandingPage();
+            break;
+        case 'login':
+            renderLoginPage();
+            break;
+        case 'gameSelect':
+            renderGameSelectPage();
+            break;
+        case 'register':
+            renderRegisterPage();
+            break;
+        default:
+            renderGamePage();
     }
 }
 
 // Handle browser navigation (back/forward)
-window.addEventListener('popstate', (event) => {
-    if (location.hash === '#game') {
-        currentPage = 'game';
-        renderApp();
-    } else if (location.hash === '#login') {
-        currentPage = 'login';
-        renderApp();
-    } else if (location.hash === '#gameSelect') {
-        currentPage = 'gameSelect';
-        renderApp();
-    } else {
-        if (pongGame) {
-            pongGame.stopGame();
-            pongGame = null;
-        }
-        currentUsername = '';
-        currentPage = 'landing';
-        renderApp();
+window.addEventListener('popstate', () => {
+    switch (location.pathname) {
+        case '/register':
+            currentPage = 'register';
+            break;
+        case '/login':
+            currentPage = 'login';
+            break;
+        case '/gameSelect':
+            currentPage = 'gameSelect';
+            break;
+        case '/game':
+            currentPage = 'game';
+            break;
+        case '/':
+            currentPage = 'landing';
+            break;
+        default:
+            currentPage = 'landing';
     }
+    renderApp();
 });
 
 // Enhanced SPA entry with SSR support
@@ -1023,17 +979,18 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.log('⚠️ No SSR data found, using URL-based routing');
         
-        if (location.hash === '#game') {
+        if (location.pathname === '/register') {
+            currentPage = 'register';
+        } else if (location.pathname === '/game') {
             currentPage = 'game';
-        } else if (location.hash === '#login') {
+        } else if (location.pathname === '/login') {
             currentPage = 'login';
-        } else if (location.hash === '#gameSelect') {
+        } else if (location.pathname === '/gameSelect') {
             currentPage = 'gameSelect';
         } else {
             currentPage = 'landing';
         }
     }
-    
     renderApp();
 });
 
