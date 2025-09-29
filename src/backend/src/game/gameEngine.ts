@@ -54,7 +54,6 @@ export abstract class BaseGameEngine {
     abstract updatePlayerPosition(playerId: number, position: number): void;
     abstract resetGame(): void;
     abstract checkGameEnd(): boolean;
-    abstract endGame(): void;
     abstract resetBall(): void;
 
     // Shared methods
@@ -73,13 +72,25 @@ export abstract class BaseGameEngine {
         this.gameLoop();
     }
 
-    public stopGame(): void {
+    public pauseGame(): void {
+        if (this.gameTimer) {
+            clearTimeout(this.gameTimer);
+            this.gameTimer = null;
+        }
+        
+        broadcastToGame(this.gameState.gameId, {
+            type: 'gamePause',
+            gameId: this.gameState.gameId
+        });
+    }
+
+    public endGame(): void {
         if (this.gameTimer) {
             clearTimeout(this.gameTimer);
             this.gameTimer = null;
             
             broadcastToGame(this.gameState.gameId, {
-                type: 'gameStop',
+                type: 'gameEnd',
                 gameId: this.gameState.gameId
             });
             
@@ -122,7 +133,7 @@ export abstract class BaseGameEngine {
     }
 }
 
-// 2-Player Game Engine - COMPLETE IMPLEMENTATION
+// 2-Player Game Engine
 export class TwoPlayerGameEngine extends BaseGameEngine {
     private scorePlayer1 = 0;
     private scorePlayer2 = 0;
@@ -149,47 +160,101 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
-        // Move ball
-        this.gameState.ballPosX += this.xDir * 2;
-        this.gameState.ballPosY += this.yDir * 2;
+        this.gameState.ballPosX += (this.xDir * 2.1);
+        this.gameState.ballPosY += (this.yDir * 1.8);
         
         // Update velocity for state tracking
         this.gameState.ballVelX = this.xDir * 2;
         this.gameState.ballVelY = this.yDir * 2;
         
-        // Right paddle collision (Player 2)
-        if (this.gameState.ballPosX >= (this.maxX - paddleWidth) && this.xDir > 0) {
+        // Top wall collision
+        if (this.gameState.ballPosY <= this.minY) {
+            this.yDir = Math.abs(this.yDir);
+            this.gameState.ballPosY = this.minY;
+        }
+        
+        // Bottom wall collision
+        if (this.gameState.ballPosY >= this.maxY) {
+            this.yDir = -Math.abs(this.yDir);
+            this.gameState.ballPosY = this.maxY;
+        }
+        
+        // Right paddle collision - paddle is at x=390 (canvas width 400 - paddle width 10)
+        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius)) {
             const rightPaddleTop = this.gameState.player2Pos || 0;
             const rightPaddleBottom = rightPaddleTop + paddleHeight;
             
+            // Check if ball hits paddle
             if (this.gameState.ballPosY >= rightPaddleTop && 
                 this.gameState.ballPosY <= rightPaddleBottom) {
-                this.xDir = -Math.abs(this.xDir); // Bounce left
-            } else {
-                // Goal for Player 1
+                
+                // **ADD THIS SECTION - Calculate hit position and add spin**
+                const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
+                const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
+                
+                // Reverse and slightly increase speed
+                this.xDir = -Math.abs(this.xDir) * 1.05;
+                this.yDir = (this.yDir + relativeHit * 0.8) * 1.05;
+                
+                // Add tiny random element
+                this.yDir += (Math.random() - 0.5) * 0.15;
+                
+                // Prevent too-shallow angles
+                if (Math.abs(this.yDir) < 0.4) {
+                    this.yDir = Math.sign(this.yDir || 1) * 0.4;
+                }
+                
+                // Cap maximum speed
+                const maxSpeed = 5;
+                if (Math.abs(this.xDir) > maxSpeed) this.xDir = Math.sign(this.xDir) * maxSpeed;
+                if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
+                // **END OF NEW SECTION**
+                
+                this.gameState.ballPosX = 390 - ballRadius;
+            } else if (this.gameState.ballPosX >= 400) {
+                // Missed paddle - Goal for Player 1
                 this.updateScoreBoard(1);
-                return 1; // Signal to reset ball
+                return 1;
             }
         }
         
-        // Left paddle collision (Player 1)
-        if (this.gameState.ballPosX <= (this.minX + paddleWidth) && this.xDir < 0) {
+        // Left paddle collision - paddle is at x=0
+        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius)) {
             const leftPaddleTop = this.gameState.player1Pos || 0;
             const leftPaddleBottom = leftPaddleTop + paddleHeight;
             
+            // Check if ball hits paddle
             if (this.gameState.ballPosY >= leftPaddleTop && 
                 this.gameState.ballPosY <= leftPaddleBottom) {
-                this.xDir = Math.abs(this.xDir); // Bounce right
-            } else {
-                // Goal for Player 2
+                
+                // **ADD THIS SECTION - Calculate hit position and add spin**
+                const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
+                const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
+                
+                // Reverse and slightly increase speed
+                this.xDir = Math.abs(this.xDir) * 1.05;
+                this.yDir = (this.yDir + relativeHit * 0.8) * 1.05;
+                
+                // Add tiny random element
+                this.yDir += (Math.random() - 0.5) * 0.15;
+                
+                // Prevent too-shallow angles
+                if (Math.abs(this.yDir) < 0.4) {
+                    this.yDir = Math.sign(this.yDir || 1) * 0.4;
+                }
+                
+                // Cap maximum speed
+                const maxSpeed = 5;
+                if (Math.abs(this.xDir) > maxSpeed) this.xDir = Math.sign(this.xDir) * maxSpeed;
+                if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
+                // **END OF NEW SECTION**
+                
+                this.gameState.ballPosX = paddleWidth + ballRadius;
+            } else if (this.gameState.ballPosX <= 0) {
+                // Missed paddle - Goal for Player 2
                 this.updateScoreBoard(2);
-                return 1; // Signal to reset ball
+                return 1;
             }
-        }
-        
-        // Top and bottom wall collisions
-        if (this.gameState.ballPosY <= this.minY || this.gameState.ballPosY >= this.maxY) {
-            this.yDir = -this.yDir;
         }
         
         return 0; // No reset needed
@@ -217,7 +282,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updatePlayerPosition(playerId: number, position: number): void {
-        const clampedPos = Math.max(0, Math.min(position, this.maxY - paddleHeight));
+        const maxPosition = 200 - paddleHeight; // Use raw value, not this.maxY
+        const clampedPos = Math.max(0, Math.min(position, maxPosition));
         
         if (playerId === 1) {
             this.gameState.player1Pos = clampedPos;
@@ -269,8 +335,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             timestamp: Date.now()
         };
         broadcastToGame(this.gameState.gameId, gameEndMessage);
-        
-        this.stopGame();
     }
 
     resetBall(): void {
@@ -343,10 +407,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         this.gameState.ballPosY = (this.maxY + this.minY) / 2;  // Should be 200 for 400x400
         
         // Initialize 4 player positions with proper boundaries
-        // Player 1 (Top) - horizontal paddle at top
-        // Player 2 (Right) - vertical paddle at right  
-        // Player 3 (Bottom) - horizontal paddle at bottom
-        // Player 4 (Left) - vertical paddle at left
         this.playerPositions = [
             (this.maxX - this.minX) / 2 - paddleHeight / 2, // Top player X position (center horizontally)
             (this.maxY - this.minY) / 2 - paddleHeight / 2, // Right player Y position (center vertically)
@@ -364,7 +424,7 @@ export class FourPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
-        const speed = 3;
+        const speed = 4;
         
         // Move ball first
         this.gameState.ballPosX += speed * this.xDir;
@@ -559,7 +619,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         };
         broadcastToGame(this.gameState.gameId, gameEndMessage);
         
-        this.stopGame();
     }
 
     resetBall(): void {

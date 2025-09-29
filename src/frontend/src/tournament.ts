@@ -233,7 +233,7 @@ export async function renderTournament(): Promise<void> {
 				</form>
 				<ul id="pendingAliasesList" class="t-alias-list"></ul>
 				<div class="t-actions">
-					<button id="clearAliasesBtn" class="btn btn-stop" disabled>Clear</button>
+					<button id="clearAliasesBtn" class="btn btn-pause" disabled>Clear</button>
 					<button id="startTournamentBtn" class="btn btn-start" disabled>Start Tournament</button>
 				</div>
 			</div>`;
