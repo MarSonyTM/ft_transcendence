@@ -61,17 +61,21 @@ async function webSocketRoutes(fastify: FastifyInstance) {
               case 'move':
                 if (typeof message.position === 'number') {
                   const playerId = typeof message.playerId === 'number' ? message.playerId : 1;
-                  handlePlayerMove(gameIdNum, message.position, playerId);
+                  handlePlayerMove(gameIdNum, playerId, message.position);
                 }
                 break;
               
               case 'score':
-                const gameEngine = activeGames.get(gameId);
+                const gameEngine = activeGames.get(gameIdNum);
                 if (gameEngine) {
-                  const currentScore = gameEngine.getScore();
-                  socket.send(JSON.stringify(currentScore));
-                  break;
+                  const currentState = gameEngine.getCurrentState();
+                  socket.send(JSON.stringify({
+                    type: 'score',
+                    scorePlayer1: currentState.scorePlayer1,
+                    scorePlayer2: currentState.scorePlayer2
+                  }));
                 }
+                break;
             }
           } catch (error) {
             // Ignore malformed messages
@@ -101,8 +105,6 @@ async function webSocketRoutes(fastify: FastifyInstance) {
       }
     });
   });
-
-  // New routes
 }
 
 // Helper function to remove socket from game connections
@@ -116,25 +118,18 @@ function removeSocketFromGame(gameId: number, socket: any) {
   }
 }
 
-// Handle player movement
-function handlePlayerMove(gameId: number, position: number, playerId: number) {
+// Handle player movement - FIXED VERSION
+function handlePlayerMove(gameId: number, playerId: number, position: number) {
   const gameEngine = activeGames.get(gameId);
   if (gameEngine) {
-    if (playerId === 2) {
-      gameEngine.updatePlayer2Position(position);
-    } else {
-      gameEngine.updatePlayer1Position(position);
+    // Use the correct method name from your game engine
+    gameEngine.updatePlayerPosition(playerId, position);
+    
+    if (DEBUG) {
+      console.log(`🎮 Player ${playerId} moved to position ${position} in game ${gameId}`);
     }
   }
 }
-
-// Update score
-// function updateScore(gameId: number, score1: number, score2: number) {
-//   const gameEngine = activeGames.get(gameId);
-//   if (gameEngine) {
-//     gameEngine.updatePlayerScore(score1, score1);
-//   }
-// }
 
 // Broadcast message to all connections in a game
 export function broadcastToGame(gameId: number, message: any) {

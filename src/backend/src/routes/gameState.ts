@@ -7,6 +7,8 @@ export interface CreateGameStateInput {
     gameId: number;
     player1Id: number;
     player2Id: number;
+    player3Id: number;
+    player4Id: number;
 }
 
 export interface UpdateGameStateInput {
@@ -16,8 +18,12 @@ export interface UpdateGameStateInput {
     ballVelY?: number;
     player1Pos?: number;
     player2Pos?: number;
+    player3Pos?: number;
+    player4Pos?: number;
     scorePlayer1: number;
     scorePlayer2: number;
+    scorePlayer3: number;
+    scorePlayer4: number;
 }
 
 const gameStateInstance = new GameState();

@@ -329,8 +329,8 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         }
     });
 
-    // Stop game engine
-    fastify.post('/:id/stop', async (request, reply) => {
+    // Pause game engine
+    fastify.post('/:id/pause', async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
             const gameId = parseInt(id);
@@ -352,7 +352,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            gameEngine.stopGame();
+            gameEngine.pauseGame();
             activeGames.delete(gameId);
             
             // Update game status in database
@@ -362,14 +362,63 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             return {
                 success: true,
-                message: 'Game stopped successfully',
+                message: 'Game paused successfully',
                 gameId: gameId
             };
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
                 success: false,
-                message: 'Failed to stop game'
+                message: 'Failed to pause game'
+            });
+        }
+    });
+
+    // End game engine
+    fastify.post('/:id/end', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+            const gameId = parseInt(id);
+            
+            if (isNaN(gameId)) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Invalid game ID'
+                });
+                return;
+            }
+            
+            const gameEngine = activeGames.get(gameId);
+            if (!gameEngine) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'No active game found'
+                });
+                return;
+            }
+            
+            // End the game (this resets everything)
+            gameEngine.endGame();
+            
+            // Remove from active games so next start creates fresh instance
+            activeGames.delete(gameId);
+            
+            // Update game status in database to 'waiting' so it can be started again
+            database.games.updateGame(gameId, { 
+                status: 'waiting',
+                endedAt: new Date().toISOString()
+            });
+            
+            return {
+                success: true,
+                message: 'Game ended and reset - ready for new game',
+                gameId: gameId
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to end game'
             });
         }
     });
@@ -600,7 +649,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Stop game engine if running
             const gameEngine = activeGames.get(gameId);
             if (gameEngine) {
-                gameEngine.stopGame();
+                gameEngine.endGame();
                 activeGames.delete(gameId);
             }
             
