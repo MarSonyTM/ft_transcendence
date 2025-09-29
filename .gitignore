@@ -30,6 +30,9 @@ Thumbs.db
 .idea/
 *.swp
 
+
+
 # Backend and Frontend node_modules
 src/backend/node_modules/
+src/backend/.env
 src/frontend/node_modules/

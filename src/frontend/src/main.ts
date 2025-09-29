@@ -2,6 +2,7 @@ import './styles.css';
 import { toggleTournaments, currentMatchPlayers } from './tournament';
 import renderRegisterPage from './pages/register';
 import renderLoginPage from './pages/login';
+import renderAuthCallbackPage from './pages/authCallback';
 
 declare global {
   interface Window {
@@ -685,7 +686,7 @@ class PongGame {
 }
 
 // SPA State
-type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'register';
+type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'register' | 'authCallback';
 
 // Initialize from SSR if available, otherwise use defaults
 let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
@@ -940,6 +941,9 @@ function renderApp() {
         case 'register':
             renderRegisterPage();
             break;
+        case 'authCallback':
+            renderAuthCallbackPage();
+            break;
         default:
             renderGamePage();
     }
@@ -959,6 +963,9 @@ window.addEventListener('popstate', () => {
             break;
         case '/game':
             currentPage = 'game';
+            break;
+        case '/auth/callback':
+            currentPage = 'authCallback';
             break;
         case '/':
             currentPage = 'landing';
@@ -987,6 +994,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPage = 'login';
         } else if (location.pathname === '/gameSelect') {
             currentPage = 'gameSelect';
+        } else if (location.pathname === '/auth/callback') {
+            currentPage = 'authCallback';
         } else {
             currentPage = 'landing';
         }

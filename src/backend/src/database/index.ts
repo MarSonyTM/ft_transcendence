@@ -12,6 +12,10 @@ export interface User {
   firstName: string;
   lastName: string;
   email?: string;
+  username?: string;
+  password?: string;
+  avatar?: string;
+  googleId?: string;
   createdAt: string;
 }
 
@@ -111,13 +115,18 @@ class UserDatabaseManager {
     return stmt.get(email) as User | undefined;
   }
 
-  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string }): Promise<User> {
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE googleId = ?');
+    return stmt.get(googleId) as User | undefined;
+  }
+
+  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string }): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (firstName, lastName, email, username, password, avatar) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar);
+    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId);
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
@@ -516,6 +525,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         username TEXT UNIQUE,
         password TEXT,
         avatar TEXT,
+        googleId TEXT UNIQUE,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )

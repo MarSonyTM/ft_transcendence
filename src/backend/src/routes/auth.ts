@@ -2,7 +2,8 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, User } from '../database/index';
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
-import {JWT_SECRET} from '../config/index';
+import {JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FRONTEND_URL} from '../config/index';
+import { OAuth2Client } from 'google-auth-library';
 
 // Types
 export interface CreateUserInput {
@@ -17,6 +18,11 @@ export interface CreateUserInput {
 export interface LoginInput {
   username?: string;
   password?: string;
+  email?: string;
+}
+
+export interface GoogleAuthInput {
+  token: string;
 }
 
 function validateEmail(email: string): boolean {
@@ -153,6 +159,192 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 			reply.code(500).send({
 				success: false,
 				message: 'Failed to create user'
+			});
+		}
+	});
+
+	// Google OAuth routes
+	const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+
+	// Google OAuth callback route
+	fastify.get('/google/callback', async (request, reply) => {
+		try {
+			const { code } = request.query as { code: string };
+			
+			if (!code) {
+				reply.code(400).send({
+					success: false,
+					message: 'Authorization code is required'
+				});
+				return;
+			}
+
+			// Exchange code for tokens
+			const { tokens } = await googleClient.getToken(code);
+
+			googleClient.setCredentials(tokens);
+
+			// Get user info from Google
+			const ticket = await googleClient.verifyIdToken({
+				idToken: tokens.id_token!,
+				audience: GOOGLE_CLIENT_ID
+			});
+
+			const payload = ticket.getPayload();
+			if (!payload) {
+				reply.code(400).send({
+					success: false,
+					message: 'Invalid Google token'
+				});
+				return;
+			}
+
+			const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: avatar } = payload;
+
+			// Check if user already exists
+			let user = await database.users.getUserByGoogleId(googleId);
+			
+			if (!user) {
+				// Check if user exists with same email
+				if (email) {
+					user = await database.users.getUserByEmail(email);
+					if (user) {
+						// Update existing user with Google ID
+						// Note: You might want to add an update method for googleId
+						reply.code(409).send({
+							success: false,
+							message: 'User with this email already exists. Please link your Google account from your profile.'
+						});
+						return;
+					}
+				}
+
+				// Create new user
+				const username = email ? email.split('@')[0] : `user_${googleId.substring(0, 8)}`;
+				user = await database.users.createUser({
+					firstName: firstName || 'Google',
+					lastName: lastName || 'User',
+					email: email || undefined,
+					username,
+					googleId,
+					avatar: avatar || undefined
+				});
+			}
+
+			// Generate JWT token
+			const token = jwt.sign(
+				{ id: user.id, email: user.email || '', username: user.username || '' },
+				JWT_SECRET,
+				{ expiresIn: '1w' }
+			);
+
+			// Redirect to frontend with token
+			const frontendUrl = FRONTEND_URL || 'http://localhost:5173';
+			reply.redirect(`${frontendUrl}/auth/callback?token=${token}&success=true`);
+
+		} catch (error) {
+			fastify.log.error(error);
+			const frontendUrl = FRONTEND_URL || 'http://localhost:5173';
+			reply.redirect(`${frontendUrl}/auth/callback?success=false&error=Authentication failed`);
+		}
+	});
+
+	// Google OAuth login route
+	fastify.get('/google', async (request, reply) => {
+		try {
+			const authUrl = googleClient.generateAuthUrl({
+				access_type: 'offline',
+				scope: ['profile', 'email'],
+				redirect_uri: GOOGLE_REDIRECT_URI
+			});
+			
+			reply.redirect(authUrl);
+		} catch (error) {
+			fastify.log.error(error);
+			reply.code(500).send({
+				success: false,
+				message: 'Failed to initiate Google authentication'
+			});
+		}
+	});
+
+	// Alternative: Direct token verification route (for frontend integration)
+	fastify.post('/google/verify', async (request, reply) => {
+		try {
+			const { token } = request.body as GoogleAuthInput;
+			
+			if (!token) {
+				reply.code(400).send({
+					success: false,
+					message: 'Google token is required'
+				});
+				return;
+			}
+
+			// Verify the Google token
+			const ticket = await googleClient.verifyIdToken({
+				idToken: token,
+				audience: GOOGLE_CLIENT_ID
+			});
+
+			const payload = ticket.getPayload();
+			if (!payload) {
+				reply.code(400).send({
+					success: false,
+					message: 'Invalid Google token'
+				});
+				return;
+			}
+
+			const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: avatar } = payload;
+
+			// Check if user already exists
+			let user = await database.users.getUserByGoogleId(googleId);
+			
+			if (!user) {
+				// Check if user exists with same email
+				if (email) {
+					user = await database.users.getUserByEmail(email);
+					if (user) {
+						reply.code(409).send({
+							success: false,
+							message: 'User with this email already exists. Please link your Google account from your profile.'
+						});
+						return;
+					}
+				}
+
+				// Create new user
+				const username = email ? email.split('@')[0] : `user_${googleId.substring(0, 8)}`;
+				user = await database.users.createUser({
+					firstName: firstName || 'Google',
+					lastName: lastName || 'User',
+					email: email || undefined,
+					username,
+					googleId,
+					avatar: avatar || undefined
+				});
+			}
+
+			// Generate JWT token
+			const jwtToken = jwt.sign(
+				{ id: user.id, email: user.email || '', username: user.username || '' },
+				JWT_SECRET,
+				{ expiresIn: '1w' }
+			);
+
+			reply.code(200).send({
+				success: true,
+				message: 'Google authentication successful',
+				token: jwtToken,
+				data: user
+			});
+
+		} catch (error) {
+			fastify.log.error(error);
+			reply.code(500).send({
+				success: false,
+				message: 'Google authentication failed'
 			});
 		}
 	});
