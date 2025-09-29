@@ -34,7 +34,7 @@ export interface WebSocketMessage {
     finalScores?: number[];
 }
 
-export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 'lobby';
+export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 'lobby' | 'authCallback' | 'register';
 
 declare global {
   interface Window {

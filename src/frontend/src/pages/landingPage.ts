@@ -18,7 +18,7 @@ export function renderLandingPage(): void {
     const loginBtn = document.getElementById('loginBtn');
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
-            history.pushState({ page: 'login' }, '', '#login');
+            history.pushState({ page: 'login' }, '', '/login');
             setCurrentPage('login');
             renderApp();
         });
@@ -27,7 +27,9 @@ export function renderLandingPage(): void {
     const registerBtn = document.getElementById('registerBtn');
     if (registerBtn) {
         registerBtn.addEventListener('click', () => {
-            alert('Registration coming soon!');
+            history.pushState({ page: 'register' }, '', '/register');
+            setCurrentPage('register');
+            renderApp();
         });
     }
     

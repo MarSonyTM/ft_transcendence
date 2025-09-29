@@ -7,22 +7,36 @@ import { renderGameSelectPage } from './pages/gameSelectPage';
 import { renderProfilePage } from './pages/profilePage';
 import { renderLobbyPage } from './pages/lobbyPage';
 import { renderGamePage, pongGame } from './pages/gamePage';
+import renderRegisterPage from './pages/registerPage';
+import renderAuthCallbackPage from './pages/authCallback';
 
 export async function renderApp(): Promise<void> {
     const page = getCurrentPage();
     
-    if (page === 'landing') {
-        renderLandingPage();
-    } else if (page === 'login') {
-        renderLoginPage();
-    } else if (page === 'gameSelect') {
-        renderGameSelectPage();
-    } else if (page === 'profile') {
-        renderProfilePage();
-    } else if (page === 'lobby') {
-        renderLobbyPage();
-    } else {
-        await renderGamePage();
+    switch (page) {
+        case 'landing':
+            renderLandingPage();
+            break;
+        case 'login':
+            renderLoginPage();
+            break;
+        case 'gameSelect':
+            renderGameSelectPage();
+            break;
+        case 'register':
+            renderRegisterPage();
+            break;
+        case 'authCallback':
+            renderAuthCallbackPage();
+            break;
+        case 'lobby':
+            renderLobbyPage();
+            break;
+        case 'profile':
+            renderProfilePage();
+            break;
+        default:
+            renderGamePage();
     }
 }
 
@@ -42,6 +56,12 @@ window.addEventListener('popstate', async () => {
         await renderApp();
     } else if (location.hash === '#lobby') {
         setCurrentPage('lobby');
+        await renderApp();
+    } else if (location.hash === '#register') {
+        setCurrentPage('register');
+        await renderApp();
+    } else if (location.hash === '#authCallback') {
+        setCurrentPage('authCallback');
         await renderApp();
     } else {
         if (pongGame) {
@@ -73,6 +93,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             setCurrentPage('profile');
         } else if (location.hash === '#lobby') {
             setCurrentPage('lobby');
+        } else if (location.hash === '#register') {
+            setCurrentPage('register');
+        } else if (location.hash === '#authCallback') {
+            setCurrentPage('authCallback');
         } else {
             setCurrentPage('landing');
         }
