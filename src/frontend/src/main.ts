@@ -683,7 +683,7 @@ class PongGame {
 }
 
 // SPA State
-type AppPage = 'landing' | 'login' | 'game' | 'gameSelect';
+type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile';
 
 // Initialize from SSR if available, otherwise use defaults
 let currentPage: AppPage = (window.__CURRENT_PAGE__ as AppPage) || 'landing';
@@ -872,6 +872,7 @@ function renderTwoPlayerGame() {
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
             <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
+            <button id="profileBtn" class="btn btn-profile" style="margin-left:1em; font-size:1em; background:#60a5fa; color:#fff;">Profile</button>
         </div>
         <div class="player-info">
             <div class="player-names">
@@ -893,7 +894,16 @@ function renderTwoPlayerGame() {
         <div id="tournamentRoot" class="t-section"></div>
     `;
     
+    // Add event for profile button
     setupGameButtons();
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+            history.pushState({ page: 'profile' }, '', '#profile');
+            currentPage = 'profile';
+            renderApp();
+        });
+    }
     initializeGame();
 }
 
@@ -918,6 +928,7 @@ function renderFourPlayerGame() {
             <button id="stopBtn" class="btn btn-stop">Stop Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
             <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
+            <button id="profileBtn" class="btn btn-profile" style="margin-left:1em; font-size:1em; background:#60a5fa; color:#fff;">Profile</button>
         </div>
         
         <!-- 4-Player Layout -->
@@ -951,7 +962,16 @@ function renderFourPlayerGame() {
         <div id="tournamentRoot" class="t-section"></div>
     `;
     
+    // Add event for profile button
     setupGameButtons();
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+            history.pushState({ page: 'profile' }, '', '#profile');
+            currentPage = 'profile';
+            renderApp();
+        });
+    }
     initializeGame();
 }
 
@@ -986,9 +1006,58 @@ function renderApp() {
         renderLoginPage();
     } else if (currentPage === 'gameSelect') {
         renderGameSelectPage();
+    } else if (currentPage === 'profile') {
+        renderProfilePage();
     } else {
         renderGamePage();
     }
+// --- Profile Page ---
+function renderProfilePage() {
+    const root = document.getElementById('app-root');
+    if (!root) return;
+    // Mock stats for now
+    const username = currentUsername || 'Player';
+    const gamesPlayed = 42;
+    const gamesWon = 24;
+    const gamesLost = gamesPlayed - gamesWon;
+    const winPercent = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+    root.innerHTML = `
+        <div class="profile-container" style="max-width: 400px; margin: 40px auto; background: #18181b; border-radius: 16px; box-shadow: 0 2px 12px #0004; padding: 2em; color: #fff; text-align: center;">
+            <h2 style="font-size: 2.2em; font-weight: bold; margin-bottom: 0.5em;">Profile</h2>
+            <div style="font-size: 1.3em; margin-bottom: 1.5em;">
+                <span style="font-weight: bold; color: #60a5fa;">${username}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1em; align-items: center;">
+                <div style="background: #23232b; border-radius: 8px; padding: 1em 2em; width: 100%; max-width: 300px;">
+                    <span style="font-weight: bold; color: #4ade80;">Games Played:</span> ${gamesPlayed}
+                </div>
+                <div style="background: #23232b; border-radius: 8px; padding: 1em 2em; width: 100%; max-width: 300px;">
+                    <span style="font-weight: bold; color: #f87171;">Games Lost:</span> ${gamesLost}
+                </div>
+                <div style="background: #23232b; border-radius: 8px; padding: 1em 2em; width: 100%; max-width: 300px;">
+                    <span style="font-weight: bold; color: #facc15;">Win %:</span> ${winPercent}%
+                </div>
+            </div>
+            <button id="friendListBtn" class="btn btn-friends" style="margin-top: 2em; font-size: 1.1em; background: #38bdf8; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">Friend List</button>
+            <button id="backToGameBtn" class="btn btn-back" style="margin-top: 1em; font-size: 1.1em; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">Back to Game</button>
+        </div>
+    `;
+    const backBtn = document.getElementById('backToGameBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'game' }, '', '#game');
+            currentPage = 'game';
+            renderApp();
+        });
+    }
+    const friendBtn = document.getElementById('friendListBtn');
+    if (friendBtn) {
+        friendBtn.addEventListener('click', () => {
+            // Placeholder for friend list navigation
+            alert('Friend list coming soon!');
+        });
+    }
+}
 }
 
 // Handle browser navigation (back/forward)
