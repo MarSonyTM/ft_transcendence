@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, User } from '../database/index';
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
+import {JWT_SECRET} from '../config/index';
 
 // Types
 export interface CreateUserInput {
@@ -125,7 +126,6 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 				return;
 			}
 			// check later
-			const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 			const token = jwt.sign(
 				{ id: res.id, email: res.email || '', username: res.username || '' }, // Payload: any user info you want to include
 				JWT_SECRET,
