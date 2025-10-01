@@ -195,13 +195,10 @@ h3 {
 
 .btn-profile {
   font-weight: bold;
-  margin: 8px 0;
-  font-size: 2em;
-  margin-top: 1px;
-  margin-right: 2px;
-  position: absolute;
-  top:20;
-  right: 0;
+  margin: 8px 0; 
+  font-size: 2em; 
+  background: #079fdb; 
+  color: #ffffff;
 }
 
 .btn-game-mode {

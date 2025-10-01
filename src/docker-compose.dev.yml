@@ -12,7 +12,6 @@ services:
       - ./backend/tsconfig.json:/app/tsconfig.json
       - ./frontend/dist:/app/frontend/dist
       - transcendence_db:/app/database
-      # Explicitly exclude node_modules by not mounting it
     environment:
       - NODE_ENV=development
       - FORCE_COLOR=1

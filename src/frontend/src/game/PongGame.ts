@@ -34,6 +34,7 @@ export class PongGame {
     player3Id: number = 3;
     player4Id: number = 4;
     paddlePosition: number = 80;
+    onGameEnd?: (winnerId: number) => Promise<void>;
     private renderLoopRunning: boolean = false;
     private animationFrameId: number | null = null;
     private shouldReconnect: boolean = true;
@@ -216,16 +217,31 @@ export class PongGame {
                 this.isActive = false;
                 this.updateStatus("Game stopped");
                 break;
-                
+
             case 'gameEnd':
                 if (message.mode === '4player') {
                     this.updateStatus(`Game Over! ${message.winnerName} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`, message.finalScores);
+                    
+                    // Trigger callback for 4-player mode
+                    if (this.onGameEnd) {
+                        const winnerId = this.parseWinnerIdFromName(message.winnerName);
+                        this.onGameEnd(winnerId);
+                    }
                 } else {
-                    this.updateStatus(`Game Over! Player ${message.winner} wins!`);
-                    console.log(`Game Over! Winner: Player ${message.winner}`);
+                    this.updateStatus(`Game Over! ${message.winner} wins!`);
+                    console.log(`Game Over! Winner: ${message.winner}`);
+                    
+                    // Trigger callback for 2-player mode
+                    if (this.onGameEnd && message.winner !== undefined) {
+                        this.onGameEnd(message.winner);
+                    }
                 }
                 this.isActive = false;
+                break;
+
+            case 'ping':
+                console.log("pong");
                 break;
                 
             default:
@@ -272,7 +288,6 @@ export class PongGame {
                 const pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement;
                 if (startBtn) startBtn.disabled = true;
                 if (pauseBtn) pauseBtn.disabled = false;
-                this.updatePlayerInfo();
             } else {
                 throw new Error(data.message || "Failed to start game");
             }
@@ -472,12 +487,9 @@ export class PongGame {
     }
 
     updatePlayerInfo(): void {
-        const player1Name = document.getElementById('player1Name');
         const player2Name = document.getElementById('player2Name');
         const player3Name = document.getElementById('player3Name');
         const player4Name = document.getElementById('player4Name');
-        const username = window.__USERNAME__ || getCurrentUser() || "Player 1";
-        if (player1Name) player1Name.textContent = username;
         if (player2Name) player2Name.textContent = "Marvin";
         if (player3Name) player3Name.textContent = "Ben";
         if (player4Name) player4Name.textContent = "Jerry";
@@ -565,5 +577,10 @@ export class PongGame {
         const pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement;
         if (startBtn) startBtn.disabled = false;
         if (pauseBtn) pauseBtn.disabled = true;
+    }
+
+    private parseWinnerIdFromName(winnerName: string): number {
+        const match = winnerName.match(/Player (\d+)/);
+        return match ? parseInt(match[1]) : 1;
     }
 }

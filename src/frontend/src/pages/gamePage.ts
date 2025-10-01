@@ -1,19 +1,18 @@
-import { getCurrentGameMode, getCurrentUser, setCurrentPage, setCurrentUser } from '../utils/globalState';
-import { PongGame } from '../game/PongGame';
-import { toggleTournaments } from '../tournament';
+import { setCurrentPage, getCurrentUser, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
+import { authService } from '../utils/auth';
+import { PongGame } from '../game/PongGame';
+import { getLobbyPlayers, Player } from './lobbyPage';
 
-let pongGame: PongGame | null = null;
+export let pongGame: PongGame | null = null;
 
 export async function renderGamePage(): Promise<void> {
     const gameMode = getCurrentGameMode();
     
-    if (gameMode === "1v1") {
-        await renderTwoPlayerGame();
-    } else if (gameMode === "4player") {
+    if (gameMode === '4player') {
         await renderFourPlayerGame();
     } else {
-        console.log("Unrecognized game mode:", gameMode);
+        await renderTwoPlayerGame();
     }
 }
 
@@ -21,8 +20,17 @@ async function renderTwoPlayerGame(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
+    // Get players from lobby
+    const lobbyPlayers = getLobbyPlayers();
+    const player1 = lobbyPlayers[0] || { username: 'Player 1', isAI: false };
+    const player2 = lobbyPlayers[1] || { username: 'Player 2', isAI: false };
+    
+    // Get authenticated user info for fallback
+    const user = authService.getCurrentUser();
+    const displayName = user?.username || getCurrentUser() || player1.username;
+    
     root.innerHTML = `
-        <h1 class="main-title">2-Player Pong</h1>
+        <h1 class="main-title">Pong Game</h1>
         <div class="game-status">
             <div>
                 Status: <span id="gameStatus" class="status-text">Initializing...</span>
@@ -41,11 +49,12 @@ async function renderTwoPlayerGame(): Promise<void> {
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
             <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
+        
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${getCurrentUser() || 'Player 1'}</span>
+                <span id="player1Name" class="player1-name">${player1.username}</span>
                 <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">Player 2</span>
+                <span id="player2Name" class="player2-name">${player2.username}</span>
             </div>
             <div class="score-container">
                 <span id="player1score" class="player1-score">0</span> 
@@ -78,6 +87,15 @@ async function renderFourPlayerGame(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
+    // Get players from lobby
+    const lobbyPlayers = getLobbyPlayers();
+    const players = [
+        lobbyPlayers[0] || { username: 'Player 1', isAI: false },
+        lobbyPlayers[1] || { username: 'Player 2', isAI: false },
+        lobbyPlayers[2] || { username: 'Player 3', isAI: false },
+        lobbyPlayers[3] || { username: 'Player 4', isAI: false }
+    ];
+    
     root.innerHTML = `
         <h1 class="main-title">4-Player Pong</h1>
         <div class="game-status">
@@ -100,13 +118,13 @@ async function renderFourPlayerGame(): Promise<void> {
         </div>
         
         <div class="player-info">
-            <span id="player1Name" class="player1-name">${getCurrentUser() || 'Player 1'}</span>
+            <span id="player1Name" class="player1-name">${players[0].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">Player 2</span>
+            <span id="player2Name" class="player2-name">${players[1].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player3Name" class="player3-name">Player 3</span>
+            <span id="player3Name" class="player3-name">${players[2].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player4Name" class="player4-name">Player 4</span>
+            <span id="player4Name" class="player4-name">${players[3].username}</span>
         </div>
         <div class="score-container">
             <span id="player1score" class="player1-score">0</span> 
@@ -122,14 +140,20 @@ async function renderFourPlayerGame(): Promise<void> {
         
         <div class="controls-info" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 5px; margin-top: 15px;">
             <div class="four-player-controls">
+                <p style="color: #60a5fa; font-weight: bold;">${players[0].username} (Top): A / D</p>
+                <p style="color: #f87171; font-weight: bold;">${players[1].username} (Right): Up / Down Arrow</p>
+                <p style="color: #facc15; font-weight: bold;">${players[2].username} (Bottom): J / L</p>
+                <p style="color: #1be71b; font-weight: bold;">${players[3].username} (Left): W / S</p>
                 <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
             </div>
         </div>
-        <button id="backToLandingBtn" class="btn btn-back" style="text-align: center">Back</button>
+        <button id="backToLandingBtn" class="btn btn-back">Back</button>
         <hr>
         <div id="tournamentRoot" class="t-section"></div>
     `;
     
+    await setupGameButtons();
+
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
@@ -138,74 +162,88 @@ async function renderFourPlayerGame(): Promise<void> {
             renderApp();
         });
     }
-
-    await setupGameButtons();
 }
 
 async function setupGameButtons(): Promise<void> {
+    pongGame = new PongGame();
+    
+    pongGame.onGameEnd = async (winnerId: number) => {
+        console.log(`Game ended, winner is Player ${winnerId}`);
+        
+        if (!pongGame || !pongGame.gameId) {
+            console.error('No game ID available to update winner');
+            return;
+        }
+        
+        try {
+            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+            const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ 
+                    winnerId: winnerId 
+                }),
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                console.log(`Winner (Player ${winnerId}) updated in database successfully`);
+            } else {
+                console.error('Failed to update winner:', data.message);
+            }
+        } catch (error) {
+            console.error('Error updating winner:', error);
+        }
+    };
+    
+    await pongGame.init();
+
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
     const tournamentsBtn = document.getElementById('tournamentsBtn');
-    
-    if (startBtn) startBtn.addEventListener('click', startGame);
-    if (pauseBtn) pauseBtn.addEventListener('click', pauseGame);
-    if (endBtn) endBtn.addEventListener('click', endGame);
-    if (reconnectBtn) reconnectBtn.addEventListener('click', reconnectWS);
-    if (tournamentsBtn) tournamentsBtn.addEventListener('click', toggleTournaments);
 
-    await initializeGame();
-}
-
-async function initializeGame(): Promise<void> {
-    if (pongGame) {
-        await pongGame.pauseGame();
-        pongGame = null;
+    if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+            if (pongGame) {
+                await pongGame.startServerGame();
+            }
+        });
     }
-    
-    pongGame = new PongGame();
-    await pongGame.init();
-}
 
-async function startGame(): Promise<void> {
-    if (pongGame) {
-        if (!pongGame.gameId) {
-            await pongGame.init();
-        }
-        
-        try {
-            await pongGame.startServerGame();
-            pongGame.startRenderLoop();
-        } catch (error) {
-            console.error('Failed to start game:', error);
-        }
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', async () => {
+            if (pongGame) {
+                await pongGame.pauseGame();
+            }
+        });
     }
-}
 
-async function pauseGame(): Promise<void> {
-    if (pongGame) {
-        await pongGame.pauseGame();
+    if (endBtn) {
+        endBtn.addEventListener('click', async () => {
+            if (pongGame) {
+                await pongGame.endGame();
+            }
+        });
     }
-}
 
-async function endGame(): Promise<void> {
-    if (pongGame) {
-        await pongGame.endGame();
-        
-        const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
-        const pauseBtn = document.getElementById('pauseBtn') as HTMLButtonElement;
-        if (startBtn) startBtn.disabled = false;
-        if (pauseBtn) pauseBtn.disabled = true;
-        
-        pongGame.updateStatus("Game ended - Click Start for new game");
+    if (reconnectBtn) {
+        reconnectBtn.addEventListener('click', async () => {
+            if (pongGame) {
+                await pongGame.reconnectWebSocket();
+            }
+        });
+    }
+
+    if (tournamentsBtn) {
+        tournamentsBtn.addEventListener('click', () => {
+            const tournamentRoot = document.getElementById('tournamentRoot');
+            if (tournamentRoot) {
+                tournamentRoot.style.display = tournamentRoot.style.display === 'none' ? 'block' : 'none';
+            }
+        });
     }
 }
-
-async function reconnectWS(): Promise<void> {
-    if (pongGame) {
-        pongGame.reconnectWebSocket();
-    }
-}
-
-export { pongGame };
