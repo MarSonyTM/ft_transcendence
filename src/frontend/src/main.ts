@@ -9,6 +9,8 @@ import { renderLobbyPage } from './pages/lobbyPage';
 import { renderGamePage, pongGame } from './pages/gamePage';
 import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
+import { setAccessToken } from './utils/api';
+
 
 export async function renderApp(): Promise<void> {
     const page = getCurrentPage();
@@ -104,3 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     await renderApp();
 });
+
+
+const existing = localStorage.getItem('authToken');
+if (existing) setAccessToken(existing);

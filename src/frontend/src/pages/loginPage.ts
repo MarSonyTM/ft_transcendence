@@ -1,23 +1,10 @@
 import { setCurrentPage, setCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
+import {  setAccessToken } from '../utils/api';
+import { loginUser } from '../_api/auth';
 
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-    const res = await fetch(`http://localhost:3000/api/auth/login`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password })
-	});
-	if (res.ok) {
-		const data = await res.json().catch(() => ({}));
-		return data;
-	}
-    if (res.status === 404) {
-        return { success: false, error: 'API not available (404)' };
-    } else if ( res.status === 401 ) {
-        return { success: false, error: 'Invalid username/email or password' };
-    }
-	return { success: false, error: `Server error (${res.status})` };
-}
+
+
 
 export function renderLoginPage(): void {
     const root = document.getElementById('app-root');
@@ -60,11 +47,6 @@ export function renderLoginPage(): void {
 				const loginError = document.getElementById('loginError');
 				if (loginError) loginError.style.color = 'green';
 				if (loginError) loginError.textContent = 'Login successful! Redirecting...';
-
-				const token = result.token;
-                if (token) {
-                    localStorage.setItem('authToken', token);
-                }
 
 				// Redirect to dashboard after short delay 
                 setTimeout(() => {
