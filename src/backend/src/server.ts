@@ -1,11 +1,13 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import path from 'path';
 import userRoutes from './routes/users';
+import auth from './routes/auth';
 import gameRoutes from './routes/game';
 import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
+import tournamentRoutes from './routes/tournament';
 import { database } from './database';
 
 const PORT = 3000;
@@ -31,11 +33,13 @@ const start = async (): Promise<void> => {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
       origin: [
-        'http://localhost:8080',
+        'http://0.0.0.0:8080',
         'http://frontend:8080',
+        'http://0.0.0.0:3000',
+        'http://0.0.0.0:5173', // Vite dev server
         'http://localhost:3000',
-        'http://localhost:5173', // Vite dev server
-        /^http:\/\/localhost:\d+$/
+        'http://localhost:5173',
+        /^http:\/\/0.0.0.0:\d+$/
       ],
       credentials: true
     });
@@ -48,6 +52,8 @@ const start = async (): Promise<void> => {
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
     await server.register(playerRoutes, { prefix: '/api/players' });
+    await server.register(tournamentRoutes, { prefix: '/api/tournament' });
+    await server.register(auth, { prefix: '/api/auth' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -58,6 +64,9 @@ const start = async (): Promise<void> => {
           version: '0.0.3',
           features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
           endpoints: {
+            auth: '/api/auth',
+            createUser: '/api/auth/create',
+            login: '/api/auth/login',
             users: '/api/users',
             userById: '/api/users/:id',
             games: '/api/game',
@@ -70,6 +79,9 @@ const start = async (): Promise<void> => {
             playersByGame: '/api/players/game/:gameId',
             playersByUser: '/api/players/user/:userId',
             playerStats: '/api/players/:id/stats',
+            tournamentStart: '/api/tournament/start',
+            tournamentState: '/api/tournament/state',
+            tournamentResult: '/api/tournament/result',
             ping: '/api/ping',
             health: '/health',
             webSocket: '/game/:gameid/ws'

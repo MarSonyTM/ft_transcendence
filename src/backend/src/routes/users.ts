@@ -7,6 +7,9 @@ export interface CreateUserInput {
   firstName: string;
   lastName: string;
   email?: string;
+  username?: string;
+  password?: string;
+  avatar?: string;
 }
 
 // Plugin function that registers all user routes
@@ -70,7 +73,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Create new user ====
-    // Example: curl -X POST http://localhost:3000/users -H "Content-Type: application/json" -d '{ "firstName": "John", "lastName": "Doe", "email": "john.doe@example.com" }'
+    // Example: curl -X POST http://localhost:3000/users/create -H "Content-Type: application/json" -d '{ "firstName": "John", "lastName": "Doe", "email": "john.doe@example.com" }'
     fastify.post('/', async (request, reply) => {
         try {
             const userData = request.body as CreateUserInput;
@@ -98,7 +101,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
                 reply.code(409).send({
                     success: false,
-                    message: 'Email already exists'
+                    message: 'Email or username already exists'
                 });
                 return;
             }
@@ -118,7 +121,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const userId = parseInt(id);
             const userData = request.body as Partial<CreateUserInput>;
             
-            if (isNaN(userId)) {
+            if (isNaN(userId)) {//TODO: add check for negative and 0 ids?
                 reply.code(400).send({
                     success: false,
                     message: 'Invalid user ID'

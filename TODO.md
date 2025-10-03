@@ -69,14 +69,14 @@
 - [x] Database (SQLite) - Minor
 - [ ] Blockchain Score Storage - Major
 
-### User Management
-- [ ] Standard User Management - Major
-  - [ ] User registration/login
+### User Management - @bmahdi
+- [x] Standard User Management - Major
+  - [x] User registration/login
   - [ ] Profile management
-  - [ ] Avatar support
+  - [x] Avatar support
   - [ ] Friend system
   - [ ] Match history
-- [ ] OAuth Authentication - Major
+- [x] OAuth Authentication - Major
 
 ### Gameplay & UX - @mgeiger-
 - [ ] Remote Players - Major
@@ -92,7 +92,7 @@
 ### Security - @bmahdi
 - [ ] WAF/ModSecurity + HashiCorp Vault - Major
 - [ ] GDPR Compliance - Minor
-- [ ] 2FA & JWT - Major
+- [x] 2FA & JWT - Major
 
 ### DevOps
 - [ ] ELK Stack Integration - Major

@@ -15,6 +15,7 @@ coverage/
 # Env
 .env
 .env.*
+src/backend/.env
 
 # Docker
 *.pid

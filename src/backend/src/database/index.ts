@@ -41,14 +41,20 @@ export interface GameState {
   gameId: number;
   player1Id: number;
   player2Id: number;
+  player3Id: number;
+  player4Id: number;
   ballPosX: number;
   ballPosY: number;
   ballVelX: number;
   ballVelY: number;
   player1Pos: number;
   player2Pos: number;
+  player3Pos: number;
+  player4Pos: number;
   scorePlayer1: number;
   scorePlayer2: number;
+  scorePlayer3: number;
+  scorePlayer4: number;
   lastActivity: string;
 }
 
@@ -101,13 +107,28 @@ class UserDatabaseManager {
     return stmt.get(id) as User | undefined;
   }
 
-  createUser(userData: { firstName: string; lastName: string; email?: string }): User {
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE username = ?');
+    return stmt.get(username) as User | undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE email = ?');
+    return stmt.get(email) as User | undefined;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE googleId = ?');
+    return stmt.get(googleId) as User | undefined;
+  }
+
+  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string }): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (firstName, lastName, email) 
-      VALUES (?, ?, ?)
+      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email);
+
+    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId);
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
@@ -361,14 +382,20 @@ class GameStateDatabaseManager {
 
   createGameState(gameStateData: { gameId: number; player1Id: number; player2Id: number }): GameState {
     const stmt = this.db.prepare(`
-      INSERT INTO gameState (gameId, player1Id, player2Id, ballPosX, ballPosY, ballVelX, ballVelY, player1Pos, player2Pos, scorePlayer1, scorePlayer2) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO gameState (
+        gameId, player1Id, player2Id, player3Id, player4Id,
+        ballPosX, ballPosY, ballVelX, ballVelY, 
+        player1Pos, player2Pos, scorePlayer1, scorePlayer2
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
       gameStateData.gameId,
       gameStateData.player1Id,
       gameStateData.player2Id,
+      gameStateData.player1Id,  // Use player1Id as default for player3Id
+      gameStateData.player2Id,  // Use player2Id as default for player4Id
       0, // Default ball X position
       0, // Default ball Y position
       0, // Default ball X velocity
@@ -382,7 +409,7 @@ class GameStateDatabaseManager {
     const newGameState = this.getGameStateById(result.lastInsertRowid as number);
     
     if (!newGameState) {
-      throw new Error('Failed to retrieve created game logic');
+      throw new Error('Failed to retrieve created game state');
     }
     
     return newGameState;
@@ -497,7 +524,12 @@ export class DatabaseManager extends BaseDatabaseManager {
         firstName TEXT NOT NULL,
         lastName TEXT NOT NULL,
         email TEXT UNIQUE,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        username TEXT UNIQUE,
+        password TEXT,
+        avatar TEXT,
+        googleId TEXT UNIQUE,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
     
@@ -522,6 +554,8 @@ export class DatabaseManager extends BaseDatabaseManager {
       }
     }
   }
+
+
 
   private initializeGamesTable() {
     const createGamesTable = `
@@ -567,18 +601,27 @@ export class DatabaseManager extends BaseDatabaseManager {
         gameId INTEGER NOT NULL,
         player1Id INTEGER NOT NULL,
         player2Id INTEGER NOT NULL,
+        player3Id INTEGER NOT NULL,
+        player4Id INTEGER NOT NULL,
         ballPosX INTEGER NOT NULL DEFAULT 0,
         ballPosY INTEGER NOT NULL DEFAULT 0,
         ballVelX INTEGER NOT NULL DEFAULT 0,
         ballVelY INTEGER NOT NULL DEFAULT 0,
         player1Pos INTEGER NOT NULL DEFAULT 0,
         player2Pos INTEGER NOT NULL DEFAULT 0,
+        player3Pos INTEGER NOT NULL DEFAULT 0,
+        player4Pos INTEGER NOT NULL DEFAULT 0,
         scorePlayer1 INTEGER NOT NULL DEFAULT 0,
         scorePlayer2 INTEGER NOT NULL DEFAULT 0,
+        scorePlayer3 INTEGER NOT NULL DEFAULT 0,
+        scorePlayer4 INTEGER NOT NULL DEFAULT 0,
+        gameMode TEXT NOT NULL DEFAULT '1v1',
         lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
         FOREIGN KEY (player1Id) REFERENCES users(id),
-        FOREIGN KEY (player2Id) REFERENCES users(id)
+        FOREIGN KEY (player2Id) REFERENCES users(id),
+        FOREIGN KEY (player3Id) REFERENCES users(id),
+        FOREIGN KEY (player4Id) REFERENCES users(id)
       )
     `;
     
