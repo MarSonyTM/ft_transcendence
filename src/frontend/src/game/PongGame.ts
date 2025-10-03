@@ -69,8 +69,17 @@ export class PongGame {
         this.updateStatus("Ready to start...");
         
         try {
-            if (!this.gameId) {
+            // CRITICAL FIX: Check if this is a room-based game
+            const room = getCurrentRoom();
+            
+            if (room && room.gameId) {
+                // For room-based games, use the existing game ID from the room
+                this.gameId = room.gameId;
+                console.log(`✅ Using room's game ID: ${this.gameId}`);
+            } else if (!this.gameId) {
+                // Only create a new game if not in a room
                 await this.createGame();
+                console.log(`✅ Created new game ID: ${this.gameId}`);
             }
             
             if (this.gameId) {
