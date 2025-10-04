@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { StringAsNumber } from 'fastify/types/utils';
 
 // Use environment variable for Docker compatibility, fallback to local path
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
@@ -12,7 +13,14 @@ export interface User {
   firstName: string;
   lastName: string;
   email?: string;
+  username: string;
+  password: string;
+  avatar: string;
+  googleId: string;
+  gamesWon: number;
+  gamesLost: number;
   createdAt: string;
+  UpdatedAt: string;
 }
 
 export interface Game {
@@ -122,13 +130,13 @@ class UserDatabaseManager {
     return stmt.get(googleId) as User | undefined;
   }
 
-  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string }): Promise<User> {
+  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string; gamesWon?: number; gamesLost?: number}): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId, gamesWon, gamesLost) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId);
+    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId, userData.gamesWon, userData.gamesLost);
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
@@ -136,6 +144,31 @@ class UserDatabaseManager {
     }
     
     return insertedUser;
+  }
+
+  updateUserStats(userId: number, won: boolean): User | undefined {
+    const user = this.getUserById(userId);
+    
+    if (!user) {
+      return undefined;
+    }
+    
+    const stmt = this.db.prepare(`
+      UPDATE users 
+      SET gamesWon = COALESCE(gamesWon, 0) + ?, 
+          gamesLost = COALESCE(gamesLost, 0) + ?,
+          UpdatedAt = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    
+    // If won is true, increment gamesWon, otherwise increment gamesLost
+    const result = stmt.run(won ? 1 : 0, won ? 0 : 1, userId);
+    
+    if (result.changes === 0) {
+      return undefined;
+    }
+    
+    return this.getUserById(userId);
   }
 
   updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string }>): User | undefined {
@@ -528,31 +561,14 @@ export class DatabaseManager extends BaseDatabaseManager {
         password TEXT,
         avatar TEXT,
         googleId TEXT UNIQUE,
+        gamesWon INTEGER DEFAULT 0,
+        gamesLost INTEGER DEFAULT 0,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
     
     this.db.exec(createUsersTable);
-    
-    // Insert sample data if table is empty
-    const userCount = this.db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-    
-    if (userCount.count === 0) {
-      const insertSampleUsers = this.db.prepare(`
-        INSERT INTO users (firstName, lastName, email) VALUES (?, ?, ?)
-      `);
-      
-      const sampleUsers = [
-        ['Michael', 'Naysmith', 'michael@example.com'],
-        ['John', 'Doe', 'john.doe@example.com'],
-        ['Jane', 'Smith', 'jane.smith@example.com']
-      ];
-      
-      for (const user of sampleUsers) {
-        insertSampleUsers.run(user);
-      }
-    }
   }
 
 

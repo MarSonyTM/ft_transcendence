@@ -1,19 +1,30 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { authService } from '../utils/auth';
+
 
 export function renderLandingPage(): void {
     const root = document.getElementById('app-root');
     if (!root) return;
-    
-    root.innerHTML = `
-        <button id="profileBtn" class="btn btn-profile">Profile</button>
+
+    if (!authService.isAuthenticated()) {
+        root.innerHTML = `
         <div class="landing-container">
-            <h1 class="main-title">PING PONG</h1>
+        <h1 class="main-title">PING PONG</h1>
             <button id="loginBtn" class="btn btn-login">Login</button>
             <button id="registerBtn" class="btn btn-register">Register</button>
-            <button id="playBtn" class="btn btn-play">Play</button>
         </div>
     `;
+    }
+    else {
+        root.innerHTML = `
+        <div class="landing-container">
+        <h1 class="main-title">PING PONG</h1>
+        <button id="profileBtn" class="btn btn-profile">Profile</button>
+        <button id="playBtn" class="btn btn-play">Play</button>
+        </div>
+        `;
+    }
     
     const loginBtn = document.getElementById('loginBtn');
     if (loginBtn) {
