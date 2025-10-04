@@ -52,3 +52,26 @@ Once both services are running, you can access:
 - Port forwarding is set up in the first terminal
 - Changes in your local files are reflected in the container due to volume mounting
 - Environment variables are loaded from `.env` file
+
+### Troubleshooting
+
+1. **Database Initialization Error**
+   If you get a database initialization error, ensure the database directory exists with proper permissions:
+   ```bash
+   cd src/backend
+   mkdir -p database
+   chmod 777 database
+   ```
+
+2. **API Connection Error**
+   If you get `ENOTFOUND backend_dev` errors, ensure the frontend's vite.config.ts is using localhost:
+   ```typescript
+   // in src/frontend/vite.config.ts
+   proxy: {
+     '/api': {
+       target: 'http://localhost:3000',  // Not backend_dev
+       changeOrigin: true,
+     }
+   }
+   ```
+   After changing the config, restart the frontend server.
