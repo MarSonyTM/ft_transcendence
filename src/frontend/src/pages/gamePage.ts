@@ -2,7 +2,7 @@ import { setCurrentPage, getCurrentUser, getCurrentGameMode } from '../utils/glo
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
-import { getLobbyPlayers, Player, getCurrentRoom } from './lobbyPage';
+import { getLobbyPlayers, Player, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 
 let roomWS: RoomWebSocketManager | null = null;
@@ -204,7 +204,10 @@ async function setupGameButtons(): Promise<void> {
     if (isRoomBasedGame && room && room.gameId) {
         console.log('🎮 Room-based game detected! Using shared gameId:', room.gameId);
         
-        // Manually initialize without creating a new game
+        // CRITICAL: Set the gameId BEFORE any initialization
+        pongGame.gameId = room.gameId;
+        
+        // Manually initialize canvas without creating a new game
         pongGame.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
         if (!pongGame.canvas) {
             console.error('❌ Canvas not found!');
@@ -212,7 +215,6 @@ async function setupGameButtons(): Promise<void> {
         }
         
         pongGame.ctx = pongGame.canvas.getContext('2d');
-        pongGame.gameId = room.gameId;
         
         console.log('✅ Set gameId to:', pongGame.gameId);
         
@@ -220,6 +222,8 @@ async function setupGameButtons(): Promise<void> {
         try {
             await pongGame.connectWebSocket();
             console.log('✅ Connected to shared game WebSocket');
+            
+            pongGame.updateStatus("Connected - Click Start to begin");
             
             // Start the render loop manually since we skipped init()
             if (pongGame.startRenderLoop) {
@@ -230,7 +234,7 @@ async function setupGameButtons(): Promise<void> {
         }
     } else {
         console.log('🎮 Local game - creating new game instance');
-        // Local game - create new game normally
+        // Local game - create new game normally (this will create a NEW game)
         await pongGame.init();
     }
     

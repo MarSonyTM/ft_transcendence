@@ -1,5 +1,6 @@
 import { GameState, WebSocketMessage } from '../types';
 import { getCurrentGameMode, getCurrentUser } from '../utils/globalState';
+import { getCurrentRoom } from '../utils/roomState';
 
 export class PongGame {
     gameId: number | null = null;
@@ -73,13 +74,14 @@ export class PongGame {
             const room = getCurrentRoom();
             
             if (room && room.gameId) {
-                // For room-based games, use the existing game ID from the room
                 this.gameId = room.gameId;
                 console.log(`✅ Using room's game ID: ${this.gameId}`);
             } else if (!this.gameId) {
-                // Only create a new game if not in a room
                 await this.createGame();
                 console.log(`✅ Created new game ID: ${this.gameId}`);
+            } else {
+                // gameId was already set (from room or elsewhere)
+                console.log(`✅ Using pre-set game ID: ${this.gameId}`);
             }
             
             if (this.gameId) {

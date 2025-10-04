@@ -15,6 +15,7 @@ interface JoinRoomBody {
   playerId: string;
   username: string;
   isAI?: boolean;
+  isReady?: boolean;
 }
 
 interface ToggleReadyBody {
@@ -90,7 +91,8 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false } = request.body;
+      const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
+      const isReady = !!isAI;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -99,13 +101,12 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady);
 
       if (!result.success) {
         return reply.code(400).send(result);
       }
 
-      // ✨ CRITICAL FIX: Broadcast room update to ALL players
       const room = gameRoomManager.getRoom(roomId);
       if (room) {
         console.log(`📡 Broadcasting room update to ${room.players.length} players`);
@@ -114,7 +115,7 @@ async function roomRoutes(fastify: FastifyInstance) {
           type: 'roomState',
           room: {
             roomId: room.roomId,
-            hostId: room.hostId,        // ADD THIS LINE
+            hostId: room.hostId,
             players: room.players,
             status: room.status,
             maxPlayers: room.maxPlayers,

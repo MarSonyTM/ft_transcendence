@@ -56,7 +56,7 @@ class GameRoomManager {
   }
 
   // Join an existing room
-  joinRoom(roomId: string, playerId: string, username: string, isAI: boolean): { success: boolean; message: string; room?: GameRoom } {
+  joinRoom(roomId: string, playerId: string, username: string, isAI: boolean, isReady: boolean): { success: boolean; message: string; room?: GameRoom } {
     const room = this.rooms.get(roomId);
 
     if (!room) {
