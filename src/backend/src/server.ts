@@ -1,5 +1,6 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import path from 'path';
+import websocket from '@fastify/websocket';
 import userRoutes from './routes/users';
 import auth from './routes/auth';
 import gameRoutes from './routes/game';
@@ -8,10 +9,12 @@ import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
 import tournamentRoutes from './routes/tournament';
+import roomRoutes from './routes/room';
+import roomWebSocketRoutes from './websocket/roomHandler';
 import { database } from './database';
 
-const PORT = 3000;
-const HOST = '0.0.0.0';
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const HOST = process.env.HOST || '0.0.0.0';
 
 const server: FastifyInstance = fastify({
   logger: {
@@ -43,6 +46,9 @@ const start = async (): Promise<void> => {
       ],
       credentials: true
     });
+
+    await server.register(websocket);
+    console.log('🔌 WebSocket support registered');
     
     // Register WebSocket support first
     await webSocketRoutes(server);
@@ -54,6 +60,8 @@ const start = async (): Promise<void> => {
     await server.register(playerRoutes, { prefix: '/api/players' });
     await server.register(tournamentRoutes, { prefix: '/api/tournament' });
     await server.register(auth, { prefix: '/api/auth' });
+    await server.register(roomRoutes);
+    await server.register(roomWebSocketRoutes);
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -61,7 +69,7 @@ const start = async (): Promise<void> => {
       fastify.get('/api', async (request: FastifyRequest, reply: FastifyReply) => {
         return {
           message: 'Transcendence API with SSR',
-          version: '0.0.3',
+          version: '0.0.7',
           features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
           endpoints: {
             auth: '/api/auth',
@@ -82,6 +90,7 @@ const start = async (): Promise<void> => {
             tournamentStart: '/api/tournament/start',
             tournamentState: '/api/tournament/state',
             tournamentResult: '/api/tournament/result',
+            createRoom: '/api/room/create',
             ping: '/api/ping',
             health: '/health',
             webSocket: '/game/:gameid/ws'
