@@ -130,13 +130,21 @@ class UserDatabaseManager {
     return stmt.get(googleId) as User | undefined;
   }
 
-  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string; gamesWon?: number; gamesLost?: number}): Promise<User> {
+  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string }): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId, gamesWon, gamesLost) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId, userData.gamesWon, userData.gamesLost);
+    const result = stmt.run(
+      userData.firstName,
+      userData.lastName,
+      userData.email || null,
+      userData.username || null,
+      userData.password || null,
+      userData.avatar || null,
+      userData.googleId || null
+    );
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
