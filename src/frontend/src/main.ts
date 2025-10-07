@@ -94,7 +94,6 @@ function handleRouting(): void {
   }
   renderApp();
 }
->>>>>>> DEV
 
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
