@@ -79,7 +79,7 @@ class GameRoomManager {
     room.players.push({
       id: playerId,
       username,
-      isReady: false
+      isReady: isReady || isAI  // Set ready status based on parameters
     });
 
     console.log(`✅ ${username} joined room ${roomId}`);
