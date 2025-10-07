@@ -7,7 +7,17 @@
 - 42school image built
 - Being on the `feature/security-mafurnic` branch
 
-### Starting the Development Containers
+### Starting the Development Environment
+
+There are two ways to run the development environment:
+
+#### Method 1: Using Docker Compose (Recommended for Linux)
+```bash
+# In the src directory
+docker compose -f docker-compose.dev.yml up
+```
+
+#### Method 2: Single Container (Recommended for Mac)
 
 1. **First Terminal (Backend)**
 ```bash
@@ -16,11 +26,12 @@ docker run -it --rm -v "$PWD":/app -w /app -p 3000:3000 -p 5173:5173 42school:la
 
 # Inside the container, start backend
 cd src/backend
+mkdir -p database     # Create database directory if it doesn't exist
+chmod 777 database    # Set proper permissions
 npm run dev
 ```
 
 2. **Get Container ID**
-
 ```bash
 # In a new terminal on your Mac
 docker ps
@@ -37,6 +48,12 @@ cd src/frontend
 npm run dev
 ```
 
+### Important Notes for Mac Users
+- Use Method 2 (Single Container) as it avoids networking issues between containers on Mac
+- The Vite config in `src/frontend/vite.config.ts` should use `localhost:3000` as the backend target
+- Both services run in the same container, so they can communicate via localhost
+- Database files will be created in `src/backend/database/`
+
 ### Testing
 Once both services are running, you can access:
 - Frontend: http://localhost:5173
@@ -52,3 +69,26 @@ Once both services are running, you can access:
 - Port forwarding is set up in the first terminal
 - Changes in your local files are reflected in the container due to volume mounting
 - Environment variables are loaded from `.env` file
+
+### Troubleshooting
+
+1. **Database Initialization Error**
+   If you get a database initialization error, ensure the database directory exists with proper permissions:
+   ```bash
+   cd src/backend
+   mkdir -p database
+   chmod 777 database
+   ```
+
+2. **API Connection Error**
+   If you get `ENOTFOUND backend_dev` errors, ensure the frontend's vite.config.ts is using localhost:
+   ```typescript
+   // in src/frontend/vite.config.ts
+   proxy: {
+     '/api': {
+       target: 'http://localhost:3000',  // Not backend_dev
+       changeOrigin: true,
+     }
+   }
+   ```
+   After changing the config, restart the frontend server.
