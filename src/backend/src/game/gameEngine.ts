@@ -101,6 +101,9 @@ export abstract class BaseGameEngine {
     protected gameLoop = (): void => {
         const resetSignal = this.updateBallPosition();
         
+        // Update AI positions if any
+        this.updateAIPositions();
+        
         if (resetSignal === 1) {
             this.resetBall();
         }
@@ -118,6 +121,62 @@ export abstract class BaseGameEngine {
         }
 
         this.gameTimer = setTimeout(this.gameLoop, 16);
+    }
+
+    protected updateAIPositions(): void {
+        const paddleSpeed = 5; // Same speed as human players
+
+        // Right paddle (Player 2) AI
+        if (this.gameState.player2Pos !== undefined) {
+            const currentY = this.gameState.player2Pos;
+            let targetY = currentY; // Default to current position
+
+            // Only move if ball is coming towards AI
+            if (this.xDir > 0) {
+                // Calculate where ball will intersect with paddle
+                const distanceToTravel = 390 - this.gameState.ballPosX; // Right paddle X position
+                const timeToIntercept = distanceToTravel / (this.xDir * 2.1); // Using ball speed from updateBallPosition
+                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
+                
+                // Aim to center paddle on predicted ball position
+                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
+            }
+
+            // Move towards target
+            if (Math.abs(targetY - currentY) > paddleSpeed) {
+                if (targetY > currentY) {
+                    this.updatePlayerPosition(2, currentY + paddleSpeed);
+                } else {
+                    this.updatePlayerPosition(2, currentY - paddleSpeed);
+                }
+            }
+        }
+
+        // Left paddle (Player 1) AI
+        if (this.gameState.player1Pos !== undefined) {
+            const currentY = this.gameState.player1Pos;
+            let targetY = currentY; // Default to current position
+
+            // Only move if ball is coming towards AI
+            if (this.xDir < 0) {
+                // Calculate where ball will intersect with paddle
+                const distanceToTravel = this.gameState.ballPosX - 10; // Left paddle X position
+                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1); // Using ball speed
+                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
+                
+                // Aim to center paddle on predicted ball position
+                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
+            }
+
+            // Move towards target
+            if (Math.abs(targetY - currentY) > paddleSpeed) {
+                if (targetY > currentY) {
+                    this.updatePlayerPosition(1, currentY + paddleSpeed);
+                } else {
+                    this.updatePlayerPosition(1, currentY - paddleSpeed);
+                }
+            }
+        }
     }
 
     public getCurrentState(): GameState {
