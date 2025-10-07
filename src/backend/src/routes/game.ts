@@ -3,10 +3,28 @@ import { database, Game, Player } from '../database/index';
 import { createGameEngine } from '../game/gameEngine';
 import type { BaseGameEngine } from '../game/gameEngine';
 
+import { JWT_SECRET } from '../config/index';
+import jwt from 'jsonwebtoken';
+
 // Types
 export interface CreateGameInput {
   mode?: string;
   difficulty?: string;
+}
+
+function getUserIdFromRequest(request: any): number | null {
+    try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return null;
+        }
+        
+        const token = authHeader.substring(7);
+        const decoded = jwt.verify(token, JWT_SECRET!) as { id: string };
+        return parseInt(decoded.id);
+    } catch {
+        return null;
+    }
 }
 
 // Store active game engines
@@ -268,15 +286,40 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             let gameState = database.gameState.getGameStateByGameId(gameId);
             
             if (!gameState) {
-                // Create default game state if it doesn't exist
-                const defaultGameStateData = {
-                    gameId: gameId,
-                    player1Id: 1, // Default player IDs
-                    player2Id: 2
-                };
+                // Get authenticated user or first available user
+                let userId = getUserIdFromRequest(request);
                 
+                if (!userId) {
+                    // No auth token, use first user in database
+                    const allUsers = database.users.getAllUsers();
+                    if (allUsers.length === 0) {
+                        reply.code(500).send({
+                            success: false,
+                            message: 'No users in database. Create a user first.'
+                        });
+                        return;
+                    }
+                    userId = allUsers[0].id;
+                }
+                
+                // Create game state using direct database insert (bypasses validation)
                 try {
-                    gameState = database.gameState.createGameState(defaultGameStateData);
+                    const stmt = database['db'].prepare(`
+                        INSERT INTO gameState (
+                            gameId, player1Id, player2Id, player3Id, player4Id,
+                            ballPosX, ballPosY, ballVelX, ballVelY, 
+                            player1Pos, player2Pos, scorePlayer1, scorePlayer2
+                        ) 
+                        VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0)
+                    `);
+                    
+                    stmt.run(gameId, userId, userId, userId, userId);
+                    
+                    gameState = database.gameState.getGameStateByGameId(gameId);
+                    
+                    if (!gameState) {
+                        throw new Error('Failed to retrieve created game state');
+                    }
                 } catch (createError) {
                     console.error('Failed to create game state:', createError);
                     reply.code(500).send({
@@ -289,16 +332,11 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             // Start game engine
             try {
-                // Get the game mode from the database - NOW SUPPORTING 4PLAYER!
-                const gameMode = game.mode || '1v1'; // Default to 1v1 if no mode specified
-                
-                console.log(`🎮 Starting ${gameMode} game engine for game ${gameId}`);
-                
+                const gameMode = game.mode || '1v1';
                 const gameEngine = createGameEngine(gameState, gameMode);
                 activeGames.set(gameId, gameEngine);
                 gameEngine.startGame();
                 
-                // Update game status in database
                 database.games.updateGame(gameId, { 
                     status: 'active',
                     startedAt: new Date().toISOString()
@@ -315,11 +353,9 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 console.error('Failed to start game engine:', engineError);
                 reply.code(500).send({
                     success: false,
-                    message: `Failed to start game engine: ${engineError instanceof Error ? engineError.message : 'Unknown error'}`
+                    message: `Failed to start game engine`
                 });
-                return;
             }
-            
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
@@ -527,20 +563,26 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         try {
             const gameData = request.body as CreateGameInput;
             
+            // Get authenticated user ID from JWT token
+            const userId = getUserIdFromRequest(request);
+            
             // Create the game
             const newGame = database.games.createGame(gameData);
             
-            // Create corresponding gameState
-            const gameStateData = {
-                gameId: newGame.id,
-                player1Id: 1, // Default player IDs
-                player2Id: 2
-            };
-            
-            try {
-                database.gameState.createGameState(gameStateData);
-            } catch (gameStateError) {
-                // Game state creation failed, but game was created
+            // If user is authenticated, create game state with their ID
+            if (userId) {
+                try {
+                    const gameStateData = {
+                        gameId: newGame.id,
+                        player1Id: userId,
+                        player2Id: userId 
+                    };
+                    
+                    database.gameState.createGameState(gameStateData);
+                } catch (gameStateError) {
+                    // Game state creation failed, but game was created
+                    console.log('Game state creation skipped:', gameStateError);
+                }
             }
             
             reply.code(201).send({
@@ -675,8 +717,104 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             });
         }
     });
+
+    fastify.post('/:id/winner', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+            const { winnerId } = request.body as { winnerId: number };
+            const gameId = parseInt(id);
+            
+            if (isNaN(gameId)) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Invalid game ID'
+                });
+                return;
+            }
+            
+            if (!winnerId || isNaN(winnerId)) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Invalid winner ID - must be 1 or 2'
+                });
+                return;
+            }
+            
+            // Get the game
+            const game = database.games.getGameById(gameId);
+            if (!game) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'Game not found'
+                });
+                return;
+            }
+            
+            // Get the game state to find actual player IDs
+            const gameState = database.gameState.getGameStateByGameId(gameId);
+            if (!gameState) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'Game state not found'
+                });
+                return;
+            }
+            
+            // Map the winnerId (1 or 2) to actual database player ID
+            let actualWinnerId: number;
+            if (winnerId === 1) {
+                actualWinnerId = gameState.player1Id;
+            } else if (winnerId === 2) {
+                actualWinnerId = gameState.player2Id;
+            } else {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Winner ID must be 1 or 2'
+                });
+                return;
+            }
+            
+            // Update the game with winner ID and mark as finished
+            const updatedGame = database.games.updateGame(gameId, { 
+                status: 'finished',
+                winnerId: actualWinnerId,
+                endedAt: new Date().toISOString()
+            });
+            
+            if (!updatedGame) {
+                reply.code(500).send({
+                    success: false,
+                    message: 'Failed to update game'
+                });
+                return;
+            }
+            
+            // Increment gamesWon for winner
+            database.users.updateUserStats(actualWinnerId, true);
+            
+            // Increment gamesLost for loser
+            const loserId = winnerId === 1 ? gameState.player2Id : gameState.player1Id;
+            database.users.updateUserStats(loserId, false);
+            
+            fastify.log.info(`Game ${gameId} winner set to player ${winnerId} (user ID: ${actualWinnerId})`);
+            fastify.log.info(`Updated stats: Winner ${actualWinnerId} +1 win, Loser ${loserId} +1 loss`);
+            
+            return {
+                success: true,
+                message: 'Winner updated successfully',
+                gameId: gameId,
+                winnerId: actualWinnerId,
+                winnerPosition: winnerId
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to update winner'
+            });
+        }
+    });
 }
 
-// Export the activeGames map so other modules can access it if needed
 export { activeGames };
 export default gameRoutes;

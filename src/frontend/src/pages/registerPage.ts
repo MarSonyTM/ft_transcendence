@@ -31,7 +31,7 @@ export default function renderRegisterPage(): void {
 				Sign up with Google
 			</button>
 			<div style="margin-top:1.2em;display:flex;gap:.8em;">
-				<button id="toLoginBtn" class="btn btn-login" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:.5em 1.1em;cursor:pointer;font-weight:600;">Login</button>
+				<button id="toLoginBtn" class="btn btn-back" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:.5em 1.1em;cursor:pointer;font-weight:600;">Login</button>
 				<button id="backLandingBtn" class="btn btn-back" style="background:#6b7280;color:#fff;border:none;border-radius:6px;padding:.5em 1.1em;cursor:pointer;font-weight:600;">Back</button>
 			</div>
 		</div>
