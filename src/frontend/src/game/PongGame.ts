@@ -104,6 +104,7 @@ export class PongGame {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({ 
                     mode: selectedMode, 
@@ -126,7 +127,8 @@ export class PongGame {
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || 'ws://localhost:3000';
-            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
+            const token = localStorage.getItem('authToken');
+            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws?token=${token}`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
@@ -288,7 +290,14 @@ export class PongGame {
         try {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${this.gameId}/start`, {
-                method: "POST"
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
+                },
+                body: JSON.stringify({
+                    gameId: this.gameId
+                })
             });
 
             const data = await response.json();
@@ -531,7 +540,14 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
-                    method: "POST"
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({
+                        gameId: this.gameId
+                    })
                 });
                 this.updateStatus("Game paused");
             } catch (error) {
@@ -574,7 +590,14 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/end`, {
-                    method: "POST"
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({
+                        gameId: this.gameId
+                    })
                 });
                 this.updateStatus("Game ended - Click Start for new game");
             } catch (error) {

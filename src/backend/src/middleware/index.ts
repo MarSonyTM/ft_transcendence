@@ -11,9 +11,8 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
 		|| request.url.startsWith('/api/auth/google/callback')
 		|| request.url.startsWith('/api/auth/google/verify')
 		|| request.url.startsWith('/api/auth/google')
-		|| request.url.startsWith('/api/auth/google/callback')
-		|| request.url.startsWith('/api/auth/google/callback')
-		|| request.url.startsWith('/api/auth/google/callback')) {
+		|| request.url.startsWith('/room/')  // Allow WebSocket connections
+		|| request.url.startsWith('/game/')) {  // Allow WebSocket connections
 		return;
 	}
 	const auth = request.headers.authorization || '';
