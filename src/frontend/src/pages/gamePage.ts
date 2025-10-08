@@ -200,12 +200,43 @@ async function setupGameButtons(): Promise<void> {
     
     pongGame = new PongGame();
     
-    // For room-based games, use the shared gameId from the room
-    if (isRoomBasedGame && room && room.gameId) {
-        console.log('🎮 Room-based game detected! Using shared gameId:', room.gameId);
+    // For room-based games, ALWAYS connect to the shared game and NEVER create a new one locally
+    if (isRoomBasedGame) {
+        // Ensure we have a gameId; if missing, fetch latest room data and wait briefly
+        let effectiveRoom = room;
+        if (!effectiveRoom || !effectiveRoom.gameId) {
+            console.warn('⚠️ Room-based game but missing gameId. Fetching room state before connecting...');
+            const roomId = effectiveRoom?.roomId || (history.state && history.state.roomId);
+            if (roomId) {
+                try {
+                    // Try up to ~1s to obtain the gameId (helps with websocket/HTTP race)
+                    const deadline = Date.now() + 1000;
+                    while (Date.now() < deadline && (!effectiveRoom || !effectiveRoom.gameId)) {
+                        const resp = await fetch(`/api/room/${roomId}`);
+                        const data = await resp.json();
+                        if (data?.success && data?.room) {
+                            effectiveRoom = data.room;
+                        }
+                        if (!effectiveRoom?.gameId) {
+                            await new Promise(r => setTimeout(r, 100));
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch updated room:', e);
+                }
+            }
+        }
+
+        if (!effectiveRoom || !effectiveRoom.gameId) {
+            console.error('❌ No shared gameId available yet; not creating a standalone game.');
+            // Gracefully abort button setup here; lobby WS should navigate once gameId arrives
+            return;
+        }
+
+        console.log('🎮 Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
         
-        // CRITICAL: Set the gameId BEFORE any initialization
-        pongGame.gameId = room.gameId;
+        // Set the shared gameId BEFORE any initialization
+        pongGame.gameId = effectiveRoom.gameId;
         
         // Manually initialize canvas without creating a new game
         pongGame.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
@@ -213,28 +244,18 @@ async function setupGameButtons(): Promise<void> {
             console.error('❌ Canvas not found!');
             return;
         }
-        
         pongGame.ctx = pongGame.canvas.getContext('2d');
         
-        console.log('✅ Set gameId to:', pongGame.gameId);
-        
-        // Connect to the shared game WebSocket
         try {
             await pongGame.connectWebSocket();
             console.log('✅ Connected to shared game WebSocket');
-            
             pongGame.updateStatus("Connected - Click Start to begin");
-            
-            // Start the render loop manually since we skipped init()
-            if (pongGame.startRenderLoop) {
-                pongGame.startRenderLoop();
-            }
+            if (pongGame.startRenderLoop) pongGame.startRenderLoop();
         } catch (error) {
             console.error('❌ Failed to connect to game WebSocket:', error);
         }
     } else {
         console.log('🎮 Local game - creating new game instance');
-        // Local game - create new game normally (this will create a NEW game)
         await pongGame.init();
     }
     
@@ -259,24 +280,33 @@ async function setupGameButtons(): Promise<void> {
         
         try {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+            // Persist winner to the game
             const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ 
-                    winnerId: winnerId 
-                }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ winnerId })
             });
-
             const data = await response.json();
-            if (data.success) {
-                console.log(`Winner (Player ${winnerId}) updated in database successfully`);
-            } else {
+            if (!data.success) {
                 console.error('Failed to update winner:', data.message);
             }
+
+            // Also update the logged-in user's profile stats if available
+            const user = authService.getCurrentUser();
+            if (user && user.id) {
+                const didWin = (winnerId === 1); // Local player is mapped to Player 1 in 2P
+                try {
+                    await fetch(`${apiEndpoint}/api/users/stats`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
+                        body: JSON.stringify({ won: didWin })
+                    });
+                } catch (e) {
+                    console.warn('Unable to update user stats:', e);
+                }
+            }
         } catch (error) {
-            console.error('Error updating winner:', error);
+            console.error('Error updating winner or stats:', error);
         }
     };
 
@@ -374,6 +404,9 @@ async function initRoomBasedGame(room: any): Promise<void> {
             if (roomWS) {
                 roomWS.requestState();
             }
+
+            // Hook up keyboard controls to send moves to the room WS
+            setupRoomKeyboardControls(roomWS!, playerId);
         },
         
         onDisconnect: () => {

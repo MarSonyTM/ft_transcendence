@@ -282,13 +282,15 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     try {
       const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
-      const gameId = Date.now();
+      // Use incremental DB-backed game IDs for cleanliness
+      const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
+      const gameId = createdGame.id;
       
       console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
       // Create a proper GameState object
       const initialGameState: GameState = {
-        id: 0, // Will be set by database if needed
+        id: 0, // Optional: engine updates guard errors internally
         gameId: gameId,
         player1Id: 0,
         player2Id: 0,
@@ -319,6 +321,10 @@ async function roomRoutes(fastify: FastifyInstance) {
 
       // Store and start the game engine
       activeGames.set(gameId, gameEngine);
+      // IMPORTANT: start the engine loop so the ball moves and state updates
+      if (typeof (gameEngine as any).startGame === 'function') {
+        (gameEngine as any).startGame();
+      }
       
       const started = gameRoomManager.startGame(roomId, gameId);
       if (!started) {

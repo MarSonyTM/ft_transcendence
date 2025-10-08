@@ -35,15 +35,28 @@ const start = async (): Promise<void> => {
   try {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
-      origin: [
-        'http://0.0.0.0:8080',
-        'http://frontend:8080',
-        'http://0.0.0.0:3000',
-        'http://0.0.0.0:5173', // Vite dev server
-        'http://localhost:3000',
-        'http://localhost:5173',
-        /^http:\/\/0.0.0.0:\d+$/
-      ],
+      origin: (origin: string, cb: Function) => {
+        const defaults = [
+          'http://0.0.0.0:8080',
+          'http://frontend:8080',
+          'http://0.0.0.0:3000',
+          'http://0.0.0.0:5173',
+          'http://localhost:3000',
+          'http://localhost:5173',
+          'https://localhost:5173',
+          'https://localhost:3000'
+        ];
+        const extra = (process.env.ALLOWED_ORIGINS || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        const allowed = new Set([...defaults, ...extra]);
+        if (!origin || allowed.has(origin) || [...allowed].some(p => origin.startsWith(p))) {
+          cb(null, true);
+        } else {
+          cb(null, false);
+        }
+      },
       credentials: true
     });
 

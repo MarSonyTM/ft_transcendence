@@ -157,6 +157,13 @@ export class AuthService {
     this.currentUser = null;
   }
 
+  // Helper: authorization header for authenticated requests
+  getAuthHeader(): Record<string, string> | null {
+    const token = this.getToken();
+    if (!token) return null;
+    return { 'Authorization': `Bearer ${token}` };
+  }
+
   // Update user stats after game
   async updateGameStats(won: boolean): Promise<void> {
     const token = this.getToken();

@@ -70,29 +70,49 @@ export class PongGame {
         this.updateStatus("Ready to start...");
         
         try {
-            // CRITICAL FIX: Check if this is a room-based game
+            // CRITICAL FIX: Check if this is a room-based game FIRST
             const room = getCurrentRoom();
             
-            if (room && room.gameId) {
+            console.log('🔍 [PONGGAME] init() - room:', room);
+            console.log('🔍 [PONGGAME] init() - room?.gameId:', room?.gameId);
+            console.log('🔍 [PONGGAME] init() - this.gameId:', this.gameId);
+            
+            // Priority 1: If gameId was already set externally (from gamePage), use it
+            if (this.gameId) {
+                console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
+            }
+            // Priority 2: If there's a room with a gameId, use it
+            else if (room && room.gameId) {
                 this.gameId = room.gameId;
-                console.log(`✅ Using room's game ID: ${this.gameId}`);
-            } else if (!this.gameId) {
+                console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
+            }
+            // Priority 3: Only create a new game if there's NO room AND no gameId set
+            else if (!room) {
+                console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
                 await this.createGame();
-                console.log(`✅ Created new game ID: ${this.gameId}`);
-            } else {
-                // gameId was already set (from room or elsewhere)
-                console.log(`✅ Using pre-set game ID: ${this.gameId}`);
+                console.log(`✅ [PONGGAME] Created new standalone game ID: ${this.gameId}`);
+            }
+            // Priority 4: Room exists but no gameId yet - wait for host to start
+            else {
+                console.warn(`⏳ [PONGGAME] Room exists but no gameId - game not started yet`);
+                this.updateStatus("Waiting for host to start game...");
+                return; // Don't initialize yet
             }
             
+            // Connect to WebSocket only after gameId is confirmed
             if (this.gameId) {
                 await this.connectWebSocket();
                 this.updateStatus("Connected - Click Start to begin");
                 this.startRenderLoop();
+            } else {
+                throw new Error("Failed to establish game ID");
             }
         } catch (error) {
+            console.error("❌ [PONGGAME] Initialization error:", error);
             this.updateStatus(`Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+
 
     async createGame(): Promise<void> {
         try {
