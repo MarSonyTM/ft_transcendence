@@ -52,7 +52,8 @@ export default function renderAuthCallbackPage(): void {
         const retryBtn = document.getElementById('retryAuthBtn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => {
-                window.location.href = 'http://localhost:3000/api/auth/google';
+                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+                window.location.href = `${apiEndpoint}/api/auth/google`;
             });
         }
 

@@ -14,7 +14,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://backend_dev:3000',
+        target: process.env.VITE_BACKEND_URL || 'http://backend_dev:3000',
         changeOrigin: true,
         rewrite: (path) => path,
         configure: (proxy, options) => {
@@ -28,7 +28,11 @@ export default defineConfig({
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
           });
         },
-      }
+      },
+    },
+    // Enable SPA fallback for client-side routing
+    fs: {
+      strict: false
     }
   },
   preview: {

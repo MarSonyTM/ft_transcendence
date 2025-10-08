@@ -144,3 +144,8 @@ Remember:
 - Each major module = 10 points
 - Each minor module = 5 points
 - Two minor modules = one major module
+
+
+// Host cant end, remote can
+// Remote cant host the game, only Host
+// Only host of the match should be updating the database. Possible double up

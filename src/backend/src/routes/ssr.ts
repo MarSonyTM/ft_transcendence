@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from 'fastify';
 import { database } from '../database';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
@@ -30,162 +30,139 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
   });
 
   // Helper function to inject server data into the HTML
-  function injectGameData(html: string, gameState: any, gameId: number | null, currentUsername: string, currentPage: string): string {
+  function injectGameData(html: string, gameState: any, gameId: number | null, currentUsername: string, currentPage: string, request: FastifyRequest): string {
+    // Get the host from the request headers
+    const host = request.headers.host || `0.0.0.0:${process.env.PORT || 3000}`;
+    const protocol = request.headers['x-forwarded-proto'] || (request.protocol === 'https' ? 'https' : 'http');
+    const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
+    
     const initialState = {
       gameState,
       gameId,
       currentUsername,
       currentPage,
       timestamp: Date.now(),
-      apiEndpoint: `http://0.0.0.0:${process.env.PORT || 3000}`,
-      wsEndpoint: `ws://0.0.0.0:${process.env.PORT || 3000}`,
+      apiEndpoint: `${protocol}://${host}`,
+      wsEndpoint: `${wsProtocol}://${host}`,
       environment: process.env.NODE_ENV || 'development'
     };
 
-    // Inject the state right after the app-root div
-    return html.replace(
-      '<div id="app-root"></div>',
-      `<div id="app-root"></div>
-       <script>
-         window.__INITIAL_STATE__ = ${JSON.stringify(initialState)};
-         window.__GAME_STATE__ = ${JSON.stringify(gameState)};
-         window.__GAME_ID__ = ${gameId};
-         window.__USERNAME__ = ${JSON.stringify(currentUsername)};
-         window.__CURRENT_PAGE__ = ${JSON.stringify(currentPage)};
-         console.log('🏓 SSR: Game state injected for page:', '${currentPage}');
-       </script>`
-    );
+    const scriptTag = `
+      <script>
+        window.__INITIAL_STATE__ = ${JSON.stringify(initialState)};
+        window.__GAME_STATE__ = ${JSON.stringify(gameState)};
+        window.__GAME_ID__ = ${gameId};
+        window.__CURRENT_USER__ = "${currentUsername}";
+        window.__CURRENT_PAGE__ = "${currentPage}";
+      </script>
+    `;
+
+    return html.replace('</head>', `${scriptTag}</head>`);
   }
 
-  // Serve HTML with game state injection
-  async function servePageWithGameState(
-    request: any, 
-    reply: any, 
-    pageType: 'landing' | 'login' | 'game',
-    gameId: number | null = null,
-    username: string = ''
-  ) {
+  // SSR route for root
+  fastify.get('/', async (request, reply) => {
     try {
-      // Check if frontend is built
       if (!existsSync(indexPath)) {
-        fastify.log.error(`Frontend build not found at: ${indexPath}`);
-        reply.code(503);
-        return {
-          error: 'Frontend not built',
-          message: 'Please run "npm run build" in the frontend directory',
-          expectedPath: indexPath
+        reply.code(500);
+        return { 
+          error: 'Frontend build not found',
+          message: 'Please run frontend build first',
+          path: indexPath
         };
       }
 
-      // Default game state
-      let gameState = {
-        ballPosX: 200,
-        ballPosY: 100,
-        player1Pos: 80,
-        player2Pos: 80,
-        scorePlayer1: 0,
-        scorePlayer2: 0
+      let html = readFileSync(indexPath, 'utf-8');
+      html = injectGameData(html, null, null, 'Guest', 'landing', request);
+      
+      reply.type('text/html');
+      return reply.send(html);
+    } catch (error) {
+      reply.code(500);
+      return { 
+        error: 'Failed to render page',
+        message: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  });
 
-      // If gameId is provided, try to get current game state from database
+  // SSR route for login page
+  fastify.get('/login', async (request, reply) => {
+    try {
+      if (!existsSync(indexPath)) {
+        reply.code(500);
+        return { error: 'Frontend build not found' };
+      }
+
+      let html = readFileSync(indexPath, 'utf-8');
+      html = injectGameData(html, null, null, 'Guest', 'login', request);
+      
+      reply.type('text/html');
+      return reply.send(html);
+    } catch (error) {
+      reply.code(500);
+      return { error: 'Failed to render login page' };
+    }
+  });
+
+  // SSR route for game page with optional gameId
+  fastify.get('/game/:gameId?', async (request, reply) => {
+    try {
+      const { gameId } = request.params as { gameId?: string };
+
+      if (!existsSync(indexPath)) {
+        reply.code(500);
+        return { error: 'Frontend build not found' };
+      }
+
+      let html = readFileSync(indexPath, 'utf-8');
+      let gameState = null;
+      let parsedGameId = null;
+
       if (gameId) {
-        try {
-          const dbGameState = database.gameState.getGameStateByGameId(gameId);
-          if (dbGameState) {
-            gameState = {
-              ballPosX: dbGameState.ballPosX || 200,
-              ballPosY: dbGameState.ballPosY || 100,
-              player1Pos: dbGameState.player1Pos || 80,
-              player2Pos: dbGameState.player2Pos || 80,
-              scorePlayer1: dbGameState.scorePlayer1 || 0,
-              scorePlayer2: dbGameState.scorePlayer2 || 0
-            };
-            fastify.log.info(`Loaded game state for game ${gameId}: ${JSON.stringify(gameState)}`);
-          }
-        } catch (error) {
-          fastify.log.warn(`Failed to load game state for game ${gameId}: ${error}`);
+        parsedGameId = parseInt(gameId, 10);
+        const game = database.prepare('SELECT * FROM games WHERE id = ?').get(parsedGameId);
+        
+        if (game) {
+          gameState = {
+            id: game.id,
+            mode: game.mode,
+            status: game.status,
+            difficulty: game.difficulty,
+            createdAt: game.created_at
+          };
         }
       }
 
-      // Read the built HTML file
-      const html = readFileSync(indexPath, 'utf-8');
+      html = injectGameData(html, gameState, parsedGameId, 'Guest', 'game', request);
       
-      // Inject server-side game data
-      const htmlWithGameData = injectGameData(html, gameState, gameId, username, pageType);
-      
-      // Set proper headers
-      reply.type('text/html; charset=utf-8');
-      
-      // Add caching headers
-      if (process.env.NODE_ENV === 'production') {
-        reply.header('Cache-Control', 'public, max-age=3600');
-      } else {
-        reply.header('Cache-Control', 'no-cache');
-      }
-      
-      return reply.send(htmlWithGameData);
-      
+      reply.type('text/html');
+      return reply.send(html);
     } catch (error) {
-      fastify.log.error(`SSR Error for ${pageType}: ${error}`);
       reply.code(500);
-      return {
-        error: 'Server-side rendering failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        page: pageType,
-        timestamp: new Date().toISOString()
+      return { 
+        error: 'Failed to render game page',
+        message: error instanceof Error ? error.message : 'Unknown error'
       };
     }
-  }
-
-  // Root route - renders based on query parameters or defaults to landing
-  fastify.get('/', async (request, reply) => {
-    const query = request.query as { page?: string; username?: string };
-    const page = query.page || 'landing';
-    const username = query.username || '';
-    
-    return servePageWithGameState(
-      request, 
-      reply, 
-      page as 'landing' | 'login' | 'game', 
-      null, 
-      username
-    );
   });
 
-  // Game-specific SSR route
-  fastify.get('/game/:gameId?', async (request, reply) => {
-    const params = request.params as { gameId?: string };
-    const query = request.query as { username?: string };
-    
-    const gameId = params.gameId ? parseInt(params.gameId) : null;
-    const username = query.username || '';
-    
-    return servePageWithGameState(request, reply, 'game', gameId, username);
-  });
+  // Catch-all route for SPA routing
+  fastify.get('*', async (request, reply) => {
+    try {
+      if (!existsSync(indexPath)) {
+        reply.code(500);
+        return { error: 'Frontend build not found' };
+      }
 
-  // Login page route
-  fastify.get('/login', async (request, reply) => {
-    return servePageWithGameState(request, reply, 'login');
-  });
-
-  // Catch-all route for SPA client-side routing
-
-  fastify.setNotFoundHandler(async (request, reply) => {
-    // Only handle HTML requests, not API or WebSocket requests
-    const acceptsHtml = request.headers.accept?.includes('text/html');
-    const isApiRequest = request.url.startsWith('/api/') || 
-                        (request.url.startsWith('/game/') && request.url.includes('/ws'));
-    
-    if (acceptsHtml && !isApiRequest) {
-      // Default to serving the SPA with empty state for unknown routes
-      return servePageWithGameState(request, reply, 'landing');
-    } else {
-      reply.code(404);
-      return {
-        error: 'Not Found',
-        message: `Route ${request.method} ${request.url} not found`,
-        timestamp: new Date().toISOString()
-      };
+      let html = readFileSync(indexPath, 'utf-8');
+      html = injectGameData(html, null, null, 'Guest', 'unknown', request);
+      
+      reply.type('text/html');
+      return reply.send(html);
+    } catch (error) {
+      reply.code(500);
+      return { error: 'Failed to render page' };
     }
   });
 }

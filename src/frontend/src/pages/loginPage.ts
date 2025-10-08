@@ -1,24 +1,31 @@
 import { setCurrentPage, setCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
 
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-    const res = await fetch(`http://localhost:3000/api/auth/login`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password })
-	});
-	if (res.ok) {
-		const data = await res.json().catch(() => ({}));
-		return data;
-	}
+export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; error?: string }> {
+    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+    
+    const res = await fetch(`${apiEndpoint}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+    
+    if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return {
+            success: data.success || false,
+            username: data.data?.username,
+            token: data.token,
+            error: data.message
+        };
+    }
     if (res.status === 404) {
         return { success: false, error: 'API not available (404)' };
     } else if ( res.status === 401 ) {
         return { success: false, error: 'Invalid username/email or password' };
     }
-	return { success: false, error: `Server error (${res.status})` };
+    return { success: false, error: `Server error (${res.status})` };
 }
-
 export function renderLoginPage(): void {
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -38,46 +45,83 @@ export function renderLoginPage(): void {
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    <path fill="none" d="M1 1h22v22H1z"/>
                 </svg>
-                Sign in with Google
+                <span>Sign in with Google</span>
             </button>
-            <button id="backToLandingBtn" class="btn btn-back" style="margin-top: 2em; font-size: 1.2em; background: #6b7280; color: white; border: none; border-radius: 8px; padding: 0.5em 1.5em; cursor: pointer;">Back</button>
+            <p style="text-align: center; margin-top: 1.5em; color: #666; font-size: 0.9em;">
+                Don't have an account? <button id="toRegisterBtn" style="background: none; border: none; color: #3b82f6; text-decoration: underline; cursor: pointer; font-size: 1em;">Register</button>
+            </p>
+            <button id="backLandingBtn" class="btn btn-back" style="margin-top: 1em;">Back to Landing</button>
         </div>
     `;
-    const loginForm = document.getElementById('loginForm') as HTMLFormElement;
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
+
+    const form = document.getElementById('loginForm') as HTMLFormElement | null;
+    const usernameInput = document.getElementById('usernameInput') as HTMLInputElement | null;
+    const passwordInput = document.getElementById('passwordInput') as HTMLInputElement | null;
+    const errorEl = document.getElementById('loginError');
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const usernameInput = document.getElementById('usernameInput') as HTMLInputElement;
-            const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
-            const loginError = document.getElementById('loginError');
-            if (loginError) loginError.textContent = '';
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
+            if (errorEl) errorEl.textContent = '';
+
+            const username = usernameInput?.value.trim() || '';
+            const password = passwordInput?.value || '';
+
+            if (!username || !password) {
+                if (errorEl) errorEl.textContent = 'Please enter username and password';
+                return;
+            }
+
+            const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Logging in...';
+            }
+
             const result = await loginUser(username, password);
 
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+
             if (result.success) {
-				const loginError = document.getElementById('loginError');
-				if (loginError) loginError.style.color = 'green';
-				if (loginError) loginError.textContent = 'Login successful! Redirecting...';
-
-				const token = result.token;
-                if (token) {
-                    localStorage.setItem('authToken', token);
+                // Store the token if it exists
+                if (result.token) {
+                    localStorage.setItem('authToken', result.token);
                 }
-
-				// Redirect to dashboard after short delay 
+                
+                // Update current user
+                setCurrentUser(result.username || username);
+                
+                // Show success message
+                if (errorEl) {
+                    errorEl.style.color = 'green';
+                    errorEl.textContent = 'Login successful! Redirecting...';
+                }
+                
+                // Redirect to landing page
                 setTimeout(() => {
-					history.pushState({ page: 'dashboard' }, '', '/dashboard');
-					// Trigger main SPA to re-render (since main.ts controls pages)
-					window.dispatchEvent(new PopStateEvent('popstate'));
-				}, 1000);
-            } else if (loginError) {
-                loginError.textContent = result.error || 'Login failed';
+                    history.pushState({ page: 'landing' }, '', '/');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }, 500);
+            } else {
+                if (errorEl) errorEl.textContent = result.error || 'Login failed';
             }
         });
     }
-    const backBtn = document.getElementById('backToLandingBtn');
+
+    const toRegisterBtn = document.getElementById('toRegisterBtn');
+    if (toRegisterBtn) {
+        toRegisterBtn.addEventListener('click', () => {
+            history.pushState({ page: 'register' }, '', '/register');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+    }
+
+    const backBtn = document.getElementById('backLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             history.pushState({ page: 'landing' }, '', '/');
@@ -89,8 +133,9 @@ export function renderLoginPage(): void {
     const googleSignInBtn = document.getElementById('googleSignInBtn');
     if (googleSignInBtn) {
         googleSignInBtn.addEventListener('click', () => {
-            // Redirect to backend Google OAuth endpoint
-            window.location.href = 'http://localhost:3000/api/auth/google';
+            // Use the dynamic API endpoint for Google OAuth
+            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+            window.location.href = `${apiEndpoint}/api/auth/google`;
         });
     }
 }

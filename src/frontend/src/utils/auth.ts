@@ -1,4 +1,5 @@
-const API_URL = '';
+const getApiUrl = () => window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+const API_URL = getApiUrl();
 
 interface DecodedToken {
   id: string;

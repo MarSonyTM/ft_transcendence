@@ -145,7 +145,7 @@ export async function renderApp(): Promise<void> {
       renderGamePage();
       break;
     default:
-      renderGamePage();
+      renderLandingPage();
   }
 }
 
@@ -167,14 +167,11 @@ window.addEventListener('popstate', async () => {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('App starting with SSR support...');
   
+  // Always derive the page from URL routing to support deep links like /join/:roomId
   if (window.__INITIAL_STATE__) {
-    setCurrentPage((window.__CURRENT_PAGE__ as AppPage) || 'landing');
     setCurrentUser(window.__USERNAME__ || '');
-    await renderApp();
-  } else {
-    console.log('No SSR data found, using URL-based routing');
-    handleRouting();
   }
+  handleRouting();
 });
 
 // Add types for SSR support

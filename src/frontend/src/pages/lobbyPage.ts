@@ -328,17 +328,6 @@ function renderLobby(root: HTMLElement): void {
   const currentPlayer = players.find(p => p.id === currentUserId);
   const inviteLink = `${window.location.origin}/join/${currentRoom.roomId}`;
 
-  console.log('🎨 [RENDER] Lobby state:', {
-    roomId: currentRoom.roomId,
-    isHost,
-    hostId: currentRoom.hostId,
-    currentUserId: currentUserId,
-    hostIdType: typeof currentRoom.hostId,
-    currentUserIdType: typeof currentUserId,
-    canStart,
-    players: players.map(p => ({ username: p.username, isReady: p.isReady }))
-  });
-
   root.innerHTML = `
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
       <div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">

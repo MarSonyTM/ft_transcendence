@@ -35,29 +35,44 @@ const start = async (): Promise<void> => {
   try {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
-      origin: (origin: string, cb: Function) => {
-        const defaults = [
-          'http://0.0.0.0:8080',
+      origin: (origin, cb) => {
+        console.log('🔍 CORS Request from origin:', origin);
+        
+        if (!origin) {
+          console.log('✅ No origin header - allowing request');
+          return cb(null, true);
+        }
+        
+        // Allow any localhost or local network IP
+        const allowedPatterns = [
+          /^http:\/\/localhost:\d+$/,
+          /^http:\/\/127\.0\.0\.1:\d+$/,
+          /^http:\/\/0\.0\.0\.0:\d+$/,
+          /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+          /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
+          /^https:\/\/localhost$/,
           'http://frontend:8080',
-          'http://0.0.0.0:3000',
-          'http://0.0.0.0:5173',
-          'http://localhost:3000',
-          'http://localhost:5173',
-          'https://localhost:5173',
-          'https://localhost:3000'
         ];
-        const extra = (process.env.ALLOWED_ORIGINS || '')
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean);
-        const allowed = new Set([...defaults, ...extra]);
-        if (!origin || allowed.has(origin) || [...allowed].some(p => origin.startsWith(p))) {
+        
+        const isAllowed = allowedPatterns.some(pattern => {
+          if (typeof pattern === 'string') {
+            return origin === pattern;
+          }
+          return pattern.test(origin);
+        });
+        
+        if (isAllowed) {
+          console.log('✅ Origin allowed:', origin);
           cb(null, true);
         } else {
-          cb(null, false);
+          console.log('❌ Origin blocked:', origin);
+          cb(new Error('Not allowed by CORS'));
         }
       },
-      credentials: true
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     });
 
     await server.register(websocket);

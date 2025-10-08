@@ -116,9 +116,13 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
     case 'move':
       // Handle player movement
       if (typeof message.position === 'number' && room.gameId) {
-        handlePlayerMove(room.gameId, getPlayerNumber(room, playerId), message.position);
-        
-        // Broadcast movement to all players in room
+        const playerNum = getPlayerNumber(room, playerId);
+        const gameEngine = activeGames.get(room.gameId);
+        if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
+          gameEngine.updatePlayerPosition(playerNum, message.position);
+        }
+
+        // Broadcast movement to all players in room (for UI sync)
         broadcastToRoom(roomId, {
           type: 'playerMove',
           playerId,

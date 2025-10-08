@@ -4,6 +4,9 @@ import { getCurrentRoom } from '../utils/roomState';
 
 export class PongGame {
     gameId: number | null = null;
+    // Display mapping from server player indices -> local view indices
+    // Default: identity [0,1,2,3]. For 1v1, right-side client can use [1,0,2,3]
+    viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
     websocket: WebSocket | null = null;
@@ -145,7 +148,8 @@ export class PongGame {
 
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || 'ws://localhost:3000';
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
             const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
             
             console.log('Connecting to WebSocket:', wsUrl);
@@ -202,7 +206,7 @@ export class PongGame {
                 
             case 'gameState':
                 if (message.state) {
-                    this.gameState = {
+                    const nextState = {
                         ballPosX: message.state.ballPosX || this.gameState.ballPosX,
                         ballPosY: message.state.ballPosY || this.gameState.ballPosY,
                         player1Pos: message.state.player1Pos || this.gameState.player1Pos,
@@ -219,7 +223,27 @@ export class PongGame {
                         scores: message.state.scores || this.gameState.scores,
                         lastContact: message.state.lastContact || this.gameState.lastContact
                     };
-                    
+
+                    // Apply display mapping for 1v1 when the local view swaps left/right
+                    const swapLeftRight =
+                        (nextState.mode === '1v1' || nextState.gameMode === '1v1') &&
+                        this.viewIndexMap.length >= 2 &&
+                        this.viewIndexMap[0] === 1 && this.viewIndexMap[1] === 0;
+
+                    if (swapLeftRight) {
+                        const width = (this.canvas && this.canvas.width) ? this.canvas.width : 400;
+                        const mirrored = { ...nextState } as any;
+                        mirrored.ballPosX = width - (nextState.ballPosX || 0);
+                        // swap paddles
+                        mirrored.player1Pos = nextState.player2Pos || 0;
+                        mirrored.player2Pos = nextState.player1Pos || 0;
+                        // swap scores for display
+                        mirrored.scorePlayer1 = nextState.scorePlayer2 || 0;
+                        mirrored.scorePlayer2 = nextState.scorePlayer1 || 0;
+                        this.gameState = mirrored;
+                    } else {
+                        this.gameState = nextState;
+                    }
                     this.updateScoreDisplay();
                 }
                 break;
@@ -251,12 +275,12 @@ export class PongGame {
 
             case 'gameEnd':
                 if (message.mode === '4player') {
-                    this.updateStatus(`Game Over! ${message.winnerName} wins!`);
+                    this.updateStatus(`Game Over! ${message.winnerName || 'Player ?'} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`, message.finalScores);
                     
                     // Trigger callback for 4-player mode
                     if (this.onGameEnd) {
-                        const winnerId = this.parseWinnerIdFromName(message.winnerName);
+                        const winnerId = message.winnerName ? this.parseWinnerIdFromName(message.winnerName) : 1;
                         this.onGameEnd(winnerId);
                     }
                 } else {
@@ -298,9 +322,10 @@ export class PongGame {
         } else {
             const player1score = document.getElementById('player1score');
             const player2score = document.getElementById('player2score');
-            
-            if (player1score) player1score.textContent = this.gameState.scorePlayer1.toString();
-            if (player2score) player2score.textContent = this.gameState.scorePlayer2.toString();
+            const leftScore = this.gameState.scorePlayer1;
+            const rightScore = this.gameState.scorePlayer2;
+            if (player1score) player1score.textContent = leftScore.toString();
+            if (player2score) player2score.textContent = rightScore.toString();
         }
     }
 
