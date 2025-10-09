@@ -8,6 +8,7 @@ import { renderProfilePage } from './pages/profilePage';
 import { renderGamePage, pongGame } from './pages/gamePage';
 import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
+import { setAccessToken } from './utils/api';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 
@@ -173,6 +174,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   handleRouting();
 });
+
+// Initialize auth token if exists
+const existing = localStorage.getItem('authToken');
+if (existing) setAccessToken(existing);
 
 // Add types for SSR support
 declare global {

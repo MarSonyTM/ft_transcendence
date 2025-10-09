@@ -75,9 +75,13 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   const gameMode = getCurrentGameMode();
   const maxPlayers = gameMode === '1v1' ? 2 : 4;
 
+  const token = authService.getToken();
   const response = await fetch('/api/room/create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
     body: JSON.stringify({
       hostId: userId,
       hostUsername: username,
@@ -99,9 +103,13 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
   console.log('🚪 [JOIN] Joining room:', roomId);
   
+  const token = authService.getToken();
   const response = await fetch(`/api/room/${roomId}/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
     body: JSON.stringify({
       playerId: userId,
       username
@@ -125,7 +133,13 @@ async function fetchRoomState(): Promise<void> {
   if (!currentRoom) return;
 
   try {
-    const response = await fetch(`/api/room/${currentRoom.roomId}`);
+    const token = authService.getToken();
+    const response = await fetch(`/api/room/${currentRoom.roomId}`, {
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
     const data = await response.json();
     
     if (data.success && data.room) {
@@ -161,9 +175,13 @@ async function startGame(): Promise<void> {
   console.log('🎮 Starting game for room:', currentRoom.roomId);
 
   try {
+    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ 
         hostId: currentUserId
       })
@@ -497,9 +515,13 @@ async function toggleReady(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
+    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/ready`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ playerId: currentUserId })
     });
 
@@ -523,6 +545,13 @@ async function addAIOpponent(): Promise<void> {
     return;
   }
 
+  // Check if we can add more players
+  if (currentRoom.players.length >= currentRoom.maxPlayers) {
+    console.error('❌ [AI] Room is full:', currentRoom.players.length, '>=', currentRoom.maxPlayers);
+    alert('Room is full! Cannot add more players.');
+    return;
+  }
+
   const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
   const aiId = `ai-${Date.now()}`;
   const roomId = currentRoom.roomId;
@@ -531,9 +560,13 @@ async function addAIOpponent(): Promise<void> {
   
   try {
     // First, add the AI player to the room
+    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({
         playerId: aiId,
         username: `AI Bot ${aiNumber}`,
@@ -545,24 +578,8 @@ async function addAIOpponent(): Promise<void> {
     console.log('📦 [AI] Join response:', joinData);
     
     if (joinData.success) {
-      // Automatically set AI to ready
-      console.log(`✅ [AI] AI joined, setting ready status...`);
-      const readyResponse = await fetch(`/api/room/${roomId}/ready`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: aiId })
-      });
-
-      const readyData = await readyResponse.json();
-      console.log('📦 [AI] Ready response:', readyData);
-      
-      if (readyData.success) {
-        console.log('✅ [AI] AI is now ready');
-        await fetchRoomState();
-      } else {
-        console.error('❌ [AI] Failed to set AI ready:', readyData.message);
-        alert(`AI added but failed to set ready: ${readyData.message}`);
-      }
+      console.log('✅ [AI] AI joined and is ready by default');
+      await fetchRoomState();
     } else {
       console.error('❌ [AI] Failed to add AI:', joinData.message);
       alert(`Failed to add AI: ${joinData.message}`);
@@ -578,9 +595,13 @@ async function removePlayer(playerId: string): Promise<void> {
   if (!currentRoom) return;
 
   try {
+    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ playerId })
     });
 
@@ -597,9 +618,13 @@ async function leaveRoom(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
+    const token = authService.getToken();
     await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ playerId: currentUserId })
     });
 

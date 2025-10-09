@@ -1,5 +1,11 @@
 import { setCurrentPage, setCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
+import {  setAccessToken } from '../utils/api';
+import { loginUser } from '../_api/auth';
+
+
+
+
 
 export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; error?: string }> {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';

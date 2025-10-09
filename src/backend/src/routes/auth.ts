@@ -33,6 +33,7 @@ function validateEmail(email: string): boolean {
 async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
 
 	fastify.post('/create', async (request, reply) => {
+		console.log(request.body);
 		try {
 			const userData = request.body as CreateUserInput;
 			if (userData.email?.trim() && !validateEmail(userData.email)) {

@@ -12,6 +12,7 @@ import tournamentRoutes from './routes/tournament';
 import roomRoutes from './routes/room';
 import roomWebSocketRoutes from './websocket/roomHandler';
 import { database } from './database';
+import { authGuard } from './middleware';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -78,7 +79,7 @@ const start = async (): Promise<void> => {
     
     // Register WebSocket support first
     await webSocketRoutes(server);
-
+    server.addHook('onRequest', authGuard);
     // Register API routes (these must come before SSR routes)
     await server.register(userRoutes, { prefix: '/api/users' });
     await server.register(gameRoutes, { prefix: '/api/game' });
@@ -88,6 +89,7 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(roomWebSocketRoutes);
+
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -173,3 +175,8 @@ const start = async (): Promise<void> => {
 };
 
 start();
+
+
+
+
+

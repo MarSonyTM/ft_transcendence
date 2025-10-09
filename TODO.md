@@ -1,146 +1,132 @@
 # ft_transcendence Project TODO
 
-## ✅ Completed
+## 📋 Mandatory Part (Must be Perfect)
 
-### Infrastructure & Setup
+### ✅ Completed Core Features
 - [x] Basic project structure (frontend/backend)
 - [x] Docker setup with development and production configs
-- [x] GitHub workflow with branch protections (DEV, PRE, MAIN, PROD)
-- [x] CI pipeline for automated checks
-
-### Game Implementation
 - [x] Basic Pong game implementation
 - [x] Two-player local controls (W/S for P1, O/L for P2)
 - [x] Basic WebSocket connection for game state
 - [x] Canvas rendering with proper paddle movement
-
-## 🚧 In Progress
-- [ ] Tournament system implementation (MVP)
-  - [ ] Data model: tournaments, participants (aliases), matches, rounds
-  - [ ] Endpoints: create tournament, register alias, generate bracket
-  - [ ] Endpoints: get next match, report result, advance round
-  - [ ] UI: alias entry form, bracket view, "Next match" announcement
-  - [ ] Matchmaking logic: fair seeding and deterministic progression
-- [ ] Basic matchmaking system (covered by Tournament MVP)
-- [ ] Player alias registration for tournaments (covered by Tournament MVP)
-
-## ❌ Required (Mandatory Part)
-
-### Technical Requirements
-- [ ] Single-page application (SPA) implementation
-  - [ ] Back/Forward navigation works within app
-  - [ ] 404 handling and fallback route
-- [ ] Firefox compatibility verification
-  - [ ] Canvas render, keyboard input, WebSocket work on latest stable Firefox
-  - [ ] No console errors/warnings in gameplay flow
-- [ ] Error handling and validation
-  - [ ] Centralized error handler (server)
-  - [ ] User-friendly error UI (client)
-  - [ ] Fastify JSON schemas for all routes (validation)
-  - [ ] Parameterized DB access to prevent SQLi
-  - [ ] Output encoding/sanitization to prevent XSS
-- [X] HTTPS setup for all connections (including WebSocket)
-  - [ ] Nginx TLS in production (self-signed or mkcert for local)
-  - [X] Frontend uses https and wss in production
-  - [ ] README documents certificate setup and trust instructions
-
-### Game Features @lbaumeis
-- [ ] Complete tournament system
-  - [ ] Player registration with aliases
-  - [ ] Tournament matchmaking
-  - [ ] Display of player matchups
-  - [ ] Match order management
 - [x] Equal paddle speeds for all players
-- [ ] Original Pong (1972) look and feel verification
+- [x] HTTPS/WSS for connections
 
-### Security - @mafurnic
-- [ ] Password hashing implementation
-- [ ] SQL injection protection
-- [ ] XSS attack protection
-- [ ] Form validation (client/server)
-- [ ] Input sanitization
-- [ ] Environment variable management (.env)
+### ❌ Required Core Features
+1. Game Mechanics
+   - [ ] Verify identical paddle speeds (including future AI)
+   - [ ] Match original Pong (1972) visual style and gameplay
+   - [ ] Ensure smooth gameplay without errors
+   - [ ] Test all game controls and interactions
 
-## 🎯 Modules to Choose (Need 7 Major)
+2. Tournament System (Core)
+   - [ ] Implement alias registration for tournaments
+   - [ ] Ensure aliases reset between tournaments
+   - [ ] Display clear matchmaking order
+   - [ ] Show who plays against whom
+   - [ ] Basic matchmaking system implementation
+   - [ ] Tournament progression logic
+   - [ ] Next match announcements
 
-### Web (Choose from)
-- [x] Backend Framework (Fastify + Node.js) - Major
-- [x] Frontend Framework (Typescript + Tailwind) - Minor
-- [x] Database (SQLite) - Minor
-- [ ] Blockchain Score Storage - Major
+3. Technical Requirements
+   - [ ] Single-page application (SPA)
+     - [ ] Working browser Back/Forward navigation
+     - [ ] Proper 404 handling
+   - [ ] Firefox Latest Version Compatibility
+     - [ ] Test all features in Firefox
+     - [ ] No console errors/warnings
+   - [ ] Docker
+     - [ ] Single command launch
+     - [ ] All services properly connected
 
-### User Management
-- [ ] Standard User Management - Major
-  - [ ] User registration/login
-  - [ ] Profile management
-  - [ ] Avatar support
-  - [ ] Friend system
-  - [ ] Match history
-- [ ] OAuth Authentication - Major
+4. Basic Security (Mandatory Minimum)
+   - [ ] Basic form validation
+   - [ ] Input sanitization
+   - [ ] Basic SQL injection protection
+   - [ ] Basic XSS protection
+   - [ ] Environment variables in .env
+   - [ ] Secure HTTPS/WSS setup
 
-### Gameplay & UX - @mgeiger-
-- [ ] Remote Players - Major
-- [ ] Multiple Players (3+ players) - Major
-- [ ] Additional Game - Major
-- [ ] Game Customization - Minor
-- [ ] Live Chat - Major
+## 🎯 Optional Modules (Need 7 Major)
 
-### AI & Analytics
-- [ ] AI Opponent - Major
-- [ ] Stats Dashboard - Minor
+### ✅ Completed Modules
+1. Major Modules (10 points each)
+   - [x] Backend Framework (Fastify + Node.js)
+   - [x] Standard User Management
+   - [x] OAuth Authentication
+   - [x] 2FA & JWT
+   - [x] Server-side Pong + API
 
-### Security - @bmahdi
-- [ ] WAF/ModSecurity + HashiCorp Vault - Major
-- [ ] GDPR Compliance - Minor
-- [ ] 2FA & JWT - Major
+2. Minor Modules (5 points each)
+   - [x] Frontend Framework (Typescript + Tailwind)
+   - [x] Database (SQLite)
+   - [x] SSR Integration
 
-### DevOps
-- [ ] ELK Stack Integration - Major
-- [ ] Monitoring (Prometheus/Grafana) - Minor
-- [ ] Microservices Architecture - Major
+### 🚧 In Progress Modules
+- None currently in progress
 
-### Graphics & Accessibility
-- [ ] 3D Graphics (Babylon.js) - Major
-- [ ] Multi-device Support - Minor
-- [ ] Browser Compatibility - Minor
-- [ ] Multi-language Support - Minor
-- [ ] Accessibility Features - Minor
-- [X] SSR Integration - Minor
+### 📝 Available Modules
 
-### Server-Side Features
-- [x] Server-side Pong + API - Major
-  - [ ] Document existing API endpoints in README
-  - [ ] Confirm all gameplay flows are available via API
-  - [ ] Stabilize response contracts used by frontend
-- [ ] CLI Gaming Support - Major
+1. Web & Infrastructure
+   - [ ] Blockchain Score Storage (Major)
 
-## Next Steps
-1. Complete mandatory requirements first
-2. Choose and assign 7 major modules among team members
+2. User Experience (@mgeiger-)
+   - [ ] Remote Players (Major)
+   - [ ] Multiple Players (3+ players) (Major)
+   - [ ] Additional Game (Major)
+   - [ ] Game Customization (Minor)
+   - [ ] Live Chat (Major)
+
+3. AI & Analytics
+   - [ ] AI Opponent (Major)
+   - [ ] Stats Dashboard (Minor)
+
+4. Security (@bmahdi)
+   - [ ] WAF/ModSecurity + HashiCorp Vault (Major)
+   - [ ] GDPR Compliance (Minor)
+
+5. DevOps
+   - [ ] ELK Stack Integration (Major)
+   - [ ] Monitoring (Prometheus/Grafana) (Minor)
+   - [ ] Microservices Architecture (Major)
+
+6. Graphics & Accessibility
+   - [ ] 3D Graphics (Babylon.js) (Major)
+   - [ ] Multi-device Support (Minor)
+   - [ ] Browser Compatibility (Minor)
+   - [ ] Multi-language Support (Minor)
+   - [ ] Accessibility Features (Minor)
+
+7. Server-Side Features
+   - [ ] CLI Gaming Support (Major)
+
+## 📊 Progress Tracking
+
+### Current Module Count
+- Major Modules Completed: 5/7 required
+- Minor Modules Completed: 3
+- Points from Major Modules: 50
+- Points from Minor Modules: 15
+- Total Points: 65
+
+### Next Steps
+1. ⚠️ Complete ALL mandatory requirements first
+2. Choose remaining 2 major modules
 3. Add minor modules based on team capacity
-4. Ensure all security measures are implemented
-5. Test thoroughly on Firefox
+4. Test thoroughly on Firefox
 
-## Team Task Distribution
-
-### Current Assignments
+### Team Task Distribution
 Format: [Task] - @username - Status - Branch
-
-#### In Progress
-- None yet
-
-#### Available Tasks
-- All tasks from above sections are available for assignment
 
 ### Task Management Rules
 - Add your name to a task before starting work
-- Create a GitHub issue for tracking
+- Create GitHub issue for tracking
 - Create feature branch following naming convention
 - Regular progress updates via PRs
 - Code review required for all PRs
 
 Remember:
-- Mandatory part must be perfect before bonus evaluation
+- Mandatory part must be PERFECT before modules are evaluated
 - Each major module = 10 points
 - Each minor module = 5 points
 - Two minor modules = one major module
