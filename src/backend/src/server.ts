@@ -36,10 +36,8 @@ const start = async (): Promise<void> => {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
       origin: (origin, cb) => {
-        console.log('🔍 CORS Request from origin:', origin);
         
         if (!origin) {
-          console.log('✅ No origin header - allowing request');
           return cb(null, true);
         }
         
@@ -76,7 +74,7 @@ const start = async (): Promise<void> => {
     });
 
     await server.register(websocket);
-    console.log('🔌 WebSocket support registered');
+    console.log('WebSocket support registered');
     
     // Register WebSocket support first
     await webSocketRoutes(server);
@@ -164,10 +162,10 @@ const start = async (): Promise<void> => {
 
     // Start listening
     await server.listen({ port: PORT, host: HOST });
-    console.log(`🚀 Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
-    console.log(`🔌 WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
-    console.log(`📊 Health check available at http://${HOST}:${PORT}/health`);
-    console.log(`📡 API docs available at http://${HOST}:${PORT}/api`);
+    console.log(`Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
+    console.log(`WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
+    console.log(`Health check available at http://${HOST}:${PORT}/health`);
+    console.log(`API docs available at http://${HOST}:${PORT}/api`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);

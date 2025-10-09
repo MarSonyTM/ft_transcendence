@@ -465,6 +465,13 @@ async function initRoomBasedGame(room: any): Promise<void> {
             }
         }
     });
+
+    // Establish the room WebSocket connection now so callbacks (including keyboard hookup) fire
+    try {
+        await roomWS.connect();
+    } catch (e) {
+        console.error('❌ Failed to connect room WebSocket:', e);
+    }
 }
 
 // Setup keyboard controls for room-based game
@@ -524,7 +531,6 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
         if (moved && newPosition !== lastPosition) {
             // Scale to engine space for 1v1: 0..100% -> 0..160px
             const enginePos = Math.round((newPosition / 100) * 160);
-            console.log(`[INPUT] Sending move for playerIndex=${playerIndex} pos=${enginePos}`);
             ws.sendMove(enginePos);
 
             // Optimistic local update for immediate visual feedback

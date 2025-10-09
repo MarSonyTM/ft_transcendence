@@ -110,7 +110,6 @@ export class RoomWebSocketManager {
   }
 
   private handleMessage(message: any): void {
-    console.log('📨 WebSocket received:', message.type, message);
 
     switch (message.type) {
       case 'connected':

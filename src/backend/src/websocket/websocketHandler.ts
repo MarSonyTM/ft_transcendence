@@ -123,9 +123,6 @@ function handlePlayerMove(gameId: number, playerId: number, position: number) {
     // Use the correct method name from your game engine
     gameEngine.updatePlayerPosition(playerId, position);
     
-    if (DEBUG) {
-      console.log(`🎮 Player ${playerId} moved to position ${position} in game ${gameId}`);
-    }
   }
 }
 

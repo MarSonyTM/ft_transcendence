@@ -379,6 +379,9 @@ export class PongGame {
 
     handleInput(): void {
         if (!this.isActive) return;
+        // In room-based games, input is handled by room WS logic in gamePage.ts
+        // to correctly attribute controls per connected player. Avoid double-sending here.
+        if (getCurrentRoom()) return;
         
         let newPosition = this.paddlePosition;
         const paddleSpeed = 4;
@@ -411,6 +414,9 @@ export class PongGame {
     }
 
     sendPlayerMove(position: number): void {
+        // Do not send moves over the game socket when playing a room-based game;
+        // room WebSocket handles authoritative input routing.
+        if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
@@ -451,6 +457,7 @@ export class PongGame {
     render2Player(ballPosX: number, ballPosY: number): void {
         if (!this.ctx || !this.canvas) return;
 
+        // Always render from authoritative game state so remote inputs reflect correctly
         const player1Pos = this.gameState.player1Pos || 80;
         const player2Pos = this.gameState.player2Pos || 80;
 
@@ -463,7 +470,7 @@ export class PongGame {
         this.ctx.setLineDash([]);
 
         this.ctx.fillStyle = "grey";
-        this.ctx.fillRect(0, this.paddlePosition, 10, 40);
+        this.ctx.fillRect(0, player1Pos, 10, 40);
         this.ctx.fillRect(this.canvas.width - 10, player2Pos, 10, 40);
     }
 

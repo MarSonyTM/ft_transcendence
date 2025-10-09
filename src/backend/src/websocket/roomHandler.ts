@@ -21,10 +21,6 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
       const { roomId } = req.params;
       const queryParams = new URLSearchParams(req.url.split('?')[1] || '');
       const playerId = queryParams.get('playerId') || 'unknown';
-      
-      if (DEBUG) {
-        console.log(`🔌 WebSocket connection attempt: roomId=${roomId}, playerId=${playerId}`);
-      }
 
       // Verify room exists
       const room = gameRoomManager.getRoom(roomId);
@@ -54,11 +50,6 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
       // Associate socket with player in room manager
       gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
 
-      if (DEBUG) {
-        console.log(`✅ Player ${playerId} connected to room ${roomId}`);
-        console.log(`📊 Room ${roomId} now has ${roomSockets.size} connections`);
-      }
-
       // Handle incoming messages
       if (typeof socket.on === 'function') {
         socket.on('message', (data: any) => {
@@ -71,9 +62,6 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
         });
 
         socket.on('close', () => {
-          if (DEBUG) {
-            console.log(`🔌 Player ${playerId} disconnected from room ${roomId}`);
-          }
           removePlayerFromRoom(roomId, playerId);
         });
 
@@ -103,10 +91,6 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 function handleRoomMessage(roomId: string, playerId: string, message: any, socket: any): void {
   const room = gameRoomManager.getRoom(roomId);
   if (!room) return;
-
-  if (DEBUG) {
-    console.log(`📨 Message from ${playerId} in room ${roomId}:`, message.type);
-  }
 
   switch (message.type) {
     case 'ping':
@@ -226,10 +210,6 @@ function broadcastToRoom(roomId: string, message: any, excludePlayerId?: string)
       }
     }
   });
-
-  if (DEBUG && sentCount > 0) {
-    console.log(`📡 Broadcast to room ${roomId}: ${message.type} (${sentCount} players)`);
-  }
 }
 
 // Broadcast game start to room
@@ -276,9 +256,6 @@ function removePlayerFromRoom(roomId: string, playerId: string): void {
     
     if (roomSockets.size === 0) {
       roomConnections.delete(roomId);
-      if (DEBUG) {
-        console.log(`🗑️ Room ${roomId} WebSocket connections cleared`);
-      }
     } else {
       // Notify remaining players
       broadcastToRoom(roomId, {

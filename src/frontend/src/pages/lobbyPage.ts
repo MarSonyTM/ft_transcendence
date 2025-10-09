@@ -22,17 +22,13 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
   console.log('🎮 [LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
 
   const currentUser = authService.getCurrentUser();
-  console.log('👤 [DEBUG] getCurrentUser():', currentUser);
   
   let user = currentUser;
   if (!user && authService.isAuthenticated()) {
     user = await authService.fetchUserProfile();
-    console.log('👤 [DEBUG] fetchUserProfile():', user);
   }
 
   currentUserId = user?.id?.toString() || `guest-${Date.now()}`;
-  console.log('👤 [DEBUG] Final currentUserId:', currentUserId);
-  console.log('👤 [DEBUG] User object:', user);
 
   try {
     if (roomIdParam) {
@@ -47,20 +43,20 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     return;
   }
 
-  const currentRoom = getCurrentRoom();  // FIXED: Get current room
-  if (!currentRoom) {
-    console.error('❌ [LOBBY] No room after setup!');
-    root.innerHTML = `
-      <div style="text-align: center; padding: 2em;">
-        <h2 style="color: #f87171;">Failed to setup room</h2>
-        <p>Please try again</p>
-        <button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
-          Back to Home
-        </button>
-      </div>
-    `;
-    return;
-  }
+	const currentRoom = getCurrentRoom();
+		if (!currentRoom) {
+			console.error('❌ [LOBBY] No room after setup!');
+			root.innerHTML = `
+			<div style="text-align: center; padding: 2em;">
+				<h2 style="color: #f87171;">Failed to setup room</h2>
+				<p>Please try again</p>
+				<button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
+				Back to Home
+				</button>
+			</div>
+			`;
+			return;
+		}
 
   console.log('✅ [LOBBY] Room ready:', currentRoom.roomId);
 
@@ -314,125 +310,152 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
 }
 
 function renderLobby(root: HTMLElement): void {
-  const currentRoom = getCurrentRoom();
-  if (!currentRoom) {
-    root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
-    return;
+	const currentRoom = getCurrentRoom();
+	if (!currentRoom) {
+	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
+	  return;
+	}
+  
+	// PRESERVE INPUT STATE BEFORE RE-RENDERING
+	const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
+	const preservedValue = existingInput ? existingInput.value : '';
+	const wasFocused = existingInput && document.activeElement === existingInput;
+	const cursorPosition = existingInput ? existingInput.selectionStart : 0;
+  
+	const players = currentRoom.players;
+	const maxPlayers = currentRoom.maxPlayers;
+	const canAddMore = players.length < maxPlayers;
+	const canStart = players.length >= 2 && players.every(p => p.isReady);
+	const isHost = currentRoom.hostId === currentUserId;
+	const currentPlayer = players.find(p => p.id === currentUserId);
+  
+	root.innerHTML = `
+	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
+		<div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">
+		  
+		  <h2 style="font-size: 2.5em; margin: 0 0 1em 0; color: rgb(209 213 219); text-align: center;">Game Lobby</h2>
+		  
+		  <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
+			<div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Room ID</div>
+			<div style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold; font-family: monospace;">${currentRoom.roomId}</div>
+		  </div>
+  
+		  <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em;">
+			<div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Join Room:</div>
+			<div style="display: flex; gap: 0.5em;">
+			  <input 
+				id="joinRoomInput" 
+				type="text"
+				placeholder="Enter Room ID"
+				autocomplete="off"
+				value="${preservedValue}"
+				style="flex: 1; background: rgb(17 24 39); color: rgb(229 231 235); border: 1px solid rgb(75 85 99); border-radius: 4px; padding: 0.5em; font-family: monospace; font-size: 0.9em; outline: none;">
+			  <button 
+				id="joinRoomBtn" 
+				style="background: rgb(99 102 241); color: white; border: none; border-radius: 4px; padding: 0.5em 1em; cursor: pointer; white-space: nowrap;">
+				Join
+			  </button>
+			</div>
+		  </div>
+  
+		  <div style="margin-bottom: 1.5em;">
+			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">Players (${players.length}/${maxPlayers})</h3>
+			${players.map(player => `
+			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
+				<div>
+				  <span style="color: rgb(229 231 235);">${player.username}</span>
+				  ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
+				  ${player.id === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
+				</div>
+				<div style="display: flex; align-items: center; gap: 0.5em;">
+				  <span style="color: ${player.isReady ? 'rgb(34 197 94)' : 'rgb(156 163 175)'}; font-size: 0.9em;">
+					${player.isReady ? '✓ Ready' : 'Not Ready'}
+				  </span>
+				  ${player.isAI && isHost ? `
+					<button class="remove-player-btn" data-player-id="${player.id}"
+							style="background: rgb(220 38 38); color: white; border: none; border-radius: 4px; padding: 0.25em 0.5em; font-size: 0.8em; cursor: pointer;">
+					  Remove
+					</button>
+				  ` : ''}
+				</div>
+			  </div>
+			`).join('')}
+		  </div>
+  
+		  ${currentPlayer && !currentPlayer.isAI ? `
+			<button id="toggleReadyBtn" 
+					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
+						   background: ${currentPlayer.isReady ? 'rgb(107 114 128)' : 'rgb(34 197 94)'}; color: white;">
+			  ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
+			</button>
+		  ` : ''}
+		  
+		  ${canAddMore && isHost ? `
+			<button id="addAIBtn" 
+					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
+						   background: rgb(99 102 241); color: white;">
+			  🤖 Add AI Opponent
+			</button>
+		  ` : ''}
+		  
+		  ${isHost ? `
+			<button id="startGameBtn"
+					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
+						   background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
+						   cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
+			  ${canStart ? '🎮 Start Game' : '⏳ Waiting for players...'}
+			</button>
+		  ` : `
+			<div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
+			  ${canStart ? '⏳ Waiting for host...' : '⏳ Waiting for players...'}
+			</div>
+		  `}
+		  
+		  <button id="leaveBtn" 
+				  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
+						 background: rgb(220 38 38); color: white;">
+			Leave Lobby
+		  </button>
+		  
+		</div>
+	  </div>
+	`;
+  
+	// RESTORE INPUT STATE AFTER RE-RENDERING
+	if (preservedValue || wasFocused) {
+	  const newInput = document.getElementById('joinRoomInput') as HTMLInputElement;
+	  if (newInput) {
+		if (preservedValue) {
+		  newInput.value = preservedValue;
+		}
+		if (wasFocused) {
+		  setTimeout(() => {
+			newInput.focus();
+			// Restore cursor position
+			if (cursorPosition !== null) {
+			  newInput.setSelectionRange(cursorPosition, cursorPosition);
+			}
+		  }, 0);
+		}
+	  }
+	}
+  
+	attachEventListeners(canAddMore, canStart, isHost, currentPlayer);
   }
-
-  const players = currentRoom.players;
-  const maxPlayers = currentRoom.maxPlayers;
-  const canAddMore = players.length < maxPlayers;
-  const canStart = players.length >= 2 && players.every(p => p.isReady);
-  const isHost = currentRoom.hostId === currentUserId;
-  const currentPlayer = players.find(p => p.id === currentUserId);
-  const inviteLink = `${window.location.origin}/join/${currentRoom.roomId}`;
-
-  root.innerHTML = `
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
-      <div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">
-        
-        <h2 style="font-size: 2.5em; margin: 0 0 1em 0; color: rgb(209 213 219); text-align: center;">Game Lobby</h2>
-        
-        <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
-          <div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Room ID</div>
-          <div style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold; font-family: monospace;">${currentRoom.roomId}</div>
-        </div>
-
-        <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em;">
-          <div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Invite Link:</div>
-          <div style="display: flex; gap: 0.5em;">
-            <input id="inviteLinkInput" type="text" readonly value="${inviteLink}"
-                   style="flex: 1; background: rgb(17 24 39); color: rgb(229 231 235); border: 1px solid rgb(75 85 99); border-radius: 4px; padding: 0.5em; font-family: monospace; font-size: 0.9em;">
-            <button id="copyLinkBtn" style="background: rgb(99 102 241); color: white; border: none; border-radius: 4px; padding: 0.5em 1em; cursor: pointer; white-space: nowrap;">
-              📋 Copy
-            </button>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 1.5em;">
-          <h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">Players (${players.length}/${maxPlayers})</h3>
-          ${players.map(player => `
-            <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <span style="color: rgb(229 231 235);">${player.username}</span>
-                ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
-                ${player.id === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
-              </div>
-              <div style="display: flex; align-items: center; gap: 0.5em;">
-                <span style="color: ${player.isReady ? 'rgb(34 197 94)' : 'rgb(156 163 175)'}; font-size: 0.9em;">
-                  ${player.isReady ? '✓ Ready' : 'Not Ready'}
-                </span>
-                ${player.isAI && isHost ? `
-                  <button class="remove-player-btn" data-player-id="${player.id}"
-                          style="background: rgb(220 38 38); color: white; border: none; border-radius: 4px; padding: 0.25em 0.5em; font-size: 0.8em; cursor: pointer;">
-                    Remove
-                  </button>
-                ` : ''}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
-        ${currentPlayer && !currentPlayer.isAI ? `
-          <button id="toggleReadyBtn" 
-                  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-                         background: ${currentPlayer.isReady ? 'rgb(107 114 128)' : 'rgb(34 197 94)'}; color: white;">
-            ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
-          </button>
-        ` : ''}
-        
-        ${canAddMore && isHost ? `
-          <button id="addAIBtn" 
-                  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-                         background: rgb(99 102 241); color: white;">
-            🤖 Add AI Opponent
-          </button>
-        ` : ''}
-        
-        ${isHost ? `
-          <button id="startGameBtn"
-                  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
-                         background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
-                         cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
-            ${canStart ? '🎮 Start Game' : '⏳ Waiting for players...'}
-          </button>
-        ` : `
-          <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
-            ${canStart ? '⏳ Waiting for host...' : '⏳ Waiting for players...'}
-          </div>
-        `}
-        
-        <button id="leaveBtn" 
-                style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
-                       background: rgb(220 38 38); color: white;">
-          Leave Lobby
-        </button>
-        
-      </div>
-    </div>
-  `;
-
-  attachEventListeners(canAddMore, canStart, isHost, currentPlayer);
-}
 
 function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: boolean, currentPlayer?: Player): void {
-  const copyLinkBtn = document.getElementById('copyLinkBtn');
-  if (copyLinkBtn) {
-    copyLinkBtn.addEventListener('click', async () => {
-      const input = document.getElementById('inviteLinkInput') as HTMLInputElement;
-      if (input) {
-        try {
-          await navigator.clipboard.writeText(input.value);
-          copyLinkBtn.textContent = '✅ Copied!';
-          setTimeout(() => { copyLinkBtn.textContent = '📋 Copy'; }, 2000);
-        } catch (err) {
-          input.select();
-          document.execCommand('copy');
-        }
-      }
-    });
-  }
+	const joinRoomBtn = document.getElementById('joinRoomBtn');
+	if (joinRoomBtn) {
+	  joinRoomBtn.addEventListener('click', () => {
+		const input = document.getElementById('joinRoomInput') as HTMLInputElement;
+		if (input && input.value.trim()) {
+		  const roomId = input.value.trim();
+		  // Replace 'yourwebsite.com' with your actual domain, or use a relative path
+		  //window.location.href = `http://yourwebsite.com:3000/join/${roomId}`;
+		  window.location.href = `/join/${roomId}`;
+		}
+	  });
+	}
 
   const toggleReadyBtn = document.getElementById('toggleReadyBtn');
   if (toggleReadyBtn && currentPlayer) {
