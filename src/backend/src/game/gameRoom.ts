@@ -2,6 +2,7 @@ interface Player {
   id: string;
   username: string;
   isReady: boolean;
+  isAI?: boolean;
   socketId?: string;
 }
 
@@ -38,7 +39,8 @@ class GameRoomManager {
       players: [{
         id: hostId,
         username: hostUsername,
-        isReady: true
+        isReady: true,
+        isAI: false  // ✅ ADD THIS LINE
       }],
       maxPlayers,
       status: 'waiting',
@@ -79,10 +81,11 @@ class GameRoomManager {
     room.players.push({
       id: playerId,
       username,
-      isReady: isReady || isAI  // Set ready status based on parameters
+      isReady: isReady,
+      isAI: isAI  // ✅ ADD THIS LINE
     });
 
-    console.log(`✅ ${username} joined room ${roomId}`);
+    console.log(`✅ ${username} ${isAI ? '(AI)' : ''} joined room ${roomId}`);
     return { success: true, message: 'Joined successfully', room };
   }
 

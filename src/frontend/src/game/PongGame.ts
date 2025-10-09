@@ -73,23 +73,18 @@ export class PongGame {
         this.updateStatus("Ready to start...");
         
         try {
-            // CRITICAL FIX: Check if this is a room-based game FIRST
             const room = getCurrentRoom();
             
-            console.log('🔍 [PONGGAME] init() - room:', room);
-            console.log('🔍 [PONGGAME] init() - room?.gameId:', room?.gameId);
-            console.log('🔍 [PONGGAME] init() - this.gameId:', this.gameId);
-            
-            // Priority 1: If gameId was already set externally (from gamePage), use it
+            // If gameId was already set externally (from gamePage), use it
             if (this.gameId) {
                 console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
             }
-            // Priority 2: If there's a room with a gameId, use it
+            // If there's a room with a gameId, use it
             else if (room && room.gameId) {
                 this.gameId = room.gameId;
                 console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
             }
-            // Priority 3: Only create a new game if there's NO room AND no gameId set
+            //  Create a new game if there's NO room AND no gameId set
             else if (!room) {
                 console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
                 await this.createGame();
@@ -592,7 +587,7 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
-                    method: "POST",
+                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${localStorage.getItem('authToken')}`

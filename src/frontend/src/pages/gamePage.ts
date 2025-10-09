@@ -477,6 +477,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
 // Setup keyboard controls for room-based game
 function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
     const keys: { [key: string]: boolean } = {};
+    
     // Start from current paddle position if available (normalize to 0..100)
     let lastPosition = 50;
     if (pongGame && pongGame.gameState) {
@@ -488,8 +489,9 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
             lastPosition = Math.max(0, Math.min(100, (pongGame.gameState.player2Pos / 160) * 100));
         }
     }
+    
     let lastSentTime = 0;
-    const throttleMs = 50; // Send updates every 50ms max
+    const throttleMs = 16; // ✅ Match game loop: 60 FPS
 
     document.addEventListener('keydown', (e) => {
         keys[e.key.toLowerCase()] = true;
@@ -517,16 +519,18 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
 
         const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
         
-        // Player-specific controls (both players can use W/S or Arrow keys; uniqueness comes from socket playerId)
+        // ✅ Increase paddle speed to match AI smoothness
+        const paddleSpeed = 5; // Match AI speed!
+        
+        // Player-specific controls (both players can use W/S or Arrow keys)
         if (keys['w'] || keys['arrowup']) {
-            newPosition = Math.max(0, newPosition - 2);
+            newPosition = Math.max(0, newPosition - paddleSpeed);
             moved = true;
         }
         if (keys['s'] || keys['arrowdown']) {
-            newPosition = Math.min(100, newPosition + 2);
+            newPosition = Math.min(100, newPosition + paddleSpeed);
             moved = true;
         }
-        // Add more player controls as needed for 4-player
 
         if (moved && newPosition !== lastPosition) {
             // Scale to engine space for 1v1: 0..100% -> 0..160px
@@ -544,7 +548,7 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
             lastPosition = newPosition;
             lastSentTime = now;
         }
-    }, 16); // ~60 FPS
+    }, 16); // ~60 FPS to match game loop
 }
 
 // Sync game state from room WebSocket

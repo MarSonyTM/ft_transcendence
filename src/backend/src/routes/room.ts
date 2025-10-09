@@ -4,6 +4,7 @@ import { broadcastGameStartToRoom, broadcastToRoom } from '../websocket/roomHand
 import { database } from '../database/index';
 import { TwoPlayerGameEngine, FourPlayerGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
+import { GameState } from '../database/index';
 
 interface CreateRoomBody {
   hostId: string;
@@ -92,7 +93,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     try {
       const { roomId } = request.params;
       const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
-      const isReady = !!isAI;
+      const isReady = isAI;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -318,6 +319,16 @@ async function roomRoutes(fastify: FastifyInstance) {
       } else {
         gameEngine = new TwoPlayerGameEngine(initialGameState);
       }
+
+      room.players.forEach((player, index) => {
+      const playerId = index + 1; // Player IDs are 1-indexed
+      if (player.isAI) {
+        gameEngine.setPlayerAI(playerId, true);
+        console.log(`🤖 Marked Player ${playerId} (${player.username}) as AI`);
+      } else {
+        console.log(`👤 Player ${playerId} (${player.username}) is human`);
+      }
+    });
 
       // Store and start the game engine
       activeGames.set(gameId, gameEngine);

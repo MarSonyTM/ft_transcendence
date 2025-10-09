@@ -32,7 +32,7 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
 
   try {
     if (roomIdParam) {
-      console.log('🚪 [LOBBY] Joining room:', roomIdParam);
+      console.log('[LOBBY] Joining room:', roomIdParam);
       await joinExistingRoom(roomIdParam, currentUserId, user?.username || 'Guest');
     } else if (!getCurrentRoom()) {
       console.log('🆕 [LOBBY] Creating new room');
@@ -70,7 +70,7 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
 }
 
 async function createNewRoom(userId: string, username: string): Promise<void> {
-  console.log('🔨 [CREATE] Creating room for:', username);
+  console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
   const maxPlayers = gameMode === '1v1' ? 2 : 4;
@@ -85,12 +85,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     body: JSON.stringify({
       hostId: userId,
       hostUsername: username,
-      maxPlayers
     })
   });
 
   const data = await response.json();
-  console.log('📦 [CREATE] Response:', data);
+  console.log('[CREATE] Response:', data);
   
   if (data.success && data.data && data.data.room) {
     setCurrentRoom(data.data.room);
@@ -101,7 +100,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
 }
 
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
-  console.log('🚪 [JOIN] Joining room:', roomId);
+  console.log('[JOIN] Joining room:', roomId);
   
   const token = authService.getToken();
   const response = await fetch(`/api/room/${roomId}/join`, {
@@ -117,7 +116,7 @@ async function joinExistingRoom(roomId: string, userId: string, username: string
   });
 
   const data = await response.json();
-  console.log('📦 [JOIN] Response:', data);
+  console.log('[JOIN] Response:', data);
   
   if (data.success && data.room) {
     setCurrentRoom(data.room);
@@ -133,13 +132,7 @@ async function fetchRoomState(): Promise<void> {
   if (!currentRoom) return;
 
   try {
-    const token = authService.getToken();
-    const response = await fetch(`/api/room/${currentRoom.roomId}`, {
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
+    const response = await fetch(`/api/room/${currentRoom.roomId}`);
     const data = await response.json();
     
     if (data.success && data.room) {
@@ -191,13 +184,12 @@ async function startGame(): Promise<void> {
     
     if (data.success) {
       console.log('✅ Game started successfully!');
-      console.log('📦 Response data:', data);
+      console.log('Response data:', data);
       
       if (data.room && data.room.gameId) {
         setCurrentRoom(data.room);
         console.log('✅ Updated room with gameId:', data.room.gameId);
       } else if (data.gameId) {
-        // Fallback if gameId is in data but not in room object
         const updatedRoom = { ...currentRoom, gameId: data.gameId };
         setCurrentRoom(updatedRoom);
         console.log('✅ Updated room with gameId (fallback):', data.gameId);
@@ -239,7 +231,6 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       let currentRoom = getCurrentRoom();
       
-      // CRITICAL FIX: Update the current room with the gameId
       if (currentRoom) {
         currentRoom = { ...currentRoom, gameId, status: 'playing' as const };
         setCurrentRoom(currentRoom);
@@ -273,20 +264,20 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
     },
     
     onRoomState: (room) => {
-      console.log('📦 [WS] Room state update received:', room);
+      console.log('[WS] Room state update received:', room);
       
       if (room) {
         setCurrentRoom(room);
         const root = document.getElementById('app-root');
         if (root) {
-          console.log('🔄 [WS] Re-rendering lobby with updated players');
+          console.log('[WS] Re-rendering lobby with updated players');
           renderLobby(root);
         }
       }
     },
     
     onPlayerReady: (playerId, isReady) => {
-      console.log(`📦 [WS] Player ${playerId} ready:`, isReady);
+      console.log(`[WS] Player ${playerId} ready:`, isReady);
       
       const currentRoom = getCurrentRoom();
       if (currentRoom) {
@@ -303,7 +294,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
     },
     
     onPlayerDisconnected: (playerId) => {
-      console.log(`📦 [WS] Player ${playerId} disconnected`);
+      console.log(`[WS] Player ${playerId} disconnected`);
       
       const currentRoom = getCurrentRoom();
       if (currentRoom) {
@@ -412,7 +403,7 @@ function renderLobby(root: HTMLElement): void {
 			<button id="addAIBtn" 
 					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
 						   background: rgb(99 102 241); color: white;">
-			  🤖 Add AI Opponent
+			  Add AI Opponent
 			</button>
 		  ` : ''}
 		  
@@ -468,8 +459,6 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
 		const input = document.getElementById('joinRoomInput') as HTMLInputElement;
 		if (input && input.value.trim()) {
 		  const roomId = input.value.trim();
-		  // Replace 'yourwebsite.com' with your actual domain, or use a relative path
-		  //window.location.href = `http://yourwebsite.com:3000/join/${roomId}`;
 		  window.location.href = `/join/${roomId}`;
 		}
 	  });
@@ -537,7 +526,7 @@ async function toggleReady(): Promise<void> {
 
 async function addAIOpponent(): Promise<void> {
   const currentRoom = getCurrentRoom();
-  console.log('🤖 [AI] addAIOpponent called, currentRoom:', currentRoom);
+  console.log('[AI] addAIOpponent called, currentRoom:', currentRoom);
   
   if (!currentRoom) {
     console.error('❌ [AI] currentRoom is null!');
@@ -545,18 +534,11 @@ async function addAIOpponent(): Promise<void> {
     return;
   }
 
-  // Check if we can add more players
-  if (currentRoom.players.length >= currentRoom.maxPlayers) {
-    console.error('❌ [AI] Room is full:', currentRoom.players.length, '>=', currentRoom.maxPlayers);
-    alert('Room is full! Cannot add more players.');
-    return;
-  }
-
   const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
   const aiId = `ai-${Date.now()}`;
   const roomId = currentRoom.roomId;
   
-  console.log(`🤖 [AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
+  console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
   
   try {
     // First, add the AI player to the room
@@ -575,14 +557,12 @@ async function addAIOpponent(): Promise<void> {
     });
 
     const joinData = await joinResponse.json();
-    console.log('📦 [AI] Join response:', joinData);
+    console.log('[AI] Join response:', joinData);
     
     if (joinData.success) {
-      console.log('✅ [AI] AI joined and is ready by default');
+      // AI is automatically ready when joining (backend handles this)
+      console.log('✅ [AI] AI joined and is ready');
       await fetchRoomState();
-    } else {
-      console.error('❌ [AI] Failed to add AI:', joinData.message);
-      alert(`Failed to add AI: ${joinData.message}`);
     }
   } catch (error) {
     console.error('❌ [AI] Error adding AI:', error);

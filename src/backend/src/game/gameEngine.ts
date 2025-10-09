@@ -1,4 +1,3 @@
-// Complete fix for src/backend/src/game/gameEngine.ts
 import { GameState, database } from "../database";
 import { broadcastToGame, getGameConnectionCount } from "../websocket/websocketHandler";
 
@@ -35,6 +34,8 @@ export abstract class BaseGameEngine {
     // Ball movement
     protected xDir: number = 1;
     protected yDir: number = 1;
+
+    protected aiPlayers: Set<number> = new Set();
 
     constructor(gameState: GameState, options?: GameEngineOptions) {
         this.gameState = gameState;
@@ -100,7 +101,7 @@ export abstract class BaseGameEngine {
 
     protected gameLoop = (): void => {
         const resetSignal = this.updateBallPosition();
-        
+
         // Update AI positions if any
         this.updateAIPositions();
         
@@ -123,26 +124,45 @@ export abstract class BaseGameEngine {
         this.gameTimer = setTimeout(this.gameLoop, 16);
     }
 
+    public setPlayerAI(playerId: number, isAI: boolean): void {
+        if (isAI) {
+            this.aiPlayers.add(playerId);
+            console.log(`Player ${playerId} marked as AI`);
+        } else {
+            this.aiPlayers.delete(playerId);
+            console.log(`Player ${playerId} marked as human`);
+        }
+    }
+
+    public isPlayerAI(playerId: number): boolean {
+        return this.aiPlayers.has(playerId);
+    }
+
+    public getAIPlayers(): number[] {
+        return Array.from(this.aiPlayers);
+    }
+
     protected updateAIPositions(): void {
-        const paddleSpeed = 5; // Same speed as human players
+        const paddleSpeed = 5;
+        const paddleHeight = 40;
 
-        // Right paddle (Player 2) AI
-        if (this.gameState.player2Pos !== undefined) {
+        // Only log every 60 frames (once per second)
+        const shouldLog = this.frameCount % 60 === 0;
+
+        // Right paddle (Player 2) AI - ONLY if Player 2 is AI
+        if (this.isPlayerAI(2) && this.gameState.player2Pos !== undefined) {
+            if (shouldLog) console.log(`🤖 AI Update for Player 2: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player2Pos.toFixed(1)}`);
+            
             const currentY = this.gameState.player2Pos;
-            let targetY = currentY; // Default to current position
+            let targetY = currentY;
 
-            // Only move if ball is coming towards AI
             if (this.xDir > 0) {
-                // Calculate where ball will intersect with paddle
-                const distanceToTravel = 390 - this.gameState.ballPosX; // Right paddle X position
-                const timeToIntercept = distanceToTravel / (this.xDir * 2.1); // Using ball speed from updateBallPosition
+                const distanceToTravel = 390 - this.gameState.ballPosX;
+                const timeToIntercept = distanceToTravel / (this.xDir * 2.1);
                 const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                
-                // Aim to center paddle on predicted ball position
                 targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
             }
 
-            // Move towards target
             if (Math.abs(targetY - currentY) > paddleSpeed) {
                 if (targetY > currentY) {
                     this.updatePlayerPosition(2, currentY + paddleSpeed);
@@ -150,25 +170,24 @@ export abstract class BaseGameEngine {
                     this.updatePlayerPosition(2, currentY - paddleSpeed);
                 }
             }
+        } else if (shouldLog && this.gameState.player2Pos !== undefined) {
+            console.log(`👤 Skipping AI update for Player 2 (Human player)`);
         }
 
-        // Left paddle (Player 1) AI
-        if (this.gameState.player1Pos !== undefined) {
+        // Left paddle (Player 1) AI - ONLY if Player 1 is AI
+        if (this.isPlayerAI(1) && this.gameState.player1Pos !== undefined) {
+            if (shouldLog) console.log(`🤖 AI Update for Player 1: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player1Pos.toFixed(1)}`);
+            
             const currentY = this.gameState.player1Pos;
-            let targetY = currentY; // Default to current position
+            let targetY = currentY;
 
-            // Only move if ball is coming towards AI
             if (this.xDir < 0) {
-                // Calculate where ball will intersect with paddle
-                const distanceToTravel = this.gameState.ballPosX - 10; // Left paddle X position
-                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1); // Using ball speed
+                const distanceToTravel = this.gameState.ballPosX - 10;
+                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1);
                 const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                
-                // Aim to center paddle on predicted ball position
                 targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
             }
 
-            // Move towards target
             if (Math.abs(targetY - currentY) > paddleSpeed) {
                 if (targetY > currentY) {
                     this.updatePlayerPosition(1, currentY + paddleSpeed);
@@ -176,6 +195,8 @@ export abstract class BaseGameEngine {
                     this.updatePlayerPosition(1, currentY - paddleSpeed);
                 }
             }
+        } else if (shouldLog && this.gameState.player1Pos !== undefined) {
+            console.log(`👤 Skipping AI update for Player 1 (Human player)`);
         }
     }
 
@@ -198,6 +219,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     private scorePlayer2 = 0;
 
     initializeGame(): void {
+        console.log('🔍 [DEBUG] initializeGame() called');
+        
         // Initialize ball in center if not set
         if (!this.gameState.ballPosX)
             this.gameState.ballPosX = (this.maxX + this.minX) / 2;
@@ -216,6 +239,13 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             
         this.scorePlayer1 = this.gameState.scorePlayer1;
         this.scorePlayer2 = this.gameState.scorePlayer2;
+        
+        this.xDir = Math.random() > 0.5 ? 1 : -1;
+        this.yDir = Math.random() > 0.5 ? 1 : -1;
+        
+        console.log(`🔍 [DEBUG] Ball initialized at (${this.gameState.ballPosX}, ${this.gameState.ballPosY})`);
+        console.log(`🔍 [DEBUG] Ball direction: xDir=${this.xDir}, yDir=${this.yDir}`);
+        console.log(`🔍 [DEBUG] AI Players: ${Array.from(this.aiPlayers).join(', ') || 'none'}`);
     }
 
     updateBallPosition(): number {
@@ -341,15 +371,18 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updatePlayerPosition(playerId: number, position: number): void {
-        const maxPosition = 200 - paddleHeight; // Use raw value, not this.maxY
-        const clampedPos = Math.max(0, Math.min(position, maxPosition));
-        
-        if (playerId === 1) {
-            this.gameState.player1Pos = clampedPos;
-        } else if (playerId === 2) {
-            this.gameState.player2Pos = clampedPos;
-        }
+    const maxPosition = 200 - paddleHeight;
+    const clampedPos = Math.max(0, Math.min(position, maxPosition));
+    
+    const isAI = this.isPlayerAI(playerId);
+    console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
+    
+    if (playerId === 1) {
+        this.gameState.player1Pos = clampedPos;
+    } else if (playerId === 2) {
+        this.gameState.player2Pos = clampedPos;
     }
+}
 
     private updateScoreBoard(player: number): void {
         if (player === 1) {
@@ -636,23 +669,21 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         if (playerId >= 1 && playerId <= 4) {
             let clampedPos: number;
             
-            // Different clamping for different paddle orientations with proper boundaries
             if (playerId === 1 || playerId === 3) {
-                // Top and bottom players (horizontal paddles) - constrain X position
-                // Can move from paddleWidth to (maxX - paddleWidth - paddleHeight)
                 clampedPos = Math.max(paddleWidth, Math.min(position, this.maxX - paddleWidth - paddleHeight));
             } else {
-                // Left and right players (vertical paddles) - constrain Y position  
-                // Can move from paddleWidth to (maxY - paddleWidth - paddleHeight)
                 clampedPos = Math.max(paddleWidth, Math.min(position, this.maxY - paddleWidth - paddleHeight));
             }
             
+            // 🔍 DEBUG: Log position updates with AI status
+            const isAI = this.isPlayerAI(playerId);
+            console.log(`🎮 4P Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
+            
             this.playerPositions[playerId - 1] = clampedPos;
             
-            // Update database-compatible positions for 2-player compatibility
-            if (playerId === 4) { // Left player maps to player1
+            if (playerId === 4) {
                 this.gameState.player1Pos = clampedPos;
-            } else if (playerId === 2) { // Right player maps to player2  
+            } else if (playerId === 2) {
                 this.gameState.player2Pos = clampedPos;
             }
         }
@@ -755,6 +786,79 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             playerPositions: [...this.playerPositions],
             lastContact: this.lastContact
         };
+    }
+
+    protected updateAIPositions(): void {
+        const paddleSpeed = 5;
+        const paddleHeight = 40;
+
+        // Player 1 (Right paddle) - Only if AI
+        if (this.isPlayerAI(1) && this.playerPositions[0] !== undefined) {
+            const currentY = this.playerPositions[0];
+            let targetY = currentY;
+
+            if (this.xDir > 0) {
+                const distanceToTravel = this.maxX - this.gameState.ballPosX;
+                const timeToIntercept = distanceToTravel / (this.xDir * 2.1);
+                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
+                targetY = Math.max(0, Math.min(this.maxY - paddleHeight, predictedY - (paddleHeight / 2)));
+            }
+
+            if (Math.abs(targetY - currentY) > paddleSpeed) {
+                this.updatePlayerPosition(1, currentY + (targetY > currentY ? paddleSpeed : -paddleSpeed));
+            }
+        }
+
+        // Player 2 (Top paddle) - Only if AI
+        if (this.isPlayerAI(2) && this.playerPositions[1] !== undefined) {
+            const currentX = this.playerPositions[1];
+            let targetX = currentX;
+
+            if (this.yDir < 0) {
+                const distanceToTravel = this.gameState.ballPosY - this.minY;
+                const timeToIntercept = distanceToTravel / (Math.abs(this.yDir) * 1.8);
+                const predictedX = this.gameState.ballPosX + (this.xDir * 2.1 * timeToIntercept);
+                targetX = Math.max(0, Math.min(this.maxX - paddleHeight, predictedX - (paddleHeight / 2)));
+            }
+
+            if (Math.abs(targetX - currentX) > paddleSpeed) {
+                this.updatePlayerPosition(2, currentX + (targetX > currentX ? paddleSpeed : -paddleSpeed));
+            }
+        }
+
+        // Player 3 (Bottom paddle) - Only if AI
+        if (this.isPlayerAI(3) && this.playerPositions[2] !== undefined) {
+            const currentX = this.playerPositions[2];
+            let targetX = currentX;
+
+            if (this.yDir > 0) {
+                const distanceToTravel = this.maxY - this.gameState.ballPosY;
+                const timeToIntercept = distanceToTravel / (this.yDir * 1.8);
+                const predictedX = this.gameState.ballPosX + (this.xDir * 2.1 * timeToIntercept);
+                targetX = Math.max(0, Math.min(this.maxX - paddleHeight, predictedX - (paddleHeight / 2)));
+            }
+
+            if (Math.abs(targetX - currentX) > paddleSpeed) {
+                this.updatePlayerPosition(3, currentX + (targetX > currentX ? paddleSpeed : -paddleSpeed));
+            }
+        }
+
+        // Player 4 (Left paddle) - Only if AI
+        if (this.isPlayerAI(4) && this.playerPositions[3] !== undefined) {
+            const currentY = this.playerPositions[3];
+            let targetY = currentY;
+
+            if (this.xDir < 0) {
+                const distanceToTravel = this.gameState.ballPosX - this.minX;
+                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1);
+                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
+                targetY = Math.max(0, Math.min(this.maxY - paddleHeight, predictedY - (paddleHeight / 2)));
+            }
+
+            if (Math.abs(targetY - currentY) > paddleSpeed) {
+                this.updatePlayerPosition(4, currentY + (targetY > currentY ? paddleSpeed : -paddleSpeed));
+            }
+        }
     }
 }
 
