@@ -35,11 +35,11 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
       console.log('[LOBBY] Joining room:', roomIdParam);
       await joinExistingRoom(roomIdParam, currentUserId, user?.username || 'Guest');
     } else if (!getCurrentRoom()) {
-      console.log('🆕 [LOBBY] Creating new room');
+      console.log('[LOBBY] Creating new room');
       await createNewRoom(currentUserId, user?.username || 'Guest');
     }
   } catch (error) {
-    console.error('❌ [LOBBY] Error setting up room:', error);
+    console.error('[LOBBY] Error setting up room:', error);
     return;
   }
 
@@ -99,6 +99,20 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
       hostUsername: username,
     })
   });
+
+  if (!response.ok) {
+    console.error('[CREATE] HTTP Error:', response.status, response.statusText);
+    const text = await response.text();
+    console.error('[CREATE] Response body:', text);
+    throw new Error(`Failed to create room: ${response.status} ${response.statusText}`);
+  }
+  
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('[CREATE] Non-JSON response:', text);
+    throw new Error('Server returned non-JSON response');
+  }
 
   const data = await response.json();
   console.log('[CREATE] Response:', data);

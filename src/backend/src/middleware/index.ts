@@ -42,6 +42,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     '/api/room/',         // Room API routes
     '/api/game/',         // Game API routes
     '/game/',             // WebSocket game routes
+    '/room/',
     '/join/',             // Join room links
   ];
 
