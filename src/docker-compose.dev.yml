@@ -37,7 +37,7 @@ services:
     volumes:
       - ./frontend/src:/app/src
     environment:
-      - VITE_BACKEND_URL=http://10.13.10.5:3000  # Your host machine IP
+      - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://localhost:3000}
     restart: unless-stopped
     networks:
       - transcendence_dev
