@@ -39,6 +39,6 @@ src/frontend/node_modules/
 *.db-shm
 *.db-wal
 *.db
-src/database/database.db
+src/database/
 
 /package-lock.json

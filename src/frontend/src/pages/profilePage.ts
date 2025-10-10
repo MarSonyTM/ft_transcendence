@@ -135,7 +135,9 @@ export async function renderProfilePage(): Promise<void> {
     const friendBtn = document.getElementById('friendListBtn');
     if (friendBtn) {
         friendBtn.addEventListener('click', () => {
-            alert('Friend list coming soon!');
+            history.pushState({ page: 'friends' }, '', '#friends');
+            setCurrentPage('friends');
+            renderApp();
         });
     }
 

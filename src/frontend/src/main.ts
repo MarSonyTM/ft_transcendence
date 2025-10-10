@@ -10,6 +10,7 @@ import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
+import { renderFriendsPage } from './pages/friendsPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -53,6 +54,9 @@ function handleRouting(): void {
         break;
       case 'authCallback':
         setCurrentPage('authCallback');
+        break;
+      case 'friends':
+        setCurrentPage('friends');
         break;
       default:
         setCurrentPage('landing');
@@ -141,6 +145,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'game':
       renderGamePage();
+      break;
+    case 'friends':
+      renderFriendsPage();
       break;
     default:
       renderLandingPage();

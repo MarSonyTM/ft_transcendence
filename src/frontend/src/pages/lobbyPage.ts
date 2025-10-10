@@ -43,20 +43,32 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     return;
   }
 
+  
 	const currentRoom = getCurrentRoom();
-		if (!currentRoom) {
-			console.error('❌ [LOBBY] No room after setup!');
-			root.innerHTML = `
-			<div style="text-align: center; padding: 2em;">
-				<h2 style="color: #f87171;">Failed to setup room</h2>
-				<p>Please try again</p>
-				<button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
-				Back to Home
-				</button>
-			</div>
-			`;
-			return;
-		}
+  if (!currentRoom) {
+    console.error('❌ [LOBBY] No room after setup!');
+    root.innerHTML = `
+    <div style="text-align: center; padding: 2em;">
+    <h2 style="color: #f87171;">Failed to setup room</h2>
+    <p>Please try again</p>
+    <button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
+    Back to Home
+    </button>
+    </div>
+    `;
+    return;
+  }
+  
+//   ${currentRoom.players.length === 1 && isHost ? `
+//   <div style="background: rgb(79 70 229); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
+//     <div style="color: white; font-weight: 500; margin-bottom: 0.5em;">
+//       💌 Invitation Sent!
+//     </div>
+//     <div style="color: rgb(224 231 255); font-size: 0.9em;">
+//       Waiting for your friend to accept the invitation...
+//     </div>
+//   </div>
+// ` : ''}
 
   console.log('✅ [LOBBY] Room ready:', currentRoom.roomId);
 

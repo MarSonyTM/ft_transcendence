@@ -11,6 +11,9 @@ import webSocketRoutes from './websocket/websocketHandler';
 import tournamentRoutes from './routes/tournament';
 import roomRoutes from './routes/room';
 import roomWebSocketRoutes from './websocket/roomHandler';
+import { authGuard } from './middleware';
+import friendRoutes from './routes/friends';
+import invitationRoutes from './routes/invite';
 import { database } from './database';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -76,10 +79,13 @@ const start = async (): Promise<void> => {
     await server.register(websocket);
     console.log('WebSocket support registered');
     
+    server.addHook('onRequest', authGuard);
+    console.log('Authentication middleware registered');
+    
     // Register WebSocket support first
     await webSocketRoutes(server);
 
-    // Register API routes (these must come before SSR routes)
+    // Register API routes (these must come after authGuard)
     await server.register(userRoutes, { prefix: '/api/users' });
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
@@ -88,6 +94,8 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(roomWebSocketRoutes);
+    await server.register(friendRoutes, { prefix: '/api/friends' });
+    await server.register(invitationRoutes, { prefix: '/api/invitations' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {

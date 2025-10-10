@@ -204,21 +204,21 @@ export class PongGame {
             case 'gameState':
                 if (message.state) {
                     const nextState = {
-                        ballPosX: message.state.ballPosX || this.gameState.ballPosX,
-                        ballPosY: message.state.ballPosY || this.gameState.ballPosY,
-                        player1Pos: message.state.player1Pos || this.gameState.player1Pos,
-                        player2Pos: message.state.player2Pos || this.gameState.player2Pos,
-                        player3Pos: message.state.player3Pos || this.gameState.player3Pos,
-                        player4Pos: message.state.player4Pos || this.gameState.player4Pos,
-                        scorePlayer1: message.state.scorePlayer1 || 0,
-                        scorePlayer2: message.state.scorePlayer2 || 0,
-                        scorePlayer3: message.state.scorePlayer3 || 0,
-                        scorePlayer4: message.state.scorePlayer4 || 0,
-                        gameMode: message.state.gameMode || this.gameState.gameMode,
-                        mode: message.mode || message.state.mode || this.gameState.mode,
-                        playerPositions: message.state.playerPositions || this.gameState.playerPositions,
-                        scores: message.state.scores || this.gameState.scores,
-                        lastContact: message.state.lastContact || this.gameState.lastContact
+                        ballPosX: message.state.ballPosX ?? this.gameState.ballPosX,
+                        ballPosY: message.state.ballPosY ?? this.gameState.ballPosY,
+                        player1Pos: message.state.player1Pos ?? this.gameState.player1Pos,
+                        player2Pos: message.state.player2Pos ?? this.gameState.player2Pos,
+                        player3Pos: message.state.player3Pos ?? this.gameState.player3Pos,
+                        player4Pos: message.state.player4Pos ?? this.gameState.player4Pos,
+                        scorePlayer1: message.state.scorePlayer1 ?? 0,
+                        scorePlayer2: message.state.scorePlayer2 ?? 0,
+                        scorePlayer3: message.state.scorePlayer3 ?? 0,
+                        scorePlayer4: message.state.scorePlayer4 ?? 0,
+                        gameMode: message.state.gameMode ?? this.gameState.gameMode,
+                        mode: message.mode ?? message.state.mode ?? this.gameState.mode,
+                        playerPositions: message.state.playerPositions ?? this.gameState.playerPositions,
+                        scores: message.state.scores ?? this.gameState.scores,
+                        lastContact: message.state.lastContact ?? this.gameState.lastContact
                     };
 
                     // Apply display mapping for 1v1 when the local view swaps left/right
@@ -230,17 +230,22 @@ export class PongGame {
                     if (swapLeftRight) {
                         const width = (this.canvas && this.canvas.width) ? this.canvas.width : 400;
                         const mirrored = { ...nextState } as any;
-                        mirrored.ballPosX = width - (nextState.ballPosX || 0);
-                        // swap paddles
-                        mirrored.player1Pos = nextState.player2Pos || 0;
-                        mirrored.player2Pos = nextState.player1Pos || 0;
-                        // swap scores for display
-                        mirrored.scorePlayer1 = nextState.scorePlayer2 || 0;
-                        mirrored.scorePlayer2 = nextState.scorePlayer1 || 0;
+                        mirrored.ballPosX = width - (nextState.ballPosX ?? 0);
+                        mirrored.player1Pos = nextState.player2Pos ?? 0;
+                        mirrored.player2Pos = nextState.player1Pos ?? 0;
+                        mirrored.scorePlayer1 = nextState.scorePlayer2 ?? 0;
+                        mirrored.scorePlayer2 = nextState.scorePlayer1 ?? 0;
                         this.gameState = mirrored;
                     } else {
                         this.gameState = nextState;
                     }
+                    
+                    if (this.playerId === 1) {
+                        this.paddlePosition = this.gameState.player1Pos ?? 80;
+                    } else if (this.playerId === 2) {
+                        this.paddlePosition = this.gameState.player2Pos ?? 80;
+                    }
+                    
                     this.updateScoreDisplay();
                 }
                 break;
@@ -252,15 +257,15 @@ export class PongGame {
             case 'score':
                 if (message.mode === '4player' && message.scores) {
                     this.gameState.scores = message.scores;
-                    this.gameState.scorePlayer1 = message.scores[3] || 0;
-                    this.gameState.scorePlayer2 = message.scores[1] || 0;
-                    this.gameState.scorePlayer3 = message.scores[0] || 0;
-                    this.gameState.scorePlayer4 = message.scores[2] || 0;
+                    this.gameState.scorePlayer1 = message.scores[3] ?? 0;
+                    this.gameState.scorePlayer2 = message.scores[1] ?? 0;
+                    this.gameState.scorePlayer3 = message.scores[0] ?? 0;
+                    this.gameState.scorePlayer4 = message.scores[2] ?? 0;
                 } else {
-                    this.gameState.scorePlayer1 = message.scorePlayer1 || 0;
-                    this.gameState.scorePlayer2 = message.scorePlayer2 || 0;
-                    this.gameState.scorePlayer3 = message.scorePlayer3 || 0;
-                    this.gameState.scorePlayer4 = message.scorePlayer4 || 0;
+                    this.gameState.scorePlayer1 = message.scorePlayer1 ?? 0;
+                    this.gameState.scorePlayer2 = message.scorePlayer2 ?? 0;
+                    this.gameState.scorePlayer3 = message.scorePlayer3 ?? 0;
+                    this.gameState.scorePlayer4 = message.scorePlayer4 ?? 0;
                 }
                 this.updateScoreDisplay();
                 break;
@@ -272,7 +277,7 @@ export class PongGame {
 
             case 'gameEnd':
                 if (message.mode === '4player') {
-                    this.updateStatus(`Game Over! ${message.winnerName || 'Player ?'} wins!`);
+                    this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`, message.finalScores);
                     
                     // Trigger callback for 4-player mode
@@ -461,9 +466,8 @@ export class PongGame {
     render2Player(ballPosX: number, ballPosY: number): void {
         if (!this.ctx || !this.canvas) return;
 
-        // Always render from authoritative game state so remote inputs reflect correctly
-        const player1Pos = this.gameState.player1Pos || 80;
-        const player2Pos = this.gameState.player2Pos || 80;
+        const player1Pos = this.gameState.player1Pos ?? 80;
+        const player2Pos = this.gameState.player2Pos ?? 80;
 
         this.ctx.strokeStyle = "white";
         this.ctx.setLineDash([5, 15]);
@@ -485,16 +489,16 @@ export class PongGame {
         
         this.ctx.fillStyle = "grey";
 
-        const topPaddleX = playerPositions[0] || 180;
+        const topPaddleX = playerPositions[0] ?? 180;
         this.ctx.fillRect(topPaddleX, 0, 40, 10);
 
-        const rightPaddleY = playerPositions[1] || 180;
+        const rightPaddleY = playerPositions[1] ?? 180;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
-        const bottomPaddleX = playerPositions[2] || 180;
+        const bottomPaddleX = playerPositions[2] ?? 180;
         this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
 
-        const leftPaddleY = this.paddlePosition;
+        const leftPaddleY = playerPositions[3] ?? 180;
         this.ctx.fillRect(0, leftPaddleY, 10, 40);
 
         this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
