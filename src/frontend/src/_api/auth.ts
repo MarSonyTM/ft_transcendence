@@ -7,7 +7,6 @@ interface RegisterResult {
 	error?: string;
 }
 
-
 //export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
 // 		const res = await fetch(`${API_BASE}/api/auth/login`, {
 //		method: 'POST',

@@ -12,7 +12,7 @@ interface GameRoom {
   players: Player[];
   maxPlayers: number;
   status: 'waiting' | 'playing' | 'finished';
-  gameId?: number; // Reference to actual game instance
+  gameId?: number;
   createdAt: Date;
 }
 
@@ -40,7 +40,7 @@ class GameRoomManager {
         id: hostId,
         username: hostUsername,
         isReady: true,
-        isAI: false  // ✅ ADD THIS LINE
+        isAI: false
       }],
       maxPlayers,
       status: 'waiting',
@@ -82,7 +82,7 @@ class GameRoomManager {
       id: playerId,
       username,
       isReady: isReady,
-      isAI: isAI  // ✅ ADD THIS LINE
+      isAI: isAI
     });
 
     console.log(`✅ ${username} ${isAI ? '(AI)' : ''} joined room ${roomId}`);

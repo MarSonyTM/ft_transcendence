@@ -15,7 +15,6 @@ export async function renderGamePage(): Promise<void> {
     const gameMode = getCurrentGameMode();
     const room = getCurrentRoom();
     
-    // Check if this is a room-based game (remote players)
     isRoomBasedGame = room !== null;
     
     if (gameMode === '4player') {
@@ -24,7 +23,6 @@ export async function renderGamePage(): Promise<void> {
         await renderTwoPlayerGame();
     }
     
-    // Initialize room-based multiplayer if room exists
     if (isRoomBasedGame && room) {
         await initRoomBasedGame(room);
     }
@@ -81,7 +79,6 @@ async function renderTwoPlayerGame(): Promise<void> {
         <div class="controls-info">
             <p>${player1.username} - Up/Down W/S</p>
             ${!isRoomBasedGame && !player2.isAI ? '<p>Player 2 - Up/Down O/L</p>' : ''}
-            ${isRoomBasedGame ? '<p style="color: #34d399;">🌐 Playing online with remote player</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Lobby</button>
         <hr>
@@ -200,16 +197,13 @@ async function setupGameButtons(): Promise<void> {
     
     pongGame = new PongGame();
     
-    // For room-based games, ALWAYS connect to the shared game and NEVER create a new one locally
     if (isRoomBasedGame) {
-        // Ensure we have a gameId; if missing, fetch latest room data and wait briefly
         let effectiveRoom = room;
         if (!effectiveRoom || !effectiveRoom.gameId) {
             console.warn('⚠️ Room-based game but missing gameId. Fetching room state before connecting...');
             const roomId = effectiveRoom?.roomId || (history.state && history.state.roomId);
             if (roomId) {
                 try {
-                    // Try up to ~1s to obtain the gameId (helps with websocket/HTTP race)
                     const deadline = Date.now() + 1000;
                     while (Date.now() < deadline && (!effectiveRoom || !effectiveRoom.gameId)) {
                         const resp = await fetch(`/api/room/${roomId}`);
@@ -229,19 +223,15 @@ async function setupGameButtons(): Promise<void> {
 
         if (!effectiveRoom || !effectiveRoom.gameId) {
             console.error('❌ No shared gameId available yet; not creating a standalone game.');
-            // Gracefully abort button setup here; lobby WS should navigate once gameId arrives
             return;
         }
 
-        console.log('🎮 Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
+        console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
         
-        // Set the shared gameId BEFORE any initialization
         pongGame.gameId = effectiveRoom.gameId;
-        // Configure view mapping so each client can see themselves on the left in 1v1
         const localUser = authService.getCurrentUser();
         if (localUser && effectiveRoom.players) {
             const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
-            // If this client is the second player (right side on server), swap left/right for display
             if (idx === 1) pongGame.viewIndexMap = [1, 0, 2, 3];
         }
         
@@ -262,14 +252,13 @@ async function setupGameButtons(): Promise<void> {
             console.error('❌ Failed to connect to game WebSocket:', error);
         }
     } else {
-        console.log('🎮 Local game - creating new game instance');
+        console.log('Local game - creating new game instance');
         await pongGame.init();
     }
     
     pongGame.onGameEnd = async (winnerId: number) => {
         console.log(`Game ended, winner is Player ${winnerId}`);
         
-        // Notify room if this is a room-based game
         if (isRoomBasedGame && roomWS) {
             const room = getCurrentRoom();
             if (room) {
@@ -287,7 +276,6 @@ async function setupGameButtons(): Promise<void> {
         
         try {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-            // Persist winner to the game
             const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -298,17 +286,14 @@ async function setupGameButtons(): Promise<void> {
                 console.error('Failed to update winner:', data.message);
             }
 
-            // Also update the logged-in user's profile stats if available
             const user = authService.getCurrentUser();
             if (user && user.id) {
-                // Determine if the current user actually won
                 let didWin = false;
                 const room = getCurrentRoom();
                 if (isRoomBasedGame && room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
                     didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
                 } else {
-                    // Fallback for local/non-room 2P
                     didWin = (winnerId === 1);
                 }
                 try {
@@ -395,17 +380,15 @@ async function initRoomBasedGame(room: any): Promise<void> {
 
     const playerId = user.id?.toString() || `guest-${Date.now()}`;
 
-    console.log('🎮 Initializing room-based game:', {
+    console.log('Initializing room-based game:', {
         roomId: room.roomId,
         playerId,
-        gameId: room.gameId  // THIS is the shared game ID
+        gameId: room.gameId
     });
 
-    // CRITICAL: Set the shared game ID BEFORE initializing the game
     if (pongGame && room.gameId) {
-        pongGame.gameId = room.gameId;  // Use the room's game ID
+        pongGame.gameId = room.gameId;
         console.log(`✅ Using shared game ID from room: ${room.gameId}`);
-        // Also set view mapping according to local player's index
         const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
         if (idx === 1) {
             pongGame.viewIndexMap = [1, 0, 2, 3];
@@ -423,12 +406,9 @@ async function initRoomBasedGame(room: any): Promise<void> {
             console.log('✅ Connected to game room');
             updateConnectionStatus('Connected (Room)', true);
             
-            // Request initial game state
             if (roomWS) {
                 roomWS.requestState();
             }
-
-            // Hook up keyboard controls to send moves to the room WS
             setupRoomKeyboardControls(roomWS!, playerId);
         },
         
@@ -438,7 +418,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         },
         
         onGameState: (state) => {
-            // Update game state from server
             currentGameState = state;
             if (pongGame) {
                 syncGameStateFromRoom(state);
@@ -466,7 +445,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         }
     });
 
-    // Establish the room WebSocket connection now so callbacks (including keyboard hookup) fire
     try {
         await roomWS.connect();
     } catch (e) {
@@ -478,7 +456,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
 function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
     const keys: { [key: string]: boolean } = {};
     
-    // Start from current paddle position if available (normalize to 0..100)
     let lastPosition = 50;
     if (pongGame && pongGame.gameState) {
         const room = getCurrentRoom();
@@ -491,11 +468,10 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
     }
     
     let lastSentTime = 0;
-    const throttleMs = 16; // ✅ Match game loop: 60 FPS
+    const throttleMs = 16;
 
     document.addEventListener('keydown', (e) => {
         keys[e.key.toLowerCase()] = true;
-        // Prevent page scroll on arrow keys
         if (['arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
     });
 
@@ -513,16 +489,13 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
         let moved = false;
         let newPosition = lastPosition;
 
-        // Get current player's controls based on their position in room
         const room = getCurrentRoom();
         if (!room) return;
 
         const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
         
-        // ✅ Increase paddle speed to match AI smoothness
-        const paddleSpeed = 5; // Match AI speed!
+        const paddleSpeed = 5;
         
-        // Player-specific controls (both players can use W/S or Arrow keys)
         if (keys['w'] || keys['arrowup']) {
             newPosition = Math.max(0, newPosition - paddleSpeed);
             moved = true;
@@ -533,11 +506,9 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
         }
 
         if (moved && newPosition !== lastPosition) {
-            // Scale to engine space for 1v1: 0..100% -> 0..160px
             const enginePos = Math.round((newPosition / 100) * 160);
             ws.sendMove(enginePos);
 
-            // Optimistic local update for immediate visual feedback
             if (pongGame && pongGame.gameState) {
                 if (playerIndex === 0) {
                     pongGame.gameState.player1Pos = enginePos;
@@ -548,7 +519,7 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
             lastPosition = newPosition;
             lastSentTime = now;
         }
-    }, 16); // ~60 FPS to match game loop
+    }, 16);
 }
 
 // Sync game state from room WebSocket

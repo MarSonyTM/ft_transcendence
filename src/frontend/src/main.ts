@@ -97,8 +97,6 @@ function handleRouting(): void {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
   
-  // Cleanup previous page if needed
-  // IMPORTANT: Preserve room state when navigating to the game page
   if (page !== 'lobby' && page !== 'game') {
     cleanupLobby();
   }

@@ -19,7 +19,7 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
   const root = document.getElementById('app-root');
   if (!root) return;
 
-  console.log('🎮 [LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
+  console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
 
   const currentUser = authService.getCurrentUser();
   
@@ -165,7 +165,7 @@ async function startGame(): Promise<void> {
   const currentRoom = getCurrentRoom();
   if (!currentRoom) return;
 
-  console.log('🎮 Starting game for room:', currentRoom.roomId);
+  console.log('Starting game for room:', currentRoom.roomId);
 
   try {
     const token = authService.getToken();
@@ -196,7 +196,7 @@ async function startGame(): Promise<void> {
       }
       
       const finalRoom = getCurrentRoom();
-      console.log('🎮 Navigating to game page with room:', finalRoom);
+      console.log('Navigating to game page with room:', finalRoom);
       
       stopRoomPolling();
       
@@ -227,7 +227,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
     },
     
     onGameStart: async (gameId) => {
-      console.log('🎮 Game started by host! GameID:', gameId);
+      console.log('Game started by host! GameID:', gameId);
       
       let currentRoom = getCurrentRoom();
       
@@ -257,7 +257,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
         lobbyWebSocket = null;
       }
       
-      console.log('🎮 Navigating to game page...');
+      console.log('Navigating to game page...');
       history.pushState({ page: 'game', roomId }, '', '#game');
       setCurrentPage('game');
       renderApp();
@@ -325,7 +325,6 @@ function renderLobby(root: HTMLElement): void {
 	  return;
 	}
   
-	// PRESERVE INPUT STATE BEFORE RE-RENDERING
 	const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
 	const preservedValue = existingInput ? existingInput.value : '';
 	const wasFocused = existingInput && document.activeElement === existingInput;
@@ -412,7 +411,7 @@ function renderLobby(root: HTMLElement): void {
 					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
 						   background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
 						   cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
-			  ${canStart ? '🎮 Start Game' : '⏳ Waiting for players...'}
+			  ${canStart ? 'Start Game' : '⏳ Waiting for players...'}
 			</button>
 		  ` : `
 			<div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
@@ -430,7 +429,6 @@ function renderLobby(root: HTMLElement): void {
 	  </div>
 	`;
   
-	// RESTORE INPUT STATE AFTER RE-RENDERING
 	if (preservedValue || wasFocused) {
 	  const newInput = document.getElementById('joinRoomInput') as HTMLInputElement;
 	  if (newInput) {
@@ -541,7 +539,6 @@ async function addAIOpponent(): Promise<void> {
   console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
   
   try {
-    // First, add the AI player to the room
     const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
@@ -560,7 +557,6 @@ async function addAIOpponent(): Promise<void> {
     console.log('[AI] Join response:', joinData);
     
     if (joinData.success) {
-      // AI is automatically ready when joining (backend handles this)
       console.log('✅ [AI] AI joined and is ready');
       await fetchRoomState();
     }

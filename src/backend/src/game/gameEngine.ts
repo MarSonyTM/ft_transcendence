@@ -277,7 +277,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             if (this.gameState.ballPosY >= rightPaddleTop && 
                 this.gameState.ballPosY <= rightPaddleBottom) {
                 
-                // **ADD THIS SECTION - Calculate hit position and add spin**
                 const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
                 
@@ -297,11 +296,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 const maxSpeed = 5;
                 if (Math.abs(this.xDir) > maxSpeed) this.xDir = Math.sign(this.xDir) * maxSpeed;
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
-                // **END OF NEW SECTION**
                 
                 this.gameState.ballPosX = 390 - ballRadius;
             } else if (this.gameState.ballPosX >= 400) {
-                // Missed paddle - Goal for Player 1
                 this.updateScoreBoard(1);
                 return 1;
             }
@@ -316,7 +313,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             if (this.gameState.ballPosY >= leftPaddleTop && 
                 this.gameState.ballPosY <= leftPaddleBottom) {
                 
-                // **ADD THIS SECTION - Calculate hit position and add spin**
                 const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
                 
@@ -336,7 +332,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 const maxSpeed = 5;
                 if (Math.abs(this.xDir) > maxSpeed) this.xDir = Math.sign(this.xDir) * maxSpeed;
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
-                // **END OF NEW SECTION**
                 
                 this.gameState.ballPosX = paddleWidth + ballRadius;
             } else if (this.gameState.ballPosX <= 0) {

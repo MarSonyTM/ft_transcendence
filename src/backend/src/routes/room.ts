@@ -165,7 +165,6 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // ✨ CRITICAL FIX: Broadcast room update to ALL players
       const room = gameRoomManager.getRoom(roomId);
       if (room) {
         console.log(`📡 Broadcasting player left to room ${roomId}`);
@@ -174,7 +173,7 @@ async function roomRoutes(fastify: FastifyInstance) {
           type: 'roomState',
           room: {
             roomId: room.roomId,
-            hostId: room.hostId,        // ADD THIS LINE
+            hostId: room.hostId,
             players: room.players,
             status: room.status,
             maxPlayers: room.maxPlayers,
@@ -228,7 +227,6 @@ async function roomRoutes(fastify: FastifyInstance) {
       const room = gameRoomManager.getRoom(roomId);
       const allReady = gameRoomManager.allPlayersReady(roomId);
 
-      // ✨ CRITICAL FIX: Broadcast room update to ALL players
       if (room) {
         console.log(`📡 Broadcasting ready status to room ${roomId}`);
         
@@ -236,7 +234,7 @@ async function roomRoutes(fastify: FastifyInstance) {
           type: 'roomState',
           room: {
             roomId: room.roomId,
-            hostId: room.hostId,        // ADD THIS LINE
+            hostId: room.hostId,
             players: room.players,
             status: room.status,
             maxPlayers: room.maxPlayers,
@@ -332,7 +330,6 @@ async function roomRoutes(fastify: FastifyInstance) {
 
       // Store and start the game engine
       activeGames.set(gameId, gameEngine);
-      // IMPORTANT: start the engine loop so the ball moves and state updates
       if (typeof (gameEngine as any).startGame === 'function') {
         (gameEngine as any).startGame();
       }
