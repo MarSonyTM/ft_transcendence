@@ -34,9 +34,10 @@ export class RoomWebSocketManager {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.hostname;
         
-        // Always use port 3000 for backend WebSocket in development
-        const token = localStorage.getItem('authToken');
-        const wsUrl = `${protocol}//${host}:3000/room/${this.config.roomId}/ws?playerId=${this.config.playerId}&token=${token}`;
+        const wsEndpoint = (window as any).__INITIAL_STATE__?.wsEndpoint || 
+                        `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}://${window.location.hostname}:3000`;
+      
+      const wsUrl = `${wsEndpoint}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
         
         console.log('🔌 Connecting to:', wsUrl);
         
@@ -111,7 +112,6 @@ export class RoomWebSocketManager {
   }
 
   private handleMessage(message: any): void {
-    console.log('📨 WebSocket received:', message.type, message);
 
     switch (message.type) {
       case 'connected':

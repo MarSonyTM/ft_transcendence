@@ -11,8 +11,10 @@ import webSocketRoutes from './websocket/websocketHandler';
 import tournamentRoutes from './routes/tournament';
 import roomRoutes from './routes/room';
 import roomWebSocketRoutes from './websocket/roomHandler';
-import { database } from './database';
 import { authGuard } from './middleware';
+import friendRoutes from './routes/friends';
+import invitationRoutes from './routes/invite';
+import { database } from './database';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -36,25 +38,54 @@ const start = async (): Promise<void> => {
   try {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
-      origin: [
-        'http://0.0.0.0:8080',
-        'http://frontend:8080',
-        'http://0.0.0.0:3000',
-        'http://0.0.0.0:5173', // Vite dev server
-        'http://localhost:3000',
-        'http://localhost:5173',
-        /^http:\/\/0.0.0.0:\d+$/
-      ],
-      credentials: true
+      origin: (origin, cb) => {
+        
+        if (!origin) {
+          return cb(null, true);
+        }
+        
+        // Allow any localhost or local network IP
+        const allowedPatterns = [
+          /^http:\/\/localhost:\d+$/,
+          /^http:\/\/127\.0\.0\.1:\d+$/,
+          /^http:\/\/0\.0\.0\.0:\d+$/,
+          /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+          /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
+          /^https:\/\/localhost$/,
+          'http://frontend:8080',
+        ];
+        
+        const isAllowed = allowedPatterns.some(pattern => {
+          if (typeof pattern === 'string') {
+            return origin === pattern;
+          }
+          return pattern.test(origin);
+        });
+        
+        if (isAllowed) {
+          console.log('✅ Origin allowed:', origin);
+          cb(null, true);
+        } else {
+          console.log('❌ Origin blocked:', origin);
+          cb(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     });
 
     await server.register(websocket);
-    console.log('🔌 WebSocket support registered');
+    console.log('WebSocket support registered');
+    
+    server.addHook('onRequest', authGuard);
+    console.log('Authentication middleware registered');
     
     // Register WebSocket support first
     await webSocketRoutes(server);
-    server.addHook('onRequest', authGuard);
-    // Register API routes (these must come before SSR routes)
+
+    // Register API routes (these must come after authGuard)
     await server.register(userRoutes, { prefix: '/api/users' });
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
@@ -63,7 +94,8 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(roomWebSocketRoutes);
-
+    await server.register(friendRoutes, { prefix: '/api/friends' });
+    await server.register(invitationRoutes, { prefix: '/api/invitations' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -138,10 +170,10 @@ const start = async (): Promise<void> => {
 
     // Start listening
     await server.listen({ port: PORT, host: HOST });
-    console.log(`🚀 Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
-    console.log(`🔌 WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
-    console.log(`📊 Health check available at http://${HOST}:${PORT}/health`);
-    console.log(`📡 API docs available at http://${HOST}:${PORT}/api`);
+    console.log(`Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
+    console.log(`WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
+    console.log(`Health check available at http://${HOST}:${PORT}/health`);
+    console.log(`API docs available at http://${HOST}:${PORT}/api`);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
@@ -149,8 +181,3 @@ const start = async (): Promise<void> => {
 };
 
 start();
-
-
-
-
-

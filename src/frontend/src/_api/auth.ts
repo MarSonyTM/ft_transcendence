@@ -7,24 +7,49 @@ interface RegisterResult {
 	error?: string;
 }
 
+//export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
+// 		const res = await fetch(`${API_BASE}/api/auth/login`, {
+//		method: 'POST',
+//		headers: { 'Content-Type': 'application/json' },
+//		body: JSON.stringify({ username, password })
+//	});
+//	if (res.ok) {
+//		const data = await res.json().catch(() => ({}));
+//        if (data?.token) setAccessToken(data.token);
+//		return data;
+//	}
+//    if (res.status === 404) {
+//        return { success: false, error: 'API not available (404)' };
+//    } else if ( res.status === 401 ) {
+//        return { success: false, error: 'Invalid username/email or password' };
+//    }
+//	return { success: false, error: `Server error (${res.status})` };
+//}
 
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password })
-	});
-	if (res.ok) {
-		const data = await res.json().catch(() => ({}));
-        if (data?.token) setAccessToken(data.token);
-		return data;
-	}
+export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; error?: string }> {
+    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+    
+    const res = await fetch(`${apiEndpoint}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+    
+    if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return {
+            success: data.success || false,
+            username: data.data?.username,
+            token: data.token,
+            error: data.message
+        };
+    }
     if (res.status === 404) {
         return { success: false, error: 'API not available (404)' };
     } else if ( res.status === 401 ) {
         return { success: false, error: 'Invalid username/email or password' };
     }
-	return { success: false, error: `Server error (${res.status})` };
+    return { success: false, error: `Server error (${res.status})` };
 }
 
 

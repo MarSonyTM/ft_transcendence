@@ -4,6 +4,7 @@ import { broadcastGameStartToRoom, broadcastToRoom } from '../websocket/roomHand
 import { database } from '../database/index';
 import { TwoPlayerGameEngine, FourPlayerGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
+import { GameState } from '../database/index';
 
 interface CreateRoomBody {
   hostId: string;
@@ -92,7 +93,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     try {
       const { roomId } = request.params;
       const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
-      const isReady = !!isAI;
+      const isReady = isAI;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -164,7 +165,6 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // ✨ CRITICAL FIX: Broadcast room update to ALL players
       const room = gameRoomManager.getRoom(roomId);
       if (room) {
         console.log(`📡 Broadcasting player left to room ${roomId}`);
@@ -173,7 +173,7 @@ async function roomRoutes(fastify: FastifyInstance) {
           type: 'roomState',
           room: {
             roomId: room.roomId,
-            hostId: room.hostId,        // ADD THIS LINE
+            hostId: room.hostId,
             players: room.players,
             status: room.status,
             maxPlayers: room.maxPlayers,
@@ -227,7 +227,6 @@ async function roomRoutes(fastify: FastifyInstance) {
       const room = gameRoomManager.getRoom(roomId);
       const allReady = gameRoomManager.allPlayersReady(roomId);
 
-      // ✨ CRITICAL FIX: Broadcast room update to ALL players
       if (room) {
         console.log(`📡 Broadcasting ready status to room ${roomId}`);
         
@@ -235,7 +234,7 @@ async function roomRoutes(fastify: FastifyInstance) {
           type: 'roomState',
           room: {
             roomId: room.roomId,
-            hostId: room.hostId,        // ADD THIS LINE
+            hostId: room.hostId,
             players: room.players,
             status: room.status,
             maxPlayers: room.maxPlayers,
@@ -282,13 +281,15 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     try {
       const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
-      const gameId = Date.now();
+      // Use incremental DB-backed game IDs for cleanliness
+      const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
+      const gameId = createdGame.id;
       
       console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
       // Create a proper GameState object
       const initialGameState: GameState = {
-        id: 0, // Will be set by database if needed
+        id: 0, // Optional: engine updates guard errors internally
         gameId: gameId,
         player1Id: 0,
         player2Id: 0,
@@ -317,8 +318,21 @@ async function roomRoutes(fastify: FastifyInstance) {
         gameEngine = new TwoPlayerGameEngine(initialGameState);
       }
 
+      room.players.forEach((player, index) => {
+      const playerId = index + 1; // Player IDs are 1-indexed
+      if (player.isAI) {
+        gameEngine.setPlayerAI(playerId, true);
+        console.log(`🤖 Marked Player ${playerId} (${player.username}) as AI`);
+      } else {
+        console.log(`👤 Player ${playerId} (${player.username}) is human`);
+      }
+    });
+
       // Store and start the game engine
       activeGames.set(gameId, gameEngine);
+      if (typeof (gameEngine as any).startGame === 'function') {
+        (gameEngine as any).startGame();
+      }
       
       const started = gameRoomManager.startGame(roomId, gameId);
       if (!started) {

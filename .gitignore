@@ -39,5 +39,6 @@ src/frontend/node_modules/
 *.db-shm
 *.db-wal
 *.db
-src/backend/database/transcendence.db
+src/database/
+
 /package-lock.json

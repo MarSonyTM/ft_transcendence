@@ -1,4 +1,5 @@
-const API_URL = '';
+const getApiUrl = () => window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+const API_URL = getApiUrl();
 
 interface DecodedToken {
   id: string;
@@ -155,6 +156,13 @@ export class AuthService {
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
     this.currentUser = null;
+  }
+
+  // Helper: authorization header for authenticated requests
+  getAuthHeader(): Record<string, string> | null {
+    const token = this.getToken();
+    if (!token) return null;
+    return { 'Authorization': `Bearer ${token}` };
   }
 
   // Update user stats after game

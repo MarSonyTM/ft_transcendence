@@ -15,7 +15,6 @@ export async function renderGamePage(): Promise<void> {
     const gameMode = getCurrentGameMode();
     const room = getCurrentRoom();
     
-    // Check if this is a room-based game (remote players)
     isRoomBasedGame = room !== null;
     
     if (gameMode === '4player') {
@@ -24,7 +23,6 @@ export async function renderGamePage(): Promise<void> {
         await renderTwoPlayerGame();
     }
     
-    // Initialize room-based multiplayer if room exists
     if (isRoomBasedGame && room) {
         await initRoomBasedGame(room);
     }
@@ -81,7 +79,6 @@ async function renderTwoPlayerGame(): Promise<void> {
         <div class="controls-info">
             <p>${player1.username} - Up/Down W/S</p>
             ${!isRoomBasedGame && !player2.isAI ? '<p>Player 2 - Up/Down O/L</p>' : ''}
-            ${isRoomBasedGame ? '<p style="color: #34d399;">🌐 Playing online with remote player</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Lobby</button>
         <hr>
@@ -200,12 +197,43 @@ async function setupGameButtons(): Promise<void> {
     
     pongGame = new PongGame();
     
-    // For room-based games, use the shared gameId from the room
-    if (isRoomBasedGame && room && room.gameId) {
-        console.log('🎮 Room-based game detected! Using shared gameId:', room.gameId);
+    if (isRoomBasedGame) {
+        let effectiveRoom = room;
+        if (!effectiveRoom || !effectiveRoom.gameId) {
+            console.warn('⚠️ Room-based game but missing gameId. Fetching room state before connecting...');
+            const roomId = effectiveRoom?.roomId || (history.state && history.state.roomId);
+            if (roomId) {
+                try {
+                    const deadline = Date.now() + 1000;
+                    while (Date.now() < deadline && (!effectiveRoom || !effectiveRoom.gameId)) {
+                        const resp = await fetch(`/api/room/${roomId}`);
+                        const data = await resp.json();
+                        if (data?.success && data?.room) {
+                            effectiveRoom = data.room;
+                        }
+                        if (!effectiveRoom?.gameId) {
+                            await new Promise(r => setTimeout(r, 100));
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch updated room:', e);
+                }
+            }
+        }
+
+        if (!effectiveRoom || !effectiveRoom.gameId) {
+            console.error('❌ No shared gameId available yet; not creating a standalone game.');
+            return;
+        }
+
+        console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
         
-        // CRITICAL: Set the gameId BEFORE any initialization
-        pongGame.gameId = room.gameId;
+        pongGame.gameId = effectiveRoom.gameId;
+        const localUser = authService.getCurrentUser();
+        if (localUser && effectiveRoom.players) {
+            const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
+            if (idx === 1) pongGame.viewIndexMap = [1, 0, 2, 3];
+        }
         
         // Manually initialize canvas without creating a new game
         pongGame.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
@@ -213,35 +241,24 @@ async function setupGameButtons(): Promise<void> {
             console.error('❌ Canvas not found!');
             return;
         }
-        
         pongGame.ctx = pongGame.canvas.getContext('2d');
         
-        console.log('✅ Set gameId to:', pongGame.gameId);
-        
-        // Connect to the shared game WebSocket
         try {
             await pongGame.connectWebSocket();
             console.log('✅ Connected to shared game WebSocket');
-            
             pongGame.updateStatus("Connected - Click Start to begin");
-            
-            // Start the render loop manually since we skipped init()
-            if (pongGame.startRenderLoop) {
-                pongGame.startRenderLoop();
-            }
+            if (pongGame.startRenderLoop) pongGame.startRenderLoop();
         } catch (error) {
             console.error('❌ Failed to connect to game WebSocket:', error);
         }
     } else {
-        console.log('🎮 Local game - creating new game instance');
-        // Local game - create new game normally (this will create a NEW game)
+        console.log('Local game - creating new game instance');
         await pongGame.init();
     }
     
     pongGame.onGameEnd = async (winnerId: number) => {
         console.log(`Game ended, winner is Player ${winnerId}`);
         
-        // Notify room if this is a room-based game
         if (isRoomBasedGame && roomWS) {
             const room = getCurrentRoom();
             if (room) {
@@ -261,22 +278,36 @@ async function setupGameButtons(): Promise<void> {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ 
-                    winnerId: winnerId 
-                }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ winnerId })
             });
-
             const data = await response.json();
-            if (data.success) {
-                console.log(`Winner (Player ${winnerId}) updated in database successfully`);
-            } else {
+            if (!data.success) {
                 console.error('Failed to update winner:', data.message);
             }
+
+            const user = authService.getCurrentUser();
+            if (user && user.id) {
+                let didWin = false;
+                const room = getCurrentRoom();
+                if (isRoomBasedGame && room && Array.isArray(room.players)) {
+                    const winnerPlayer = room.players[winnerId - 1];
+                    didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
+                } else {
+                    didWin = (winnerId === 1);
+                }
+                try {
+                    await fetch(`${apiEndpoint}/api/users/stats`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
+                        body: JSON.stringify({ won: didWin })
+                    });
+                } catch (e) {
+                    console.warn('Unable to update user stats:', e);
+                }
+            }
         } catch (error) {
-            console.error('Error updating winner:', error);
+            console.error('Error updating winner or stats:', error);
         }
     };
 
@@ -349,16 +380,21 @@ async function initRoomBasedGame(room: any): Promise<void> {
 
     const playerId = user.id?.toString() || `guest-${Date.now()}`;
 
-    console.log('🎮 Initializing room-based game:', {
+    console.log('Initializing room-based game:', {
         roomId: room.roomId,
         playerId,
-        gameId: room.gameId  // THIS is the shared game ID
+        gameId: room.gameId
     });
 
-    // CRITICAL: Set the shared game ID BEFORE initializing the game
     if (pongGame && room.gameId) {
-        pongGame.gameId = room.gameId;  // Use the room's game ID
+        pongGame.gameId = room.gameId;
         console.log(`✅ Using shared game ID from room: ${room.gameId}`);
+        const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
+        if (idx === 1) {
+            pongGame.viewIndexMap = [1, 0, 2, 3];
+        } else {
+            pongGame.viewIndexMap = [0, 1, 2, 3];
+        }
     }
 
     // Initialize WebSocket connection to room
@@ -370,10 +406,10 @@ async function initRoomBasedGame(room: any): Promise<void> {
             console.log('✅ Connected to game room');
             updateConnectionStatus('Connected (Room)', true);
             
-            // Request initial game state
             if (roomWS) {
                 roomWS.requestState();
             }
+            setupRoomKeyboardControls(roomWS!, playerId);
         },
         
         onDisconnect: () => {
@@ -382,7 +418,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         },
         
         onGameState: (state) => {
-            // Update game state from server
             currentGameState = state;
             if (pongGame) {
                 syncGameStateFromRoom(state);
@@ -409,17 +444,35 @@ async function initRoomBasedGame(room: any): Promise<void> {
             }
         }
     });
+
+    try {
+        await roomWS.connect();
+    } catch (e) {
+        console.error('❌ Failed to connect room WebSocket:', e);
+    }
 }
 
 // Setup keyboard controls for room-based game
 function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
     const keys: { [key: string]: boolean } = {};
+    
     let lastPosition = 50;
+    if (pongGame && pongGame.gameState) {
+        const room = getCurrentRoom();
+        const idx = room?.players.findIndex((p: any) => p.id === playerId) ?? 0;
+        if (idx === 0 && typeof pongGame.gameState.player1Pos === 'number') {
+            lastPosition = Math.max(0, Math.min(100, (pongGame.gameState.player1Pos / 160) * 100));
+        } else if (idx === 1 && typeof pongGame.gameState.player2Pos === 'number') {
+            lastPosition = Math.max(0, Math.min(100, (pongGame.gameState.player2Pos / 160) * 100));
+        }
+    }
+    
     let lastSentTime = 0;
-    const throttleMs = 50; // Send updates every 50ms max
+    const throttleMs = 16;
 
     document.addEventListener('keydown', (e) => {
         keys[e.key.toLowerCase()] = true;
+        if (['arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
     });
 
     document.addEventListener('keyup', (e) => {
@@ -436,40 +489,37 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
         let moved = false;
         let newPosition = lastPosition;
 
-        // Get current player's controls based on their position in room
         const room = getCurrentRoom();
         if (!room) return;
 
         const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
         
-        // Player-specific controls
-        if (playerIndex === 0) { // Player 1 - W/S or Up/Down
-            if (keys['w'] || keys['arrowup']) {
-                newPosition = Math.max(0, newPosition - 2);
-                moved = true;
-            }
-            if (keys['s'] || keys['arrowdown']) {
-                newPosition = Math.min(100, newPosition + 2);
-                moved = true;
-            }
-        } else if (playerIndex === 1) { // Player 2
-            if (keys['w'] || keys['arrowup']) {
-                newPosition = Math.max(0, newPosition - 2);
-                moved = true;
-            }
-            if (keys['s'] || keys['arrowdown']) {
-                newPosition = Math.min(100, newPosition + 2);
-                moved = true;
-            }
+        const paddleSpeed = 5;
+        
+        if (keys['w'] || keys['arrowup']) {
+            newPosition = Math.max(0, newPosition - paddleSpeed);
+            moved = true;
         }
-        // Add more player controls as needed for 4-player
+        if (keys['s'] || keys['arrowdown']) {
+            newPosition = Math.min(100, newPosition + paddleSpeed);
+            moved = true;
+        }
 
         if (moved && newPosition !== lastPosition) {
-            ws.sendMove(newPosition);
+            const enginePos = Math.round((newPosition / 100) * 160);
+            ws.sendMove(enginePos);
+
+            if (pongGame && pongGame.gameState) {
+                if (playerIndex === 0) {
+                    pongGame.gameState.player1Pos = enginePos;
+                } else if (playerIndex === 1) {
+                    pongGame.gameState.player2Pos = enginePos;
+                }
+            }
             lastPosition = newPosition;
             lastSentTime = now;
         }
-    }, 16); // ~60 FPS
+    }, 16);
 }
 
 // Sync game state from room WebSocket

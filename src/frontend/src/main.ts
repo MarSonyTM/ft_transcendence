@@ -8,9 +8,9 @@ import { renderProfilePage } from './pages/profilePage';
 import { renderGamePage, pongGame } from './pages/gamePage';
 import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
-import { setAccessToken } from './utils/api';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
+import { renderFriendsPage } from './pages/friendsPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -55,6 +55,9 @@ function handleRouting(): void {
       case 'authCallback':
         setCurrentPage('authCallback');
         break;
+      case 'friends':
+        setCurrentPage('friends');
+        break;
       default:
         setCurrentPage('landing');
     }
@@ -98,8 +101,7 @@ function handleRouting(): void {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
   
-  // Cleanup previous page if needed
-  if (page !== 'lobby') {
+  if (page !== 'lobby' && page !== 'game') {
     cleanupLobby();
   }
 
@@ -144,8 +146,11 @@ export async function renderApp(): Promise<void> {
     case 'game':
       renderGamePage();
       break;
+    case 'friends':
+      renderFriendsPage();
+      break;
     default:
-      renderGamePage();
+      renderLandingPage();
   }
 }
 
@@ -167,19 +172,12 @@ window.addEventListener('popstate', async () => {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('App starting with SSR support...');
   
+  // Always derive the page from URL routing to support deep links like /join/:roomId
   if (window.__INITIAL_STATE__) {
-    setCurrentPage((window.__CURRENT_PAGE__ as AppPage) || 'landing');
     setCurrentUser(window.__USERNAME__ || '');
-    await renderApp();
-  } else {
-    console.log('No SSR data found, using URL-based routing');
-    handleRouting();
   }
+  handleRouting();
 });
-
-// Initialize auth token if exists
-const existing = localStorage.getItem('authToken');
-if (existing) setAccessToken(existing);
 
 // Add types for SSR support
 declare global {

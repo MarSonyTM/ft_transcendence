@@ -26,7 +26,7 @@ export function getCurrentRoom(): GameRoom | null {
 
 export function setCurrentRoom(room: GameRoom | null): void {
   currentRoom = room;
-  console.log('🔄 Room state updated:', room?.roomId || 'null');
+  // console.log('🔄 Room state updated:', room?.roomId || 'null');
 }
 
 export function getLobbyPlayers(): Player[] {

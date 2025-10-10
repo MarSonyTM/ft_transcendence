@@ -4,6 +4,9 @@ import { getCurrentRoom } from '../utils/roomState';
 
 export class PongGame {
     gameId: number | null = null;
+    // Display mapping from server player indices -> local view indices
+    // Default: identity [0,1,2,3]. For 1v1, right-side client can use [1,0,2,3]
+    viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
     websocket: WebSocket | null = null;
@@ -70,29 +73,44 @@ export class PongGame {
         this.updateStatus("Ready to start...");
         
         try {
-            // CRITICAL FIX: Check if this is a room-based game
             const room = getCurrentRoom();
             
-            if (room && room.gameId) {
+            // If gameId was already set externally (from gamePage), use it
+            if (this.gameId) {
+                console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
+            }
+            // If there's a room with a gameId, use it
+            else if (room && room.gameId) {
                 this.gameId = room.gameId;
-                console.log(`✅ Using room's game ID: ${this.gameId}`);
-            } else if (!this.gameId) {
+                console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
+            }
+            //  Create a new game if there's NO room AND no gameId set
+            else if (!room) {
+                console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
                 await this.createGame();
-                console.log(`✅ Created new game ID: ${this.gameId}`);
-            } else {
-                // gameId was already set (from room or elsewhere)
-                console.log(`✅ Using pre-set game ID: ${this.gameId}`);
+                console.log(`✅ [PONGGAME] Created new standalone game ID: ${this.gameId}`);
+            }
+            // Priority 4: Room exists but no gameId yet - wait for host to start
+            else {
+                console.warn(`⏳ [PONGGAME] Room exists but no gameId - game not started yet`);
+                this.updateStatus("Waiting for host to start game...");
+                return; // Don't initialize yet
             }
             
+            // Connect to WebSocket only after gameId is confirmed
             if (this.gameId) {
                 await this.connectWebSocket();
                 this.updateStatus("Connected - Click Start to begin");
                 this.startRenderLoop();
+            } else {
+                throw new Error("Failed to establish game ID");
             }
         } catch (error) {
+            console.error("❌ [PONGGAME] Initialization error:", error);
             this.updateStatus(`Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+
 
     async createGame(): Promise<void> {
         try {
@@ -126,7 +144,8 @@ export class PongGame {
 
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || 'ws://localhost:3000';
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
             const token = localStorage.getItem('authToken');
             const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws?token=${token}`;
             
@@ -184,23 +203,48 @@ export class PongGame {
                 
             case 'gameState':
                 if (message.state) {
-                    this.gameState = {
-                        ballPosX: message.state.ballPosX || this.gameState.ballPosX,
-                        ballPosY: message.state.ballPosY || this.gameState.ballPosY,
-                        player1Pos: message.state.player1Pos || this.gameState.player1Pos,
-                        player2Pos: message.state.player2Pos || this.gameState.player2Pos,
-                        player3Pos: message.state.player3Pos || this.gameState.player3Pos,
-                        player4Pos: message.state.player4Pos || this.gameState.player4Pos,
-                        scorePlayer1: message.state.scorePlayer1 || 0,
-                        scorePlayer2: message.state.scorePlayer2 || 0,
-                        scorePlayer3: message.state.scorePlayer3 || 0,
-                        scorePlayer4: message.state.scorePlayer4 || 0,
-                        gameMode: message.state.gameMode || this.gameState.gameMode,
-                        mode: message.mode || message.state.mode || this.gameState.mode,
-                        playerPositions: message.state.playerPositions || this.gameState.playerPositions,
-                        scores: message.state.scores || this.gameState.scores,
-                        lastContact: message.state.lastContact || this.gameState.lastContact
+                    const nextState = {
+                        ballPosX: message.state.ballPosX ?? this.gameState.ballPosX,
+                        ballPosY: message.state.ballPosY ?? this.gameState.ballPosY,
+                        player1Pos: message.state.player1Pos ?? this.gameState.player1Pos,
+                        player2Pos: message.state.player2Pos ?? this.gameState.player2Pos,
+                        player3Pos: message.state.player3Pos ?? this.gameState.player3Pos,
+                        player4Pos: message.state.player4Pos ?? this.gameState.player4Pos,
+                        scorePlayer1: message.state.scorePlayer1 ?? 0,
+                        scorePlayer2: message.state.scorePlayer2 ?? 0,
+                        scorePlayer3: message.state.scorePlayer3 ?? 0,
+                        scorePlayer4: message.state.scorePlayer4 ?? 0,
+                        gameMode: message.state.gameMode ?? this.gameState.gameMode,
+                        mode: message.mode ?? message.state.mode ?? this.gameState.mode,
+                        playerPositions: message.state.playerPositions ?? this.gameState.playerPositions,
+                        scores: message.state.scores ?? this.gameState.scores,
+                        lastContact: message.state.lastContact ?? this.gameState.lastContact
                     };
+
+                    // Apply display mapping for 1v1 when the local view swaps left/right
+                    const swapLeftRight =
+                        (nextState.mode === '1v1' || nextState.gameMode === '1v1') &&
+                        this.viewIndexMap.length >= 2 &&
+                        this.viewIndexMap[0] === 1 && this.viewIndexMap[1] === 0;
+
+                    if (swapLeftRight) {
+                        const width = (this.canvas && this.canvas.width) ? this.canvas.width : 400;
+                        const mirrored = { ...nextState } as any;
+                        mirrored.ballPosX = width - (nextState.ballPosX ?? 0);
+                        mirrored.player1Pos = nextState.player2Pos ?? 0;
+                        mirrored.player2Pos = nextState.player1Pos ?? 0;
+                        mirrored.scorePlayer1 = nextState.scorePlayer2 ?? 0;
+                        mirrored.scorePlayer2 = nextState.scorePlayer1 ?? 0;
+                        this.gameState = mirrored;
+                    } else {
+                        this.gameState = nextState;
+                    }
+                    
+                    if (this.playerId === 1) {
+                        this.paddlePosition = this.gameState.player1Pos ?? 80;
+                    } else if (this.playerId === 2) {
+                        this.paddlePosition = this.gameState.player2Pos ?? 80;
+                    }
                     
                     this.updateScoreDisplay();
                 }
@@ -213,15 +257,15 @@ export class PongGame {
             case 'score':
                 if (message.mode === '4player' && message.scores) {
                     this.gameState.scores = message.scores;
-                    this.gameState.scorePlayer1 = message.scores[3] || 0;
-                    this.gameState.scorePlayer2 = message.scores[1] || 0;
-                    this.gameState.scorePlayer3 = message.scores[0] || 0;
-                    this.gameState.scorePlayer4 = message.scores[2] || 0;
+                    this.gameState.scorePlayer1 = message.scores[3] ?? 0;
+                    this.gameState.scorePlayer2 = message.scores[1] ?? 0;
+                    this.gameState.scorePlayer3 = message.scores[0] ?? 0;
+                    this.gameState.scorePlayer4 = message.scores[2] ?? 0;
                 } else {
-                    this.gameState.scorePlayer1 = message.scorePlayer1 || 0;
-                    this.gameState.scorePlayer2 = message.scorePlayer2 || 0;
-                    this.gameState.scorePlayer3 = message.scorePlayer3 || 0;
-                    this.gameState.scorePlayer4 = message.scorePlayer4 || 0;
+                    this.gameState.scorePlayer1 = message.scorePlayer1 ?? 0;
+                    this.gameState.scorePlayer2 = message.scorePlayer2 ?? 0;
+                    this.gameState.scorePlayer3 = message.scorePlayer3 ?? 0;
+                    this.gameState.scorePlayer4 = message.scorePlayer4 ?? 0;
                 }
                 this.updateScoreDisplay();
                 break;
@@ -233,12 +277,12 @@ export class PongGame {
 
             case 'gameEnd':
                 if (message.mode === '4player') {
-                    this.updateStatus(`Game Over! ${message.winnerName} wins!`);
+                    this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`, message.finalScores);
                     
                     // Trigger callback for 4-player mode
                     if (this.onGameEnd) {
-                        const winnerId = this.parseWinnerIdFromName(message.winnerName);
+                        const winnerId = message.winnerName ? this.parseWinnerIdFromName(message.winnerName) : 1;
                         this.onGameEnd(winnerId);
                     }
                 } else {
@@ -280,9 +324,10 @@ export class PongGame {
         } else {
             const player1score = document.getElementById('player1score');
             const player2score = document.getElementById('player2score');
-            
-            if (player1score) player1score.textContent = this.gameState.scorePlayer1.toString();
-            if (player2score) player2score.textContent = this.gameState.scorePlayer2.toString();
+            const leftScore = this.gameState.scorePlayer1;
+            const rightScore = this.gameState.scorePlayer2;
+            if (player1score) player1score.textContent = leftScore.toString();
+            if (player2score) player2score.textContent = rightScore.toString();
         }
     }
 
@@ -343,6 +388,9 @@ export class PongGame {
 
     handleInput(): void {
         if (!this.isActive) return;
+        // In room-based games, input is handled by room WS logic in gamePage.ts
+        // to correctly attribute controls per connected player. Avoid double-sending here.
+        if (getCurrentRoom()) return;
         
         let newPosition = this.paddlePosition;
         const paddleSpeed = 4;
@@ -375,6 +423,9 @@ export class PongGame {
     }
 
     sendPlayerMove(position: number): void {
+        // Do not send moves over the game socket when playing a room-based game;
+        // room WebSocket handles authoritative input routing.
+        if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
@@ -415,8 +466,8 @@ export class PongGame {
     render2Player(ballPosX: number, ballPosY: number): void {
         if (!this.ctx || !this.canvas) return;
 
-        const player1Pos = this.gameState.player1Pos || 80;
-        const player2Pos = this.gameState.player2Pos || 80;
+        const player1Pos = this.gameState.player1Pos ?? 80;
+        const player2Pos = this.gameState.player2Pos ?? 80;
 
         this.ctx.strokeStyle = "white";
         this.ctx.setLineDash([5, 15]);
@@ -427,7 +478,7 @@ export class PongGame {
         this.ctx.setLineDash([]);
 
         this.ctx.fillStyle = "grey";
-        this.ctx.fillRect(0, this.paddlePosition, 10, 40);
+        this.ctx.fillRect(0, player1Pos, 10, 40);
         this.ctx.fillRect(this.canvas.width - 10, player2Pos, 10, 40);
     }
 
@@ -438,16 +489,16 @@ export class PongGame {
         
         this.ctx.fillStyle = "grey";
 
-        const topPaddleX = playerPositions[0] || 180;
+        const topPaddleX = playerPositions[0] ?? 180;
         this.ctx.fillRect(topPaddleX, 0, 40, 10);
 
-        const rightPaddleY = playerPositions[1] || 180;
+        const rightPaddleY = playerPositions[1] ?? 180;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
-        const bottomPaddleX = playerPositions[2] || 180;
+        const bottomPaddleX = playerPositions[2] ?? 180;
         this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
 
-        const leftPaddleY = this.paddlePosition;
+        const leftPaddleY = playerPositions[3] ?? 180;
         this.ctx.fillRect(0, leftPaddleY, 10, 40);
 
         this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
@@ -540,7 +591,7 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
-                    method: "POST",
+                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${localStorage.getItem('authToken')}`

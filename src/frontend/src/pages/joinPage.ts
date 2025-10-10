@@ -2,6 +2,7 @@ import { renderLobbyPage } from './lobbyPage';
 import { authService } from '../utils/auth';
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { setCurrentRoom } from '../utils/roomState';
 
 export async function renderJoinPage(roomId: string): Promise<void> {
   const root = document.getElementById('app-root');
@@ -42,8 +43,17 @@ export async function renderJoinPage(roomId: string): Promise<void> {
       return;
     }
 
-    // Room exists, redirect to lobby with roomId
-    await renderLobbyPage(roomId);
+    // Room exists: cache room locally to avoid race on next navigation
+    if (data.room) {
+      setCurrentRoom(data.room);
+    }
+
+    // Redirect to lobby with roomId (and update URL/state)
+    // Store intent so main router can pass roomId to lobby
+    sessionStorage.setItem('pendingRoomJoin', roomId);
+    history.pushState({ page: 'lobby', roomId }, '', '#lobby');
+    setCurrentPage('lobby');
+    renderApp();
   } catch (error) {
     console.error('Error checking room:', error);
     showRoomError(root, roomId);
