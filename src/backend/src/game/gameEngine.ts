@@ -665,22 +665,25 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             let clampedPos: number;
             
             if (playerId === 1 || playerId === 3) {
-                clampedPos = Math.max(paddleWidth, Math.min(position, this.maxX - paddleWidth - paddleHeight));
+                // Top/Bottom paddles - horizontal movement along X axis
+                // Paddle can move from 0 to (maxX - paddleHeight) = 0 to 350
+                clampedPos = Math.max(0, Math.min(position, this.maxX - paddleHeight));
             } else {
-                clampedPos = Math.max(paddleWidth, Math.min(position, this.maxY - paddleWidth - paddleHeight));
+                // Left/Right paddles - vertical movement along Y axis
+                // Paddle can move from 0 to (maxY - paddleHeight) = 0 to 350
+                clampedPos = Math.max(0, Math.min(position, this.maxY - paddleHeight));
             }
             
             // 🔍 DEBUG: Log position updates with AI status
             const isAI = this.isPlayerAI(playerId);
             console.log(`🎮 4P Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
             
+            // Update the position array
             this.playerPositions[playerId - 1] = clampedPos;
             
-            if (playerId === 4) {
-                this.gameState.player1Pos = clampedPos;
-            } else if (playerId === 2) {
-                this.gameState.player2Pos = clampedPos;
-            }
+            // Also update compatibility fields for 2-player API
+            if (playerId === 3) this.gameState.player1Pos = clampedPos; // Bottom -> Left
+            if (playerId === 1) this.gameState.player2Pos = clampedPos; // Top -> Right
         }
     }
 

@@ -487,20 +487,50 @@ export class PongGame {
 
         const playerPositions = this.gameState.playerPositions || [180, 180, 180, 180];
         
+        // Apply view rotation if needed
+        const needsRotation = this.viewIndexMap[0] !== 0;
+        
+        if (needsRotation) {
+            // Save the current state
+            this.ctx.save();
+            
+            // Rotate canvas based on viewIndexMap
+            const rotations = this.viewIndexMap[0]; // 0, 1, 2, or 3 (90° steps)
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 2;
+            
+            this.ctx.translate(centerX, centerY);
+            this.ctx.rotate((rotations * Math.PI) / 2);
+            this.ctx.translate(-centerX, -centerY);
+        }
+        
         this.ctx.fillStyle = "grey";
 
-        const topPaddleX = playerPositions[0] ?? 180;
+        // Draw paddles in rotated positions
+        const rotatedPositions = [
+            playerPositions[this.viewIndexMap[0]],
+            playerPositions[this.viewIndexMap[1]],
+            playerPositions[this.viewIndexMap[2]],
+            playerPositions[this.viewIndexMap[3]]
+        ];
+
+        // Top paddle
+        const topPaddleX = rotatedPositions[0] ?? 180;
         this.ctx.fillRect(topPaddleX, 0, 40, 10);
 
-        const rightPaddleY = playerPositions[1] ?? 180;
+        // Right paddle
+        const rightPaddleY = rotatedPositions[1] ?? 180;
         this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
 
-        const bottomPaddleX = playerPositions[2] ?? 180;
+        // Bottom paddle
+        const bottomPaddleX = rotatedPositions[2] ?? 180;
         this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
 
-        const leftPaddleY = playerPositions[3] ?? 180;
+        // Left paddle (active player)
+        const leftPaddleY = rotatedPositions[3] ?? 180;
         this.ctx.fillRect(0, leftPaddleY, 10, 40);
 
+        // Draw center lines
         this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
         this.ctx.setLineDash([3, 10]);
         
@@ -515,6 +545,11 @@ export class PongGame {
         this.ctx.stroke();
         
         this.ctx.setLineDash([]);
+        
+        if (needsRotation) {
+            // Restore the canvas state
+            this.ctx.restore();
+        }
     }
 
     setupKeyboardControls(): void {

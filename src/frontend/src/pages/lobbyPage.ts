@@ -85,43 +85,34 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '1v1' ? 2 : 4;
-
-  const token = authService.getToken();
-  const response = await fetch('/api/room/create', {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      hostId: userId,
-      hostUsername: username,
-    })
-  });
-
-  if (!response.ok) {
-    console.error('[CREATE] HTTP Error:', response.status, response.statusText);
-    const text = await response.text();
-    console.error('[CREATE] Response body:', text);
-    throw new Error(`Failed to create room: ${response.status} ${response.statusText}`);
-  }
+  const maxPlayers = gameMode === '1v1' ? 2 : 4; // ✅ Complete this line
   
-  const contentType = response.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
-    const text = await response.text();
-    console.error('[CREATE] Non-JSON response:', text);
-    throw new Error('Server returned non-JSON response');
-  }
+  try {
+    const token = authService.getToken();
+    const response = await fetch('/api/room/create', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        hostId: userId,
+        hostUsername: username,
+        maxPlayers: maxPlayers
+      })
+    });
 
-  const data = await response.json();
-  console.log('[CREATE] Response:', data);
-  
-  if (data.success && data.data && data.data.room) {
-    setCurrentRoom(data.data.room);
-    console.log('✅ [CREATE] Room created:', data.data.room.roomId);
-  } else {
-    throw new Error(data.message || 'Failed to create room');
+    const data = await response.json();
+    
+    if (data.success && data.data && data.data.room) {
+      console.log('[CREATE] Room created:', data.data.room);
+      setCurrentRoom(data.data.room);
+    } else {
+      throw new Error(data.message || 'Failed to create room');
+    }
+  } catch (error) {
+    console.error('[CREATE] Error:', error);
+    throw error;
   }
 }
 
@@ -193,6 +184,9 @@ async function startGame(): Promise<void> {
 
   console.log('Starting game for room:', currentRoom.roomId);
 
+  // Show countdown overlay
+  await showGameStartCountdown();
+
   try {
     const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
@@ -237,6 +231,80 @@ async function startGame(): Promise<void> {
     console.error('❌ Error starting game:', error);
     alert('Failed to start game');
   }
+}
+
+// Add this new function for the countdown
+async function showGameStartCountdown(): Promise<void> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'countdown-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: fadeIn 0.3s ease-out;
+    `;
+
+    const countdownText = document.createElement('div');
+    countdownText.style.cssText = `
+      font-size: 10em;
+      font-weight: bold;
+      color: rgb(52 211 153);
+      text-shadow: 0 0 30px rgba(52, 211, 153, 0.5);
+      animation: pulse 1s ease-in-out;
+    `;
+
+    const messageText = document.createElement('div');
+    messageText.style.cssText = `
+      font-size: 2em;
+      color: rgb(209 213 219);
+      margin-top: 1em;
+      opacity: 0.8;
+    `;
+    messageText.textContent = 'Get Ready!';
+
+    overlay.appendChild(countdownText);
+    overlay.appendChild(messageText);
+    document.body.appendChild(overlay);
+
+    let count = 3;
+    countdownText.textContent = count.toString();
+
+    const countdownInterval = setInterval(() => {
+      count--;
+      
+      if (count > 0) {
+        countdownText.textContent = count.toString();
+        // Reset animation
+        countdownText.style.animation = 'none';
+        setTimeout(() => {
+          countdownText.style.animation = 'pulse 1s ease-in-out';
+        }, 10);
+      } else {
+        countdownText.textContent = 'GO!';
+        countdownText.style.color = 'rgb(251 191 36)';
+        messageText.textContent = 'Game Starting...';
+        
+        clearInterval(countdownInterval);
+        
+        setTimeout(() => {
+          overlay.style.animation = 'fadeOut 0.3s ease-in';
+          setTimeout(() => {
+            overlay.remove();
+            resolve();
+          }, 300);
+        }, 800);
+      }
+    }, 1000);
+  });
 }
 
 function initLobbyWebSocket(roomId: string, playerId: string): void {
@@ -359,7 +427,8 @@ function renderLobby(root: HTMLElement): void {
 	const players = currentRoom.players;
 	const maxPlayers = currentRoom.maxPlayers;
 	const canAddMore = players.length < maxPlayers;
-	const canStart = players.length >= 2 && players.every(p => p.isReady);
+  const minPlayersRequired = maxPlayers === 4 ? 4 : 2;
+  const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
 	const currentPlayer = players.find(p => p.id === currentUserId);
   
@@ -393,7 +462,9 @@ function renderLobby(root: HTMLElement): void {
 		  </div>
   
 		  <div style="margin-bottom: 1.5em;">
-			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">Players (${players.length}/${maxPlayers})</h3>
+			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">
+        Players (${players.length}/${maxPlayers}) - ${maxPlayers === 4 ? '4-Player Mode' : '1v1 Mode'}
+      </h3>
 			${players.map(player => `
 			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
 				<div>
@@ -425,25 +496,25 @@ function renderLobby(root: HTMLElement): void {
 		  ` : ''}
 		  
 		  ${canAddMore && isHost ? `
-			<button id="addAIBtn" 
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-						   background: rgb(99 102 241); color: white;">
-			  Add AI Opponent
-			</button>
-		  ` : ''}
+      <button id="addAIBtn" 
+              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
+                    background: rgb(99 102 241); color: white;">
+        ${maxPlayers === 4 ? '🤖 Add AI Player' : '🤖 Add AI Opponent'}
+      </button>
+    ` : ''}
 		  
 		  ${isHost ? `
-			<button id="startGameBtn"
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
-						   background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
-						   cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
-			  ${canStart ? 'Start Game' : '⏳ Waiting for players...'}
-			</button>
-		  ` : `
-			<div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
-			  ${canStart ? '⏳ Waiting for host...' : '⏳ Waiting for players...'}
-			</div>
-		  `}
+      <button id="startGameBtn"
+              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
+                    background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
+                    cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
+        ${canStart ? '🎮 Start Game' : `⏳ Need ${minPlayersRequired - players.length} more player(s)...`}
+      </button>
+    ` : `
+      <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
+        ${canStart ? 'Waiting for host to start...' : `Waiting for ${minPlayersRequired - players.length} more player(s)...`}
+      </div>
+    `}
 		  
 		  <button id="leaveBtn" 
 				  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
