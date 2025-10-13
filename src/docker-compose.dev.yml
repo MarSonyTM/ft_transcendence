@@ -5,7 +5,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./backend/src:/app/src
+      - ./backend/src:/app/src                # Only mount src
+      - ./backend/config:/app/config          # Only mount config
+      - ./backend/.env:/app/.env              # Only mount .env
       - ./backend/package.json:/app/package.json
       - ./backend/tsconfig.json:/app/tsconfig.json
       - ./frontend/dist:/app/frontend/dist
@@ -18,6 +20,12 @@ services:
     restart: unless-stopped
     networks:
       - transcendence_dev
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
   frontend:
     build: 
@@ -25,12 +33,17 @@ services:
       dockerfile: Dockerfile.dev
     container_name: frontend_dev
     ports:
-      - "5173:5173"  # Vite dev server port
+      - "5173:5173"
     volumes:
       - ./frontend/src:/app/src
+    environment:
+      - VITE_BACKEND_URL=http://backend_dev:3000
     restart: unless-stopped
     networks:
       - transcendence_dev
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   transcendence_db:

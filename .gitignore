@@ -15,6 +15,7 @@ coverage/
 # Env
 .env
 .env.*
+src/backend/.env
 
 # Docker
 *.pid
@@ -33,3 +34,11 @@ Thumbs.db
 # Backend and Frontend node_modules
 src/backend/node_modules/
 src/frontend/node_modules/
+
+# Database
+*.db-shm
+*.db-wal
+*.db
+src/database/
+
+/package-lock.json

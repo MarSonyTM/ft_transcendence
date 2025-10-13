@@ -54,8 +54,12 @@ GitHub Actions workflow runs on PRs and pushes to long-lived branches. It condit
 ## Quick Start Guide
 
 1. **Clone the repository**
+2. ** Find HOST IP
+  - On host machine (NOT INSIDE THE VM) run ```ip addr show```, then grab the IP address (e.g 10.13.10.5)
+  - In the terminal, create ```export VITE_BACKEND_URL=HOST_IP:3000``` where HOST_IP is your host machines IP.
+  - This will allow remote players to connect. Localhost is still available but outsiders need access
 2. **Start development**: `make dev`
-3. **Access game**: `http://localhost:5173`
+3. **Access game**: `http://localhost:5173` or `HOST_IP:3000`
 
 or 
 

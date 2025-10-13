@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { StringAsNumber } from 'fastify/types/utils';
 
 // Use environment variable for Docker compatibility, fallback to local path
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
@@ -12,7 +13,14 @@ export interface User {
   firstName: string;
   lastName: string;
   email?: string;
+  username: string;
+  password: string;
+  avatar: string;
+  googleId: string;
+  gamesWon: number;
+  gamesLost: number;
   createdAt: string;
+  UpdatedAt: string;
 }
 
 export interface Game {
@@ -41,15 +49,40 @@ export interface GameState {
   gameId: number;
   player1Id: number;
   player2Id: number;
+  player3Id: number;
+  player4Id: number;
   ballPosX: number;
   ballPosY: number;
   ballVelX: number;
   ballVelY: number;
   player1Pos: number;
   player2Pos: number;
+  player3Pos: number;
+  player4Pos: number;
   scorePlayer1: number;
   scorePlayer2: number;
+  scorePlayer3: number;
+  scorePlayer4: number;
   lastActivity: string;
+}
+
+export interface Friend {
+  id: number;
+  userId: number;
+  friendId: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GameInvitation {
+  id: number;
+  fromUserId: number;
+  toUserId: number;
+  roomId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  createdAt: string;
+  expiresAt: string;
 }
 
 // Base database manager class
@@ -101,13 +134,28 @@ class UserDatabaseManager {
     return stmt.get(id) as User | undefined;
   }
 
-  createUser(userData: { firstName: string; lastName: string; email?: string }): User {
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE username = ?');
+    return stmt.get(username) as User | undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE email = ?');
+    return stmt.get(email) as User | undefined;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const stmt = this.db.prepare('SELECT * FROM users WHERE googleId = ?');
+    return stmt.get(googleId) as User | undefined;
+  }
+
+  async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string; gamesWon?: number; gamesLost?: number}): Promise<User> {
     const stmt = this.db.prepare(`
-      INSERT INTO users (firstName, lastName, email) 
-      VALUES (?, ?, ?)
+      INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId, gamesWon, gamesLost) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email);
+
+    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId, userData.gamesWon, userData.gamesLost);
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
@@ -115,6 +163,31 @@ class UserDatabaseManager {
     }
     
     return insertedUser;
+  }
+
+  updateUserStats(userId: number, won: boolean): User | undefined {
+    const user = this.getUserById(userId);
+    
+    if (!user) {
+      return undefined;
+    }
+    
+    const stmt = this.db.prepare(`
+      UPDATE users 
+      SET gamesWon = COALESCE(gamesWon, 0) + ?, 
+          gamesLost = COALESCE(gamesLost, 0) + ?,
+          UpdatedAt = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    
+    // If won is true, increment gamesWon, otherwise increment gamesLost
+    const result = stmt.run(won ? 1 : 0, won ? 0 : 1, userId);
+    
+    if (result.changes === 0) {
+      return undefined;
+    }
+    
+    return this.getUserById(userId);
   }
 
   updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string }>): User | undefined {
@@ -474,12 +547,227 @@ class GameStateDatabaseManager {
   }
 }
 
+class FriendDatabaseManager {
+  private db: Database.Database;
+
+  constructor(database: Database.Database) {
+    this.db = database;
+  }
+
+  // Send friend request
+  sendFriendRequest(userId: number, friendId: number): Friend {
+    // Check if request already exists
+    const existing = this.db.prepare(
+      'SELECT * FROM friends WHERE (userId = ? AND friendId = ?) OR (userId = ? AND friendId = ?)'
+    ).get(userId, friendId, friendId, userId) as Friend | undefined;
+
+    if (existing) {
+      throw new Error('Friend request already exists');
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO friends (userId, friendId, status) 
+      VALUES (?, ?, 'pending')
+    `);
+    
+    const result = stmt.run(userId, friendId);
+    return this.getFriendshipById(result.lastInsertRowid as number)!;
+  }
+
+  // Get friendship by ID
+  getFriendshipById(id: number): Friend | undefined {
+    const stmt = this.db.prepare('SELECT * FROM friends WHERE id = ?');
+    return stmt.get(id) as Friend | undefined;
+  }
+
+  // Accept friend request
+  acceptFriendRequest(userId: number, friendId: number): Friend | undefined {
+    const stmt = this.db.prepare(`
+      UPDATE friends 
+      SET status = 'accepted', updatedAt = CURRENT_TIMESTAMP 
+      WHERE friendId = ? AND userId = ? AND status = 'pending'
+    `);
+    
+    const result = stmt.run(userId, friendId);
+    if (result.changes === 0) return undefined;
+
+    return this.db.prepare(
+      'SELECT * FROM friends WHERE userId = ? AND friendId = ?'
+    ).get(friendId, userId) as Friend | undefined;
+  }
+
+  // Reject friend request
+  rejectFriendRequest(userId: number, friendId: number): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE friends 
+      SET status = 'rejected', updatedAt = CURRENT_TIMESTAMP 
+      WHERE friendId = ? AND userId = ? AND status = 'pending'
+    `);
+    
+    const result = stmt.run(userId, friendId);
+    return result.changes > 0;
+  }
+
+  // Remove friend
+  removeFriend(userId: number, friendId: number): boolean {
+    const stmt = this.db.prepare(`
+      DELETE FROM friends 
+      WHERE (userId = ? AND friendId = ?) OR (userId = ? AND friendId = ?)
+    `);
+    
+    const result = stmt.run(userId, friendId, friendId, userId);
+    return result.changes > 0;
+  }
+
+  // Get all friends for a user
+  getFriends(userId: number): User[] {
+    const stmt = this.db.prepare(`
+      SELECT u.* FROM users u
+      INNER JOIN friends f ON (
+        (f.userId = ? AND f.friendId = u.id) OR 
+        (f.friendId = ? AND f.userId = u.id)
+      )
+      WHERE f.status = 'accepted'
+    `);
+    
+    return stmt.all(userId, userId) as User[];
+  }
+
+  // Get pending friend requests (received)
+  getPendingRequests(userId: number): User[] {
+    const stmt = this.db.prepare(`
+      SELECT u.* FROM users u
+      INNER JOIN friends f ON f.userId = u.id
+      WHERE f.friendId = ? AND f.status = 'pending'
+    `);
+    
+    return stmt.all(userId) as User[];
+  }
+
+  // Get sent friend requests
+  getSentRequests(userId: number): User[] {
+    const stmt = this.db.prepare(`
+      SELECT u.* FROM users u
+      INNER JOIN friends f ON f.friendId = u.id
+      WHERE f.userId = ? AND f.status = 'pending'
+    `);
+    
+    return stmt.all(userId) as User[];
+  }
+
+  // Check friendship status
+  getFriendshipStatus(userId: number, friendId: number): string | null {
+    const stmt = this.db.prepare(`
+      SELECT status FROM friends 
+      WHERE (userId = ? AND friendId = ?) OR (userId = ? AND friendId = ?)
+    `);
+    
+    const result = stmt.get(userId, friendId, friendId, userId) as Friend | undefined;
+    return result ? result.status : null;
+  }
+}
+
+class InvitationDatabaseManager {
+  private db: Database.Database;
+
+  constructor(database: Database.Database) {
+    this.db = database;
+  }
+
+  sendInvitation(fromUserId: number, toUserId: number, roomId: string): GameInvitation {
+    // Set expiration to 10 minutes from now
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    
+    const stmt = this.db.prepare(`
+      INSERT INTO game_invitations (fromUserId, toUserId, roomId, status, expiresAt) 
+      VALUES (?, ?, ?, 'pending', ?)
+    `);
+    
+    const result = stmt.run(fromUserId, toUserId, roomId, expiresAt);
+    return this.getInvitationById(result.lastInsertRowid as number)!;
+  }
+
+  getInvitationById(id: number): GameInvitation | undefined {
+    const stmt = this.db.prepare('SELECT * FROM game_invitations WHERE id = ?');
+    return stmt.get(id) as GameInvitation | undefined;
+  }
+
+  getPendingInvitations(userId: number): GameInvitation[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM game_invitations 
+      WHERE toUserId = ? 
+      AND status = 'pending' 
+      AND datetime(expiresAt) > datetime('now')
+      ORDER BY createdAt DESC
+    `);
+    return stmt.all(userId) as GameInvitation[];
+  }
+
+  getSentInvitations(userId: number): GameInvitation[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM game_invitations 
+      WHERE fromUserId = ? 
+      AND status = 'pending'
+      ORDER BY createdAt DESC
+    `);
+    return stmt.all(userId) as GameInvitation[];
+  }
+
+  acceptInvitation(invitationId: number, userId: number): GameInvitation | undefined {
+    const stmt = this.db.prepare(`
+      UPDATE game_invitations 
+      SET status = 'accepted' 
+      WHERE id = ? AND toUserId = ? AND status = 'pending'
+    `);
+    
+    const result = stmt.run(invitationId, userId);
+    if (result.changes === 0) return undefined;
+    
+    return this.getInvitationById(invitationId);
+  }
+
+  rejectInvitation(invitationId: number, userId: number): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE game_invitations 
+      SET status = 'rejected' 
+      WHERE id = ? AND toUserId = ? AND status = 'pending'
+    `);
+    
+    const result = stmt.run(invitationId, userId);
+    return result.changes > 0;
+  }
+
+  cancelInvitation(invitationId: number, userId: number): boolean {
+    const stmt = this.db.prepare(`
+      DELETE FROM game_invitations 
+      WHERE id = ? AND fromUserId = ?
+    `);
+    
+    const result = stmt.run(invitationId, userId);
+    return result.changes > 0;
+  }
+
+  // Cleanup expired invitations
+  cleanupExpiredInvitations(): void {
+    const stmt = this.db.prepare(`
+      UPDATE game_invitations 
+      SET status = 'expired' 
+      WHERE status = 'pending' 
+      AND datetime(expiresAt) <= datetime('now')
+    `);
+    stmt.run();
+  }
+}
+
+
 // Central Database Manager
 export class DatabaseManager extends BaseDatabaseManager {
   public users: UserDatabaseManager;
   public games: GameDatabaseManager;
   public gameState: GameStateDatabaseManager;
   public players: PlayerDatabaseManager;
+  public friends: FriendDatabaseManager;
+  public invitations: InvitationDatabaseManager;
 
   constructor() {
     super();
@@ -487,6 +775,8 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.games = new GameDatabaseManager(this.db);
     this.gameState = new GameStateDatabaseManager(this.db);
     this.players = new PlayerDatabaseManager(this.db);
+    this.friends = new FriendDatabaseManager(this.db);
+    this.invitations = new InvitationDatabaseManager(this.db);
   }
 
   protected initializeTables() {
@@ -494,6 +784,8 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.initializeGamesTable();
     this.initializePlayersTable();
     this.initializeGameStateTable();
+    this.initializeFriendsTable();
+    this.initializeInvitationsTable();
   }
 
   private initializeUsersTable() {
@@ -503,31 +795,21 @@ export class DatabaseManager extends BaseDatabaseManager {
         firstName TEXT NOT NULL,
         lastName TEXT NOT NULL,
         email TEXT UNIQUE,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        username TEXT UNIQUE,
+        password TEXT,
+        avatar TEXT,
+        googleId TEXT UNIQUE,
+        gamesWon INTEGER DEFAULT 0,
+        gamesLost INTEGER DEFAULT 0,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
     
     this.db.exec(createUsersTable);
-    
-    // Insert sample data if table is empty
-    const userCount = this.db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-    
-    if (userCount.count === 0) {
-      const insertSampleUsers = this.db.prepare(`
-        INSERT INTO users (firstName, lastName, email) VALUES (?, ?, ?)
-      `);
-      
-      const sampleUsers = [
-        ['Michael', 'Naysmith', 'michael@example.com'],
-        ['John', 'Doe', 'john.doe@example.com'],
-        ['Jane', 'Smith', 'jane.smith@example.com']
-      ];
-      
-      for (const user of sampleUsers) {
-        insertSampleUsers.run(user);
-      }
-    }
   }
+
+
 
   private initializeGamesTable() {
     const createGamesTable = `
@@ -598,6 +880,42 @@ export class DatabaseManager extends BaseDatabaseManager {
     `;
     
     this.db.exec(createGameStateTable);
+  }
+
+  private initializeFriendsTable() {
+    const createFriendsTable = `
+      CREATE TABLE IF NOT EXISTS friends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        friendId INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'rejected')) DEFAULT 'pending',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (friendId) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(userId, friendId)
+      )
+    `;
+    
+    this.db.exec(createFriendsTable);
+  }
+
+  private initializeInvitationsTable() {
+    const createInvitationsTable = `
+      CREATE TABLE IF NOT EXISTS game_invitations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fromUserId INTEGER NOT NULL,
+        toUserId INTEGER NOT NULL,
+        roomId TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'rejected', 'expired')) DEFAULT 'pending',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expiresAt DATETIME NOT NULL,
+        FOREIGN KEY (fromUserId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (toUserId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `;
+    
+    this.db.exec(createInvitationsTable);
   }
 }
 
