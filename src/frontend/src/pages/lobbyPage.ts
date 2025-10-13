@@ -220,9 +220,11 @@ async function startGame(): Promise<void> {
       
       stopRoomPolling();
       
-      // Navigate to game
-      history.pushState({ page: 'game', roomId: currentRoom.roomId }, '', '#game');
-      setCurrentPage('game');
+      // Navigate to game based on mode
+      const gameMode = getCurrentGameMode();
+      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `#${gamePage}`);
+      setCurrentPage(gamePage);
       renderApp();
     } else {
       alert(data.message || 'Failed to start game');
@@ -352,8 +354,10 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       }
       
       console.log('Navigating to game page...');
-      history.pushState({ page: 'game', roomId }, '', '#game');
-      setCurrentPage('game');
+      const gameMode = getCurrentGameMode();
+      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      history.pushState({ page: gamePage, roomId }, '', `#${gamePage}`);
+      setCurrentPage(gamePage);
       renderApp();
     },
     

@@ -35,7 +35,7 @@ export interface WebSocketMessage {
 }
 
 export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 
-  'lobby' | 'authCallback' | 'register' | 'join' | 'friends';
+  'lobby' | 'authCallback' | 'register' | 'join' | 'friends' | '2playergame' | '4playergame';
 
 declare global {
   interface Window {

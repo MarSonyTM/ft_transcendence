@@ -6,7 +6,7 @@ const DEBUG = false;
 // Global constants
 const maxX = 400;
 const minX = 0;
-const maxY = 200;
+const maxY = 400; // Changed from 200 to 400 for 4-player mode
 const minY = 0;
 const ballRadius = 10;
 const paddleHeight = 40;
@@ -151,7 +151,6 @@ export abstract class BaseGameEngine {
 
         // Right paddle (Player 2) AI - ONLY if Player 2 is AI
         if (this.isPlayerAI(2) && this.gameState.player2Pos !== undefined) {
-            if (shouldLog) console.log(`🤖 AI Update for Player 2: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player2Pos.toFixed(1)}`);
             
             const currentY = this.gameState.player2Pos;
             let targetY = currentY;
@@ -170,8 +169,6 @@ export abstract class BaseGameEngine {
                     this.updatePlayerPosition(2, currentY - paddleSpeed);
                 }
             }
-        } else if (shouldLog && this.gameState.player2Pos !== undefined) {
-            console.log(`👤 Skipping AI update for Player 2 (Human player)`);
         }
 
         // Left paddle (Player 1) AI - ONLY if Player 1 is AI
@@ -195,8 +192,6 @@ export abstract class BaseGameEngine {
                     this.updatePlayerPosition(1, currentY - paddleSpeed);
                 }
             }
-        } else if (shouldLog && this.gameState.player1Pos !== undefined) {
-            console.log(`👤 Skipping AI update for Player 1 (Human player)`);
         }
     }
 
@@ -217,6 +212,15 @@ export abstract class BaseGameEngine {
 export class TwoPlayerGameEngine extends BaseGameEngine {
     private scorePlayer1 = 0;
     private scorePlayer2 = 0;
+
+    constructor(gameState: GameState, options?: GameEngineOptions) {
+        // Override maxY to 200 for 2-player mode
+        const twoPlayerOptions = {
+            ...options,
+            maxY: 200
+        };
+        super(gameState, twoPlayerOptions);
+    }
 
     initializeGame(): void {
         console.log('🔍 [DEBUG] initializeGame() called');
@@ -370,7 +374,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     const clampedPos = Math.max(0, Math.min(position, maxPosition));
     
     const isAI = this.isPlayerAI(playerId);
-    console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
     
     if (playerId === 1) {
         this.gameState.player1Pos = clampedPos;
@@ -521,7 +524,8 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         this.gameState.ballVelX = speed * this.xDir;
         this.gameState.ballVelY = speed * this.yDir;
         
-        // Check paddle collisions with proper boundaries
+        // Check each paddle independently (not with else-if!)
+        
         // Top paddle (Player 1) - horizontal paddle at top
         if (this.gameState.ballPosY <= (paddleWidth + ballRadius) && this.yDir < 0) {
             const paddleLeft = this.playerPositions[0];
@@ -529,6 +533,7 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             
             if (this.gameState.ballPosX >= paddleLeft && this.gameState.ballPosX <= paddleRight) {
                 this.yDir = Math.abs(this.yDir); // Bounce down
+                this.gameState.ballPosY = paddleWidth + ballRadius; // Prevent sticking
                 this.lastContact = 1;
                 this.addSpinToBall(this.gameState.ballPosX, paddleLeft, paddleRight, true);
             } else if (this.gameState.ballPosY <= this.minY) {
@@ -538,12 +543,13 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         }
         
         // Right paddle (Player 2) - vertical paddle at right
-        else if (this.gameState.ballPosX >= (this.maxX - ballRadius) && this.xDir > 0) {
+        if (this.gameState.ballPosX >= (this.maxX - paddleWidth - ballRadius) && this.xDir > 0) {
             const paddleTop = this.playerPositions[1];
             const paddleBottom = this.playerPositions[1] + paddleHeight;
             
             if (this.gameState.ballPosY >= paddleTop && this.gameState.ballPosY <= paddleBottom) {
                 this.xDir = -Math.abs(this.xDir); // Bounce left
+                this.gameState.ballPosX = this.maxX - paddleWidth - ballRadius; // Prevent sticking
                 this.lastContact = 2;
                 this.addSpinToBall(this.gameState.ballPosY, paddleTop, paddleBottom, false);
             } else if (this.gameState.ballPosX >= this.maxX) {
@@ -553,12 +559,13 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         }
         
         // Bottom paddle (Player 3) - horizontal paddle at bottom
-        else if (this.gameState.ballPosY >= (this.maxY - ballRadius) && this.yDir > 0) {
+        if (this.gameState.ballPosY >= (this.maxY - paddleWidth - ballRadius) && this.yDir > 0) {
             const paddleLeft = this.playerPositions[2];
             const paddleRight = this.playerPositions[2] + paddleHeight;
             
             if (this.gameState.ballPosX >= paddleLeft && this.gameState.ballPosX <= paddleRight) {
                 this.yDir = -Math.abs(this.yDir); // Bounce up
+                this.gameState.ballPosY = this.maxY - paddleWidth - ballRadius; // Prevent sticking
                 this.lastContact = 3;
                 this.addSpinToBall(this.gameState.ballPosX, paddleLeft, paddleRight, true);
             } else if (this.gameState.ballPosY >= this.maxY) {
@@ -568,12 +575,13 @@ export class FourPlayerGameEngine extends BaseGameEngine {
         }
         
         // Left paddle (Player 4) - vertical paddle at left
-        else if (this.gameState.ballPosX <= (this.minX + ballRadius) && this.xDir < 0) {
+        if (this.gameState.ballPosX <= (paddleWidth + ballRadius) && this.xDir < 0) {
             const paddleTop = this.playerPositions[3];
             const paddleBottom = this.playerPositions[3] + paddleHeight;
             
             if (this.gameState.ballPosY >= paddleTop && this.gameState.ballPosY <= paddleBottom) {
                 this.xDir = Math.abs(this.xDir); // Bounce right
+                this.gameState.ballPosX = paddleWidth + ballRadius; // Prevent sticking
                 this.lastContact = 4;
                 this.addSpinToBall(this.gameState.ballPosY, paddleTop, paddleBottom, false);
             } else if (this.gameState.ballPosX <= this.minX) {
@@ -581,7 +589,7 @@ export class FourPlayerGameEngine extends BaseGameEngine {
                 return this.handleGoal();
             }
         }
-
+    
         return 0; // No reset needed
     }
 
@@ -632,8 +640,10 @@ export class FourPlayerGameEngine extends BaseGameEngine {
                 ballVelX: this.gameState.ballVelX,
                 ballVelY: this.gameState.ballVelY,
                 playerPositions: this.playerPositions,
-                player1Pos: this.gameState.player1Pos, // For 2-player compatibility (Left)
-                player2Pos: this.gameState.player2Pos, // For 2-player compatibility (Right)
+                player1Pos: this.playerPositions[0] || 180, // Top player
+                player2Pos: this.playerPositions[1] || 180, // Right player
+                player3Pos: this.playerPositions[2] || 180, // Bottom player
+                player4Pos: this.playerPositions[3] || 180, // Left player
                 scores: this.scores,
                 scorePlayer1: this.scores[3] || 0, // Left player score
                 scorePlayer2: this.scores[1] || 0, // Right player score
@@ -676,7 +686,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             
             // 🔍 DEBUG: Log position updates with AI status
             const isAI = this.isPlayerAI(playerId);
-            console.log(`🎮 4P Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
             
             // Update the position array
             this.playerPositions[playerId - 1] = clampedPos;

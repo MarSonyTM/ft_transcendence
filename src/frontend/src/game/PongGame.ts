@@ -438,29 +438,79 @@ export class PongGame {
 
     render(): void {
         if (!this.ctx || !this.canvas) return;
-
-        const ballPosX = this.gameState.ballPosX || 200;
-        const ballPosY = this.gameState.ballPosY || 100;
-
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
+    
         const is4Player = this.gameState.mode === '4player' || getCurrentGameMode() === '4player';
-
+    
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
         if (is4Player) {
-            this.render4Player(ballPosX, ballPosY);
+            // Calculate rotated ball position
+            const rotatedBall = this.getRotatedBallPosition(
+                this.gameState.ballPosX || 200, 
+                this.gameState.ballPosY || 200
+            );
+            
+            // Render paddles
+            this.render4Player();
+            
+            // Draw ball at rotated position
+            this.ctx.beginPath();
+            this.ctx.arc(rotatedBall.x, rotatedBall.y, 10, 0, 2 * Math.PI);
+            this.ctx.fillStyle = "white";
+            this.ctx.fill();
         } else {
+            const ballPosX = this.gameState.ballPosX || 200;
+            const ballPosY = this.gameState.ballPosY || 100;
             this.render2Player(ballPosX, ballPosY);
+            
+            // Draw ball for 2-player
+            this.ctx.beginPath();
+            this.ctx.arc(ballPosX, ballPosY, 10, 0, 2 * Math.PI);
+            this.ctx.fillStyle = "white";
+            this.ctx.fill();
         }
-
-        this.ctx.beginPath();
-        this.ctx.arc(ballPosX, ballPosY, 10, 0, 2 * Math.PI);
-        this.ctx.fillStyle = "white";
-        this.ctx.fill();
-
+    
+        // Draw game ID
         this.ctx.font = "12px Arial";
         this.ctx.fillStyle = "white";
         this.ctx.textAlign = "center";
         this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
+    }
+
+    private getRotatedBallPosition(ballX: number, ballY: number): { x: number, y: number } {
+        if (!this.canvas) return { x: ballX, y: ballY };
+        
+        // Check if rotation is needed (viewIndexMap is not identity)
+        if (this.viewIndexMap[0] === 0) {
+            return { x: ballX, y: ballY };
+        }
+        
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        
+        // Determine rotation angle from viewIndexMap
+        // viewIndexMap[0] tells us where server position 0 (top) goes visually
+        const rotation = this.viewIndexMap[0]; // 0=no rotation, 1=90°CCW, 2=180°, 3=90°CW
+        
+        let rotatedX = ballX;
+        let rotatedY = ballY;
+        
+        switch(rotation) {
+            case 1: // 90° CCW (server bottom -> visual left)
+                rotatedX = ballY;
+                rotatedY = this.canvas.height - ballX;
+                break;
+            case 2: // 180° (server right -> visual left)
+                rotatedX = this.canvas.width - ballX;
+                rotatedY = this.canvas.height - ballY;
+                break;
+            case 3: // 90° CW (server top -> visual left)
+                rotatedX = this.canvas.width - ballY;
+                rotatedY = ballX;
+                break;
+        }
+        
+        return { x: rotatedX, y: rotatedY };
     }
 
     render2Player(ballPosX: number, ballPosY: number): void {
@@ -482,74 +532,56 @@ export class PongGame {
         this.ctx.fillRect(this.canvas.width - 10, player2Pos, 10, 40);
     }
 
-    render4Player(ballPosX: number, ballPosY: number): void {
+    render4Player(): void {
         if (!this.ctx || !this.canvas) return;
-
-        const playerPositions = this.gameState.playerPositions || [180, 180, 180, 180];
-        
-        // Apply view rotation if needed
-        const needsRotation = this.viewIndexMap[0] !== 0;
-        
-        if (needsRotation) {
-            // Save the current state
-            this.ctx.save();
-            
-            // Rotate canvas based on viewIndexMap
-            const rotations = this.viewIndexMap[0]; // 0, 1, 2, or 3 (90° steps)
-            const centerX = this.canvas.width / 2;
-            const centerY = this.canvas.height / 2;
-            
-            this.ctx.translate(centerX, centerY);
-            this.ctx.rotate((rotations * Math.PI) / 2);
-            this.ctx.translate(-centerX, -centerY);
-        }
-        
-        this.ctx.fillStyle = "grey";
-
-        // Draw paddles in rotated positions
-        const rotatedPositions = [
-            playerPositions[this.viewIndexMap[0]],
-            playerPositions[this.viewIndexMap[1]],
-            playerPositions[this.viewIndexMap[2]],
-            playerPositions[this.viewIndexMap[3]]
+    
+        // Get server positions
+        const serverPositions = [
+            this.gameState.player1Pos ?? 180, // Top paddle (server pos 0)
+            this.gameState.player2Pos ?? 180, // Right paddle (server pos 1)
+            this.gameState.player3Pos ?? 180, // Bottom paddle (server pos 2)
+            this.gameState.player4Pos ?? 180  // Left paddle (server pos 3)
         ];
-
-        // Top paddle
-        const topPaddleX = rotatedPositions[0] ?? 180;
-        this.ctx.fillRect(topPaddleX, 0, 40, 10);
-
-        // Right paddle
-        const rightPaddleY = rotatedPositions[1] ?? 180;
-        this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
-
-        // Bottom paddle
-        const bottomPaddleX = rotatedPositions[2] ?? 180;
-        this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
-
-        // Left paddle (active player)
-        const leftPaddleY = rotatedPositions[3] ?? 180;
-        this.ctx.fillRect(0, leftPaddleY, 10, 40);
-
+    
+        // Apply view rotation
+        const visualPositions = [0, 0, 0, 0];
+        for (let serverPos = 0; serverPos < 4; serverPos++) {
+            const visualPos = this.viewIndexMap[serverPos];
+            visualPositions[visualPos] = serverPositions[serverPos];
+        }
+    
+        this.ctx.fillStyle = "grey";
+    
+        // Draw paddles at rotated visual positions
+        // Visual Position 0: Top paddle (horizontal)
+        this.ctx.fillRect(visualPositions[0], 0, 40, 10);
+    
+        // Visual Position 1: Right paddle (vertical)
+        this.ctx.fillRect(this.canvas.width - 10, visualPositions[1], 10, 40);
+    
+        // Visual Position 2: Bottom paddle (horizontal)
+        this.ctx.fillRect(visualPositions[2], this.canvas.height - 10, 40, 10);
+    
+        // Visual Position 3: Left paddle (vertical) - this is where local player appears
+        this.ctx.fillRect(0, visualPositions[3], 10, 40);
+    
         // Draw center lines
         this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
         this.ctx.setLineDash([3, 10]);
         
+        // Vertical center line
         this.ctx.beginPath();
         this.ctx.moveTo(this.canvas.width / 2, 0);
         this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
         this.ctx.stroke();
         
+        // Horizontal center line
         this.ctx.beginPath();
         this.ctx.moveTo(0, this.canvas.height / 2);
         this.ctx.lineTo(this.canvas.width, this.canvas.height / 2);
         this.ctx.stroke();
         
         this.ctx.setLineDash([]);
-        
-        if (needsRotation) {
-            // Restore the canvas state
-            this.ctx.restore();
-        }
     }
 
     setupKeyboardControls(): void {
