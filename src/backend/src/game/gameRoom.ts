@@ -3,6 +3,7 @@ interface Player {
   username: string;
   isReady: boolean;
   isAI?: boolean;
+  isLocal: boolean;
   socketId?: string;
 }
 
@@ -40,7 +41,8 @@ class GameRoomManager {
         id: hostId,
         username: hostUsername,
         isReady: true,
-        isAI: false
+        isAI: false,
+        isLocal: false
       }],
       maxPlayers,
       status: 'waiting',
@@ -58,7 +60,9 @@ class GameRoomManager {
   }
 
   // Join an existing room
-  joinRoom(roomId: string, playerId: string, username: string, isAI: boolean, isReady: boolean): { success: boolean; message: string; room?: GameRoom } {
+  joinRoom(roomId: string, playerId: string, username: string, isAI: boolean, isReady: 
+            boolean, isLocal: boolean): { success: boolean; message: string; room?: GameRoom } {
+
     const room = this.rooms.get(roomId);
 
     if (!room) {
@@ -82,7 +86,8 @@ class GameRoomManager {
       id: playerId,
       username,
       isReady: isReady,
-      isAI: isAI
+      isAI: isAI,
+      isLocal: isLocal
     });
 
     console.log(`✅ ${username} ${isAI ? '(AI)' : ''} joined room ${roomId}`);

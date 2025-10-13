@@ -98,22 +98,35 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
       break;
 
     case 'move':
-      // Handle player movement
-      if (typeof message.position === 'number' && room.gameId) {
-        const playerNum = getPlayerNumber(room, playerId);
-        const gameEngine = activeGames.get(room.gameId);
-        if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
-          gameEngine.updatePlayerPosition(playerNum, message.position);
+    // Handle player movement
+    if (typeof message.position === 'number' && room.gameId) {
+      let targetPlayerId = playerId;
+      let targetPlayerNum = getPlayerNumber(room, playerId);
+      
+      // Check if this is a guest move from a local player
+      if (message.isGuest) {
+        // Find the "local" player in the room
+        const localPlayer = room.players.find((p: any) => p.id === 'local');
+        if (localPlayer) {
+          targetPlayerId = 'local';
+          targetPlayerNum = getPlayerNumber(room, 'local');
+          console.log(`📤 Guest move from ${playerId} controlling local player (position ${targetPlayerNum})`);
         }
-
-        // Broadcast movement to all players in room (for UI sync)
-        broadcastToRoom(roomId, {
-          type: 'playerMove',
-          playerId,
-          position: message.position
-        }, playerId); // Exclude sender
       }
-      break;
+      
+      const gameEngine = activeGames.get(room.gameId);
+      if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
+        gameEngine.updatePlayerPosition(targetPlayerNum, message.position);
+      }
+
+      // Broadcast movement to all players in room (for UI sync)
+      broadcastToRoom(roomId, {
+        type: 'playerMove',
+        playerId: targetPlayerId,
+        position: message.position
+      }, playerId); // Exclude sender from broadcast
+    }
+    break;
 
     case 'ready':
       // Player ready status changed

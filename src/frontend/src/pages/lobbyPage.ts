@@ -1,13 +1,12 @@
 import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
-import { initRoomWebSocket, disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { 
   Player, 
   GameRoom, 
   getCurrentRoom,
   setCurrentRoom,
-  getLobbyPlayers,
   clearRoomState
 } from '../utils/roomState';
 
@@ -424,6 +423,7 @@ function renderLobby(root: HTMLElement): void {
   const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
 	const currentPlayer = players.find(p => p.id === currentUserId);
+  let hasLocal = players.some(p => p.id === 'local');
   
 	root.innerHTML = `
 	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
@@ -487,12 +487,20 @@ function renderLobby(root: HTMLElement): void {
 			  ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
 			</button>
 		  ` : ''}
-		  
+
 		  ${canAddMore && isHost ? `
       <button id="addAIBtn" 
               style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
                     background: rgb(99 102 241); color: white;">
-        ${maxPlayers === 4 ? '🤖 Add AI Player' : '🤖 Add AI Opponent'}
+        Add AI Opponent
+      </button>
+    ` : ''}
+
+    ${canAddMore && !hasLocal ? `
+      <button id="addLocalBtn" 
+              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
+                    background: rgb(99 102 241); color: white;">
+        Add Local Opponent
       </button>
     ` : ''}
 		  
@@ -560,6 +568,11 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
   const addAIBtn = document.getElementById('addAIBtn');
   if (addAIBtn && canAddMore && isHost) {
     addAIBtn.addEventListener('click', () => addAIOpponent());
+  }
+
+  const addLocalBtn = document.getElementById('addLocalBtn');
+  if (addLocalBtn && canAddMore && isHost) {
+    addLocalBtn.addEventListener('click', () => addLocalPlayer());
   }
 
   const removeButtons = document.querySelectorAll('.remove-player-btn');
@@ -639,7 +652,9 @@ async function addAIOpponent(): Promise<void> {
       body: JSON.stringify({
         playerId: aiId,
         username: `AI Bot ${aiNumber}`,
-        isAI: true
+        isAI: true,
+        isReady: true,
+        isLocal: true
       })
     });
 
@@ -653,6 +668,61 @@ async function addAIOpponent(): Promise<void> {
   } catch (error) {
     console.error('❌ [AI] Error adding AI:', error);
     alert('Failed to add AI opponent');
+  }
+}
+
+async function addLocalPlayer(): Promise<void> {
+  const currentRoom = getCurrentRoom();
+  
+  if (!currentRoom) {
+    console.error('❌ [LOCAL] currentRoom is null!');
+    alert('Error: Room not initialized');
+    return;
+  }
+
+  const localId = `local`;
+  const roomId = currentRoom.roomId;
+  
+  console.log(`[LOCAL] Adding Local Player to room ${roomId}`);
+
+  let username:string | null = "Local";
+  username = window.prompt("Enter an alias for local player", "Local");
+  
+  if (!username) {
+    return; // User cancelled
+  }
+  
+  try {
+    const token = authService.getToken();
+    const joinResponse = await fetch(`/api/room/${roomId}/join`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        playerId: localId,
+        username: username,
+        isAI: false,
+        isReady: true,
+        isLocal: true
+      })
+    });
+
+    const joinData = await joinResponse.json();
+    
+    if (joinData.success) {
+      console.log(`✅ [LOCAL] ${username} joined as local player`);
+      
+      // Set hasGuest flag on pongGame if it exists
+      // Note: pongGame might not exist yet since we're in lobby
+      // The game page will check for local player when it initializes
+      
+      await fetchRoomState();
+    }
+  } catch (error) {
+    console.error('❌ [LOCAL] Error adding Local:', error);
+    alert('Failed to add Local opponent');
   }
 }
 

@@ -1,6 +1,6 @@
 import { PongGame } from "../game/PongGame";
 import { GameRoom, getCurrentRoom } from "./roomState";
-import { initRoomWebSocket, disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
+import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
 import { authService } from "./auth";
 
 export async function setGameScreen(pongGame: PongGame) {

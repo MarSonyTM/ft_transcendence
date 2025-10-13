@@ -17,6 +17,7 @@ interface JoinRoomBody {
   username: string;
   isAI?: boolean;
   isReady?: boolean;
+  isLocal: boolean;
 }
 
 interface ToggleReadyBody {
@@ -92,8 +93,8 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
-      const isReady = isAI;
+      const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal} = request.body;
+      const isReady = (isAI || isLocal) ? true : false;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -102,7 +103,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady, isLocal);
 
       if (!result.success) {
         return reply.code(400).send(result);

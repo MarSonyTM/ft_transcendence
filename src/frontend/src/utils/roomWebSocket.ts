@@ -192,10 +192,11 @@ export class RoomWebSocketManager {
   }
 
   // Send player movement
-  sendMove(position: number): void {
+  sendMove(position: number, isGuest: boolean = false): void {
     this.send({
       type: 'move',
       position,
+      isGuest,  // Add this flag
       timestamp: Date.now()
     });
   }

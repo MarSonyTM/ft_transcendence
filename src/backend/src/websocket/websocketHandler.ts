@@ -116,7 +116,7 @@ function removeSocketFromGame(gameId: number, socket: any) {
   }
 }
 
-// Handle player movement - FIXED VERSION
+// Handle player movement
 function handlePlayerMove(gameId: number, playerId: number, position: number) {
   const gameEngine = activeGames.get(gameId);
   if (gameEngine) {
