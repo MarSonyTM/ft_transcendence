@@ -58,17 +58,6 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     `;
     return;
   }
-  
-//   ${currentRoom.players.length === 1 && isHost ? `
-//   <div style="background: rgb(79 70 229); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
-//     <div style="color: white; font-weight: 500; margin-bottom: 0.5em;">
-//       💌 Invitation Sent!
-//     </div>
-//     <div style="color: rgb(224 231 255); font-size: 0.9em;">
-//       Waiting for your friend to accept the invitation...
-//     </div>
-//   </div>
-// ` : ''}
 
   console.log('✅ [LOBBY] Room ready:', currentRoom.roomId);
 
@@ -85,7 +74,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '1v1' ? 2 : 4; // ✅ Complete this line
+  const maxPlayers = gameMode === '1v1' ? 2 : 4;
   
   try {
     const token = authService.getToken();
@@ -223,7 +212,7 @@ async function startGame(): Promise<void> {
       // Navigate to game based on mode
       const gameMode = getCurrentGameMode();
       const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
-      history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `#${gamePage}`);
+      history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();
     } else {
@@ -356,7 +345,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       console.log('Navigating to game page...');
       const gameMode = getCurrentGameMode();
       const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
-      history.pushState({ page: gamePage, roomId }, '', `#${gamePage}`);
+      history.pushState({ page: gamePage, roomId: currentRoom?.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();
     },

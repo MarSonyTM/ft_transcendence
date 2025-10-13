@@ -35,9 +35,6 @@ function handleRouting(): void {
   if (hash) {
     const hashPage = hash.replace('#', '');
     switch (hashPage) {
-      //case 'game':
-      //  setCurrentPage('game');
-      //  break;
       case 'login':
         setCurrentPage('login');
         break;
@@ -87,9 +84,6 @@ function handleRouting(): void {
     case '/lobby':
       setCurrentPage('lobby');
       break;
-    //case '/game':
-    //  setCurrentPage('game');
-    //  break;
     case '/gameSelect':
       setCurrentPage('gameSelect');
       break;
@@ -156,9 +150,6 @@ export async function renderApp(): Promise<void> {
     case 'profile':
       renderProfilePage();
       break;
-    //case 'game':
-    //  renderGamePage();
-    //  break;
     case '2playergame':
       render2PlayerGame();
       break;
