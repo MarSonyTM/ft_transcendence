@@ -243,6 +243,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
+        // Store previous position for collision detection
+        const prevX = this.gameState.ballPosX;
+        
         this.gameState.ballPosX += (this.xDir * 2.1);
         this.gameState.ballPosY += (this.yDir * 1.8);
         
@@ -263,7 +266,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         }
         
         // Right paddle collision - paddle is at x=390 (canvas width 400 - paddle width 10)
-        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius) && prevX < (390 - ballRadius)) {
             const rightPaddleTop = this.gameState.player2Pos || 0;
             const rightPaddleBottom = rightPaddleTop + paddleHeight;
             
@@ -300,7 +304,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         }
         
         // Left paddle collision - paddle is at x=0
-        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius) && prevX > (paddleWidth + ballRadius)) {
             const leftPaddleTop = this.gameState.player1Pos || 0;
             const leftPaddleBottom = leftPaddleTop + paddleHeight;
             
