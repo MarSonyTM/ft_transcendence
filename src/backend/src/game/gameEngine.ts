@@ -267,9 +267,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             const rightPaddleTop = this.gameState.player2Pos || 0;
             const rightPaddleBottom = rightPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= rightPaddleTop && 
-                this.gameState.ballPosY <= rightPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= rightPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= rightPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
@@ -304,9 +304,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             const leftPaddleTop = this.gameState.player1Pos || 0;
             const leftPaddleBottom = leftPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= leftPaddleTop && 
-                this.gameState.ballPosY <= leftPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= leftPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= leftPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
