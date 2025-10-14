@@ -232,6 +232,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         this.scorePlayer1 = this.gameState.scorePlayer1;
         this.scorePlayer2 = this.gameState.scorePlayer2;
         
+        console.log(`🎯 Game initialized with scores: ${this.scorePlayer1} - ${this.scorePlayer2}`);
+        
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
         
@@ -290,7 +292,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = 390 - ballRadius;
-            } else if (this.gameState.ballPosX >= 400) {
+            } else {
+                // Missed paddle - score for Player 1
                 this.updateScoreBoard(1);
                 return 1;
             }
@@ -326,7 +329,7 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = paddleWidth + ballRadius;
-            } else if (this.gameState.ballPosX <= 0) {
+            } else {
                 // Missed paddle - Goal for Player 2
                 this.updateScoreBoard(2);
                 return 1;
@@ -372,9 +375,11 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         if (player === 1) {
             this.scorePlayer1 += 1;
             this.gameState.scorePlayer1 = this.scorePlayer1;
+            console.log(`⚽ GOAL! Player 1 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         } else if (player === 2) {
             this.scorePlayer2 += 1;
             this.gameState.scorePlayer2 = this.scorePlayer2;
+            console.log(`⚽ GOAL! Player 2 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         }
 
         this.broadcastScoreUpdate();

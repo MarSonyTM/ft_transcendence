@@ -53,7 +53,7 @@ export class AIPongPlayer {
                 };
             case 'hard':
                 return {
-                    updateInterval: 50,      // Fast updates (20fps)
+                    updateInterval: 100,     // Moderate updates (10fps for smoother movement)
                     predictionError: 0,      // Perfect prediction
                     reactionDelay: 0,        // Instant reactions
                     centerOffset: 0          // Perfect positioning
@@ -166,8 +166,8 @@ export class AIPongPlayer {
             // Target the center of the paddle to the predicted position
             const targetY = Math.max(0, Math.min(this.maxPaddleY, predictedY - this.paddleHeight / 2));
             
-            // Deadzone to prevent jittery movement (3px threshold)
-            const deadzone = 3;
+            // Larger deadzone to prevent jittery movement (8px threshold)
+            const deadzone = 8;
             if (Math.abs(paddleY - targetY) > deadzone) {
                 this.currentKeys.up = targetY < paddleY;
                 this.currentKeys.down = targetY > paddleY;
