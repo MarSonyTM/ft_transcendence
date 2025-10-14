@@ -345,16 +345,31 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
 }
 
 function renderLobby(root: HTMLElement): void {
-	const currentRoom = getCurrentRoom();
-	if (!currentRoom) {
-	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
-	  return;
-	}
-  
-	const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
-	const preservedValue = existingInput ? existingInput.value : '';
-	const wasFocused = existingInput && document.activeElement === existingInput;
-	const cursorPosition = existingInput ? existingInput.selectionStart : 0;
+    const currentRoom = getCurrentRoom();
+    if (!currentRoom) {
+        root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
+        return;
+    }
+
+    // Get current difficulty selection or default to 'normal'
+    const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
+    let selectedDifficulty = difficultySelect?.value;
+
+    // If no selection exists, try to get difficulty from the last AI player
+    if (!selectedDifficulty) {
+        const aiPlayers = currentRoom.players.filter(p => p.isAI);
+        if (aiPlayers.length > 0) {
+            selectedDifficulty = aiPlayers[aiPlayers.length - 1].difficulty;
+        }
+    }
+
+    // Default to normal if no difficulty is found
+    selectedDifficulty = selectedDifficulty || 'normal';
+
+    const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
+    const preservedValue = existingInput ? existingInput.value : '';
+    const wasFocused = existingInput && document.activeElement === existingInput;
+    const cursorPosition = existingInput ? existingInput.selectionStart : 0;
   
 	const players = currentRoom.players;
 	const maxPlayers = currentRoom.maxPlayers;
@@ -425,11 +440,27 @@ function renderLobby(root: HTMLElement): void {
 		  ` : ''}
 		  
 		  ${canAddMore && isHost ? `
-			<button id="addAIBtn" 
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-						   background: rgb(99 102 241); color: white;">
-			  Add AI Opponent
-			</button>
+            <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1em;">
+                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em;">AI Opponent Settings</div>
+                <select id="aiDifficulty" 
+                    style="width: 100%; padding: 0.75em; border: 1px solid rgb(75 85 99); border-radius: 8px; font-size: 1em; margin-bottom: 0.75em; background: rgb(31 41 55); color: white;">
+                    <option value="easy" ${selectedDifficulty === 'easy' ? 'selected' : ''}>Easy - Good for beginners</option>
+                    <option value="normal" ${selectedDifficulty === 'normal' ? 'selected' : ''}>Normal - Balanced challenge</option>
+                    <option value="hard" ${selectedDifficulty === 'hard' ? 'selected' : ''}>Hard - Extremely challenging</option>
+                </select>
+                <div style="color: rgb(156 163 175); font-size: 0.8em; font-style: italic; margin-bottom: 0.75em; text-align: center;">
+                    ${selectedDifficulty === 'easy' ? 
+                        '🟢 Slower reactions, less accurate - Perfect for learning the game' : 
+                    selectedDifficulty === 'normal' ? 
+                        '🟡 Moderate speed and accuracy - Good for regular practice' : 
+                        '🔴 Lightning-fast reactions, perfect accuracy - Ultimate challenge'}
+                </div>
+                <button id="addAIBtn" 
+                    style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
+                        background: rgb(99 102 241); color: white;">
+                    Add AI Opponent
+                </button>
+            </div>
 		  ` : ''}
 		  
 		  ${isHost ? `
@@ -549,47 +580,63 @@ async function toggleReady(): Promise<void> {
 }
 
 async function addAIOpponent(): Promise<void> {
-  const currentRoom = getCurrentRoom();
-  console.log('[AI] addAIOpponent called, currentRoom:', currentRoom);
-  
-  if (!currentRoom) {
-    console.error('❌ [AI] currentRoom is null!');
-    alert('Error: Room not initialized');
-    return;
-  }
-
-  const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
-  const aiId = `ai-${Date.now()}`;
-  const roomId = currentRoom.roomId;
-  
-  console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
-  
-  try {
-    const token = authService.getToken();
-    const joinResponse = await fetch(`/api/room/${roomId}/join`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        playerId: aiId,
-        username: `AI Bot ${aiNumber}`,
-        isAI: true
-      })
-    });
-
-    const joinData = await joinResponse.json();
-    console.log('[AI] Join response:', joinData);
+    const currentRoom = getCurrentRoom();
+    console.log('[AI] addAIOpponent called, currentRoom:', currentRoom);
     
-    if (joinData.success) {
-      console.log('✅ [AI] AI joined and is ready');
-      await fetchRoomState();
+    if (!currentRoom) {
+        console.error('❌ [AI] currentRoom is null!');
+        alert('Error: Room not initialized');
+        return;
     }
-  } catch (error) {
-    console.error('❌ [AI] Error adding AI:', error);
-    alert('Failed to add AI opponent');
-  }
+
+    // Get the selected difficulty
+    const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
+    const difficulty = difficultySelect?.value || 'normal';
+    
+    const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
+    const aiId = `ai-${Date.now()}`;
+    const roomId = currentRoom.roomId;
+    
+    console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId} with difficulty: ${difficulty}`);
+    
+    try {
+        const token = authService.getToken();
+        const joinResponse = await fetch(`/api/room/${roomId}/join`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                playerId: aiId,
+                username: `AI Bot ${aiNumber} (${difficulty})`,
+                isAI: true,
+                isReady: true,
+                difficulty: difficulty
+            })
+        });
+
+        if (!joinResponse.ok) {
+            const errorData = await joinResponse.json();
+            console.error('❌ [AI] Failed to join:', errorData.message);
+            alert(errorData.message || 'Failed to add AI opponent');
+            return;
+        }
+
+        const joinData = await joinResponse.json();
+        console.log('✅ [AI] Join response:', joinData);
+        
+        if (joinData.success) {
+            console.log(`✅ [AI] AI joined with ${difficulty} difficulty`);
+            await fetchRoomState();
+        } else {
+            console.error('❌ [AI] Join failed:', joinData.message);
+            alert(joinData.message || 'Failed to add AI opponent');
+        }
+    } catch (error) {
+        console.error('❌ [AI] Error adding AI:', error);
+        alert('Failed to add AI opponent');
+    }
 }
 
 async function removePlayer(playerId: string): Promise<void> {
