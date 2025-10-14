@@ -37,6 +37,9 @@ export abstract class BaseGameEngine {
 
     protected aiPlayers: Set<number> = new Set();
 
+    protected lastBroadcastTime: number = 0;
+    protected readonly BROADCAST_INTERVAL = 16;
+
     constructor(gameState: GameState, options?: GameEngineOptions) {
         this.gameState = gameState;
         
@@ -115,7 +118,11 @@ export abstract class BaseGameEngine {
         }
         
         this.frameCount++;
-        this.broadcastGameState();
+        const now = Date.now();
+        if (now - this.lastBroadcastTime >= this.BROADCAST_INTERVAL) {
+            this.broadcastGameState();
+            this.lastBroadcastTime = now;
+        }
 
         if (this.frameCount % 30 === 0) {
             this.updateDatabaseState();

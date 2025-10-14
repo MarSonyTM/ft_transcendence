@@ -54,6 +54,7 @@ const start = async (): Promise<void> => {
           /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
           /^https:\/\/localhost$/,
           'http://frontend:8080',
+          'https://play.google.com'
         ];
         
         const isAllowed = allowedPatterns.some(pattern => {
@@ -77,15 +78,18 @@ const start = async (): Promise<void> => {
     });
 
     await server.register(websocket);
-    console.log('WebSocket support registered');
+    console.log('✅ WebSocket support registered');
     
+    // Register WebSocket routes BEFORE authGuard
+    await server.register(webSocketRoutes);
+    await server.register(roomWebSocketRoutes);
+    console.log('✅ WebSocket routes registered');
+    
+    // NOW add the auth guard (it won't affect already-registered routes)
     server.addHook('onRequest', authGuard);
-    console.log('Authentication middleware registered');
+    console.log('✅ Authentication middleware registered');
     
-    // Register WebSocket support first
-    await webSocketRoutes(server);
-
-    // Register API routes (these must come after authGuard)
+    // Register all other API routes AFTER authGuard
     await server.register(userRoutes, { prefix: '/api/users' });
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
@@ -93,7 +97,6 @@ const start = async (): Promise<void> => {
     await server.register(tournamentRoutes, { prefix: '/api/tournament' });
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
-    await server.register(roomWebSocketRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
     await server.register(invitationRoutes, { prefix: '/api/invitations' });
 

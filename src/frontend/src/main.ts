@@ -12,6 +12,7 @@ import renderAuthCallbackPage from './pages/authCallback';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 import { renderFriendsPage } from './pages/friendsPage';
+import { renderTempLoginPage } from './pages/tempLoginPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -62,6 +63,9 @@ function handleRouting(): void {
       case '4playergame':
         setCurrentPage('4playergame');
         break;
+      case 'tempLogin':
+        setCurrentPage('tempLogin');
+        break;
       default:
         setCurrentPage('landing');
     }
@@ -99,6 +103,9 @@ function handleRouting(): void {
     case '/4playergame':
       setCurrentPage('4playergame');
       break;
+    case 'tempLogin':
+        setCurrentPage('tempLogin');
+        break;
     default:
       setCurrentPage('landing');
   }
@@ -158,6 +165,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'friends':
       renderFriendsPage();
+      break;
+    case 'tempLogin':
+      renderTempLoginPage();
       break;
     default:
       renderLandingPage();

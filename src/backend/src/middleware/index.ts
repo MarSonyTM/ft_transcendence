@@ -6,6 +6,11 @@ type JwtUser = { id: number; email: string; username: string };
 
 export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
   const url = request.url;
+
+  const isWebSocketUpgrade = request.headers.upgrade === 'websocket';
+  if (isWebSocketUpgrade) {
+    return;
+  }
   
   const acceptsHtml = request.headers.accept?.includes('text/html');
   if (acceptsHtml) {
@@ -23,6 +28,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     '/api/auth/create',
     '/api/auth/login',
     '/api/auth/register',
+    '/api/auth/guest', 
     '/api/auth/google',
     '/api/auth/google/callback',
     '/api/auth/google/verify',

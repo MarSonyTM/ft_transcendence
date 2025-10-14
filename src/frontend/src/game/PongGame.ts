@@ -5,8 +5,6 @@ import { RoomWebSocketManager } from '../utils/roomWebSocket';
 
 export class PongGame {
     gameId: number | null = null;
-    // Display mapping from server player indices -> local view indices
-    // Default: identity [0,1,2,3]. For 1v1, right-side client can use [1,0,2,3]
     viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
@@ -15,6 +13,10 @@ export class PongGame {
     fpsStartTime: number = performance.now();
     frameCount: number = 0;
     lastPingTime: number = 0;
+    private lastMoveTime: number = 0;
+    private readonly MOVE_THROTTLE = 16;
+    private lastSentPosition: number = 0;
+
     gameState: GameState = {
         ballPosX: 200,
         ballPosY: 100,
@@ -421,9 +423,16 @@ export class PongGame {
             }
         }
             
+        const now = Date.now();
         if (newPosition !== this.paddlePosition) {
             this.paddlePosition = newPosition;
-            this.sendPlayerMove(newPosition);
+            
+            const positionDelta = Math.abs(newPosition - this.lastSentPosition);
+            if (positionDelta >= 2 || now - this.lastMoveTime >= this.MOVE_THROTTLE) {
+                this.sendPlayerMove(newPosition);
+                this.lastMoveTime = now;
+                this.lastSentPosition = newPosition;
+            }
         }
     }
 
