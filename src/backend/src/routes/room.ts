@@ -281,7 +281,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
+      const gameMode = room.maxPlayers === 4 ? '4player' : '2player';
       // Use incremental DB-backed game IDs for cleanliness
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;

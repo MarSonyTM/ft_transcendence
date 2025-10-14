@@ -73,7 +73,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '1v1' ? 2 : 4;
+  const maxPlayers = gameMode === '2player' ? 2 : 4;
   
   try {
     const token = authService.getToken();
@@ -488,21 +488,21 @@ function renderLobby(root: HTMLElement): void {
 			</button>
 		  ` : ''}
 
+      ${canAddMore && !hasLocal ? `
+        <button id="addLocalBtn" 
+                style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
+                      background: rgb(99 102 241); color: white;">
+          Add Local Opponent
+        </button>
+      ` : ''}
+
 		  ${canAddMore && isHost ? `
       <button id="addAIBtn" 
               style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
                     background: rgb(99 102 241); color: white;">
         Add AI Opponent
       </button>
-    ` : ''}
-
-    ${canAddMore && !hasLocal ? `
-      <button id="addLocalBtn" 
-              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-                    background: rgb(99 102 241); color: white;">
-        Add Local Opponent
-      </button>
-    ` : ''}
+      ` : ''}
 		  
 		  ${isHost ? `
       <button id="startGameBtn"

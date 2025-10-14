@@ -113,7 +113,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
             if (idx === 1) 
                 pongGame.viewIndexMap = [1, 0, 2, 3];
-            // Else if not necessary, local player is watching the same screen, has to be on the right
         }
         
         setGameScreen(pongGame);
@@ -185,7 +184,7 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
 
 // Initialize room-based multiplayer game
 async function initRoomBasedGame(room: any): Promise<void> {
-    if (!pongGame) {  // ← Add null check at the start
+    if (!pongGame) {
         console.error('No pongGame instance');
         return;
     }
@@ -361,20 +360,6 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
                 } catch (error) {
                     console.error('❌ Failed to send move:', error);
                 }
-                
-                // Update local game state
-                // if (moved && newPosition !== mainPlayerPosition) {
-                //     const enginePos = Math.round((newPosition / 100) * maxEnginePosition);
-                    
-                //     try {
-                //         ws.sendMove(enginePos);
-                //     } catch (error) {
-                //         console.error('❌ Failed to send move:', error);
-                //     }
-                    
-                //     mainPlayerPosition = newPosition;
-                //     lastSentTime = now;
-                // }
 
                 if (pongGame && pongGame.gameState) {
                     const playerIndex = room?.players.findIndex((p: any) => p.id === playerId) ?? 0;
@@ -414,7 +399,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
                     console.error('❌ Failed to send guest move:', error);
                 }
                 
-                // Update local game state (guest is typically player 2 in 2-player or player 3/4 in 4-player)
+                // Update local game state
                 if (pongGame && pongGame.gameState) {
                     pongGame.gameState.player2Pos = enginePos;
                 }
@@ -440,8 +425,7 @@ function syncGameStateFromRoom(state: any): void {
     if (state.ballPosX !== undefined) pongGame.gameState.ballPosX = state.ballPosX;
     if (state.ballPosY !== undefined) pongGame.gameState.ballPosY = state.ballPosY;
     
-    // Paddle positions - DON'T update YOUR OWN paddle from server (client prediction)
-    // Only update OTHER players' paddles
+    // Paddle positions 
     if (state.player1Pos !== undefined && playerIndex !== 0) {
         pongGame.gameState.player1Pos = state.player1Pos;
     }
@@ -466,7 +450,6 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
     const user = authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
     
-    // Don't update if this is YOUR move coming back from server
     if (playerId === currentPlayerId) 
         return;
     

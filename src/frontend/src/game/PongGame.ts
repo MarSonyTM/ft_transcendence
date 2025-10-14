@@ -29,7 +29,7 @@ export class PongGame {
         scorePlayer3: 0,
         scorePlayer4: 0,
         gameMode: "",
-        mode: "1v1",
+        mode: "2player",
         playerPositions: [180, 80, 180, 80],
         scores: [0, 0, 0, 0],
         lastContact: 0
@@ -230,7 +230,7 @@ export class PongGame {
 
                     // Apply display mapping for 1v1 when the local view swaps left/right
                     const swapLeftRight =
-                        (nextState.mode === '1v1' || nextState.gameMode === '1v1') &&
+                        (nextState.mode === '2player' || nextState.gameMode === '2player') &&
                         this.viewIndexMap.length >= 2 &&
                         this.viewIndexMap[0] === 1 && this.viewIndexMap[1] === 0;
 

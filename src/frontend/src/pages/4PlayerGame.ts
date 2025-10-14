@@ -1,10 +1,10 @@
-import { setCurrentPage, getCurrentUser, getCurrentGameMode } from '../utils/globalState';
+import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
-import { getLobbyPlayers, Player, getCurrentRoom } from '../utils/roomState';
-import { initRoomWebSocket, disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame, showPlayerDisconnectedMessage, updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
+import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
+import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
+import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
 
 export let pongGame: PongGame | null = null;
 
@@ -210,7 +210,7 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
 
 // Initialize room-based multiplayer game
 async function initRoomBasedGame(room: any): Promise<void> {
-    if (!pongGame) {  // ← Already there, good!
+    if (!pongGame) {
         return;
     }
     
@@ -455,12 +455,11 @@ function syncGameStateFromRoom(state: any): void {
     const currentPlayerId = user?.id?.toString();
     const playerIndex = room?.players.findIndex((p: any) => p.id === currentPlayerId) ?? -1;
 
-    // Ball position - always sync immediately
+    // Ball position
     if (state.ballPosX !== undefined) pongGame.gameState.ballPosX = state.ballPosX;
     if (state.ballPosY !== undefined) pongGame.gameState.ballPosY = state.ballPosY;
     
-    // Paddle positions - DON'T update YOUR OWN paddle from server (client prediction)
-    // Only update OTHER players' paddles
+    // Paddle positions
     if (state.player1Pos !== undefined && playerIndex !== 0) {
         pongGame.gameState.player1Pos = state.player1Pos;
     }
@@ -474,7 +473,7 @@ function syncGameStateFromRoom(state: any): void {
         pongGame.gameState.player4Pos = state.player4Pos;
     }
     
-    // Scores - always sync
+    // Scores
     if (state.scorePlayer1 !== undefined) pongGame.gameState.scorePlayer1 = state.scorePlayer1;
     if (state.scorePlayer2 !== undefined) pongGame.gameState.scorePlayer2 = state.scorePlayer2;
     if (state.scorePlayer3 !== undefined) pongGame.gameState.scorePlayer3 = state.scorePlayer3;
@@ -494,7 +493,6 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
     const user = authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
     
-    // Don't update if this is YOUR move coming back from server
     if (playerId === currentPlayerId) 
         return;
     

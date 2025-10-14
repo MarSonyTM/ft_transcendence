@@ -6,7 +6,7 @@ const DEBUG = false;
 // Global constants
 const maxX = 400;
 const minX = 0;
-const maxY = 400; // Changed from 200 to 400 for 4-player mode
+const maxY = 400;
 const minY = 0;
 const ballRadius = 10;
 const paddleHeight = 40;
@@ -289,7 +289,7 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 this.gameState.ballPosY <= rightPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
-                const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
+                const relativeHit = (hitPosition - 0.5) * 2;
                 
                 // Reverse and slightly increase speed
                 this.xDir = -Math.abs(this.xDir) * 1.05;
@@ -325,7 +325,7 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 this.gameState.ballPosY <= leftPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
-                const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
+                const relativeHit = (hitPosition - 0.5) * 2;
                 
                 // Reverse and slightly increase speed
                 this.xDir = Math.abs(this.xDir) * 1.05;
@@ -669,8 +669,8 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             gameId: this.gameState.gameId,
             mode: '4player',
             scores: this.scores,
-            scorePlayer1: this.scores[3] || 0, // For 2-player compatibility
-            scorePlayer2: this.scores[1] || 0, // For 2-player compatibility
+            scorePlayer1: this.scores[3] || 0,
+            scorePlayer2: this.scores[1] || 0,
             timestamp: Date.now()
         };
 
@@ -775,9 +775,12 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             // Map the 4-player positions to the database fields
             player1Pos: this.playerPositions[3] || 0, // Left player
             player2Pos: this.playerPositions[1] || 0, // Right player  
+            player3Pos: this.playerPositions[0] || 0, 
+            player4Pos: this.playerPositions[2] || 0, 
             scorePlayer1: this.scores[3] || 0, // Left player score
             scorePlayer2: this.scores[1] || 0, // Right player score
-            // TODO: Add player3Pos, player4Pos, scorePlayer3, scorePlayer4 when database is extended
+            scorePlayer3: this.scores[0] || 0,
+            scorePlayer4: this.scores[2] || 0,
         };
     }
 
@@ -891,7 +894,7 @@ export function createGameEngine(gameState: GameState, mode: string, options?: G
     };
 
     switch (mode) {
-        case '1v1':
+        case '2player':
             return new TwoPlayerGameEngine(gameState, gameOptions);
         case '4player':
             return new FourPlayerGameEngine(gameState, gameOptions);

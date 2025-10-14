@@ -22,7 +22,7 @@ export function renderGameSelectPage(): void {
             if (!getCurrentUser()) {
                 setCurrentUser('Player 1');
             }
-            setCurrentGameMode('1v1');
+            setCurrentGameMode('2player');
             history.pushState({ page: 'lobby' }, '', '#lobby');
             setCurrentPage('lobby');
             renderApp();
