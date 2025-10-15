@@ -144,13 +144,33 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
         playerId,
         username: message.username,
         message: message.text,
-        timestamp: Date.now()
       });
       break;
 
     case 'requestState':
       // Send current game state to requesting player
       sendRoomState(roomId, playerId);
+      break;
+
+    case 'keyState':
+      // Handle key state updates
+      if (room.gameId) {
+        let targetPlayerNum = getPlayerNumber(room, playerId);
+        
+        // If this is a guest key press, control player 2 (the local guest)
+        if (message.isGuest) {
+          const localPlayer = room.players.find((p: any) => p.id === 'local');
+          if (localPlayer) {
+            targetPlayerNum = getPlayerNumber(room, 'local');
+          }
+        } else {
+        }
+        
+        const gameEngine = activeGames.get(room.gameId);
+        if (gameEngine && typeof gameEngine.setPlayerKeyState === 'function') {
+          gameEngine.setPlayerKeyState(targetPlayerNum, message.key, message.pressed);
+        }
+      }
       break;
 
     default:
@@ -230,7 +250,6 @@ export function broadcastGameStartToRoom(roomId: string, gameId: number): void {
   broadcastToRoom(roomId, {
     type: 'gameStart',
     gameId,
-    timestamp: Date.now()
   });
 }
 
@@ -239,7 +258,6 @@ export function broadcastGameStateToRoom(roomId: string, gameState: any): void {
   broadcastToRoom(roomId, {
     type: 'gameState',
     state: gameState,
-    timestamp: Date.now()
   });
 }
 
@@ -248,7 +266,6 @@ export function broadcastScoreToRoom(roomId: string, scores: any): void {
   broadcastToRoom(roomId, {
     type: 'score',
     ...scores,
-    timestamp: Date.now()
   });
 }
 
@@ -257,7 +274,6 @@ export function broadcastGameEndToRoom(roomId: string, winnerId: string): void {
   broadcastToRoom(roomId, {
     type: 'gameEnd',
     winnerId,
-    timestamp: Date.now()
   });
 }
 
@@ -274,7 +290,6 @@ function removePlayerFromRoom(roomId: string, playerId: string): void {
       broadcastToRoom(roomId, {
         type: 'playerDisconnected',
         playerId,
-        timestamp: Date.now()
       });
     }
   }

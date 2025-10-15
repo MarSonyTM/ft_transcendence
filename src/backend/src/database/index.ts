@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { StringAsNumber } from 'fastify/types/utils';
 
 // Use environment variable for Docker compatibility, fallback to local path
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
@@ -63,6 +62,7 @@ export interface GameState {
   scorePlayer2: number;
   scorePlayer3: number;
   scorePlayer4: number;
+  gameMode: string;
   lastActivity: string;
 }
 

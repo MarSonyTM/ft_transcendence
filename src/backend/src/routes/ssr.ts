@@ -41,7 +41,6 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
       gameId,
       currentUsername,
       currentPage,
-      timestamp: Date.now(),
       apiEndpoint: `${protocol}://${host}`,
       wsEndpoint: `${wsProtocol}://${host}`,
       environment: process.env.NODE_ENV || 'development'

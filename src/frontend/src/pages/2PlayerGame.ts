@@ -1,24 +1,23 @@
-import { setCurrentPage, getCurrentUser, getCurrentGameMode } from '../utils/globalState';
+import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
-import { getLobbyPlayers, Player, getCurrentRoom } from '../utils/roomState';
-import { initRoomWebSocket, disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame, showPlayerDisconnectedMessage, updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
+import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
+import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
+import { setGameScreen,  cleanupGame,  updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
 
 export let pongGame: PongGame | null = null;
 
 export async function render2PlayerGame(): Promise<void> {
-    const gameMode = getCurrentGameMode();
     const room = getCurrentRoom();
     
+    const gameScreenHeight = 800;
+    const gameScreenWidth = 400
     pongGame = new PongGame();
-    pongGame.isRoomBasedGame = room !== null;
 
-    if (room) {
-        pongGame.hasGuest = room.players.some(p => p.id === 'local');
-}
-    
+    if (room)
+        pongGame.hasLocal = room.players.some(p => p.id === 'local');
+
     const root = document.getElementById('app-root');
     if (!root) return;
     
@@ -65,10 +64,10 @@ export async function render2PlayerGame(): Promise<void> {
                 <span id="player2score" class="player2-score">0</span>
             </div>
         </div>
-        <canvas id="gameScreen" width="400" height="200"></canvas>
+        <canvas id="gameScreen" width="${gameScreenWidth}" height="${gameScreenHeight}"></canvas>
         <div class="controls-info">
             <p style="color: #60a5fa; font-weight: bold;">W / S</p>
-            ${!pongGame.hasGuest ? '<p style="color: #19d81cff; font-weight: bold;">Player 2 - Up/Down</p>' : ''}
+            ${!pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Player 2 - Up/Down</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
         <hr>
@@ -90,39 +89,31 @@ export async function render2PlayerGame(): Promise<void> {
         });
     }
     
-    if (pongGame.isRoomBasedGame && room) {
+    if (pongGame && room) {
         await initRoomBasedGame(room);
     }
 }
 
 async function setupGameButtons(pongGame: PongGame): Promise<void> {
     
-    if (pongGame.isRoomBasedGame) {
-        let effectiveRoom = await setEffectiveRoom();
+    let effectiveRoom = await setEffectiveRoom();
 
-        if (!effectiveRoom || !effectiveRoom.gameId) {
-            console.error('❌ No shared gameId available yet; not creating a standalone game.');
-            return;
-        }
+    if (!effectiveRoom || !effectiveRoom.gameId) {
+        console.error('❌ No shared gameId available yet; not creating a standalone game.');
+        return;
+    }
 
-        console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
-        
-        pongGame.gameId = effectiveRoom.gameId;
-        const localUser = authService.getCurrentUser();
-        if (localUser && effectiveRoom.players) {
-            const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
-            if (idx === 1) 
-                pongGame.viewIndexMap = [1, 0, 2, 3];
-        }
-        
-        setGameScreen(pongGame);
-
-    } else {
-        console.log('Local game - creating new game instance');
-        await pongGame.init();
+    console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
+    
+    pongGame.gameId = effectiveRoom.gameId;
+    const localUser = authService.getCurrentUser();
+    if (localUser && effectiveRoom.players) {
+        const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
+        if (idx === 1) 
+            pongGame.viewIndexMap = [1, 0, 2, 3];
     }
     
-    endGame(pongGame);
+    setGameScreen(pongGame);
 
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
@@ -151,9 +142,7 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             if (pongGame) {
                 await pongGame.endGame();
             }
-            if (pongGame.isRoomBasedGame) {
-                cleanupGame(pongGame);
-            }
+            cleanupGame(pongGame);
         });
     }
 
@@ -162,7 +151,7 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             if (pongGame) {
                 pongGame.reconnectWebSocket();
             }
-            if (pongGame.isRoomBasedGame && pongGame.roomWS) {
+             if (pongGame.roomWS) {
                 try {
                     await pongGame.roomWS.connect();
                 } catch (error) {
@@ -231,8 +220,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
-            }
-            if (pongGame?.roomWS) {
                 setupKeyboardControls(pongGame.roomWS, playerId);
             }
         },
@@ -280,135 +267,52 @@ async function initRoomBasedGame(room: any): Promise<void> {
 // Setup keyboard controls
 function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
     const keys: { [key: string]: boolean } = {};
+    const hasLocal = pongGame && pongGame.hasLocal;
     
-    const gameMode = getCurrentGameMode();
-    const room = getCurrentRoom();
-    
-    // Check if this player has a local guest
-    const hasLocalGuest = pongGame && pongGame.hasGuest;
-    
-    console.log('🎮 Setting up controls:', { 
+    console.log('Setting up controls:', { 
         playerId,
-        hasLocalGuest,
-        gameMode
+        hasLocal,
     });
     
-    const maxEnginePosition = 150;
-    
-    // Track positions for main player and local guest
-    let mainPlayerPosition = 50;
-    let guestPlayerPosition = 50;
-    
-    if (pongGame && pongGame.gameState) {
-        // Initialize main player position based on player index
-        const playerIndex = room?.players.findIndex((p: any) => p.id === playerId) ?? 0;
-        
-        if (playerIndex === 0 && typeof pongGame.gameState.player1Pos === 'number') {
-            mainPlayerPosition = Math.max(0, Math.min(100, (pongGame.gameState.player1Pos / maxEnginePosition) * 100));
-        } else if (playerIndex === 1 && typeof pongGame.gameState.player2Pos === 'number') {
-            mainPlayerPosition = Math.max(0, Math.min(100, (pongGame.gameState.player2Pos / maxEnginePosition) * 100));
-        }
-    }
-    
-    let lastSentTime = 0;
-    let lastGuestSentTime = 0;
-    const throttleMs = 8;
-
     const handleKeyDown = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase();
+        const wasPressed = keys[key];
         keys[key] = true;
         
-        // Block arrow keys, W/S, and O/L from scrolling
-        if (['w', 's', 'o', 'l', 'arrowup', 'arrowdown'].includes(key)) {
+        // Only send on key state CHANGE
+        if (!wasPressed && ['w', 's', 'o', 'l'].includes(key)) {
             e.preventDefault();
+            
+            // Check if this is a local guest key (o/l)
+            const isGuestKey = ['o', 'l'].includes(key);
+            
+            if (isGuestKey && hasLocal) {
+                // Send as guest/local player
+                ws.sendKeyState(key, true, true);
+            } else if (!isGuestKey) {
+                // Send as main player
+                ws.sendKeyState(key, true, false);
+            }
         }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase();
         keys[key] = false;
+        
+        if (['w', 's', 'o', 'l'].includes(key)) {
+            const isGuestKey = ['o', 'l'].includes(key);
+            
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, false, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, false, false);
+            }
+        }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-
-    // Update loop
-    setInterval(() => {
-        const now = Date.now();
-        const paddleSpeed = 3;
-        
-        // MAIN PLAYER (W/S)
-        if (now - lastSentTime >= throttleMs) {
-            let moved = false;
-            let newPosition = mainPlayerPosition;
-            
-            if (keys['w']) {
-                newPosition = Math.max(0, newPosition - paddleSpeed);
-                moved = true;
-            }
-            
-            if (keys['s']) {
-                newPosition = Math.min(100, newPosition + paddleSpeed);
-                moved = true;
-            }
-
-            if (moved && newPosition !== mainPlayerPosition) {
-                const enginePos = Math.round((newPosition / 100) * maxEnginePosition);
-                
-                try {
-                    ws.sendMove(enginePos);
-                } catch (error) {
-                    console.error('❌ Failed to send move:', error);
-                }
-
-                if (pongGame && pongGame.gameState) {
-                    const playerIndex = room?.players.findIndex((p: any) => p.id === playerId) ?? 0;
-                    if (playerIndex === 0)
-                        pongGame.gameState.player1Pos = enginePos;
-                    else if (playerIndex === 1) 
-                        pongGame.gameState.player2Pos = enginePos;
-
-                    mainPlayerPosition = newPosition;
-                    lastSentTime = now;
-                }
-            }
-        }
-        
-        // LOCAL GUEST (O/L) - only if hasLocalGuest is true
-        if (hasLocalGuest && now - lastGuestSentTime >= throttleMs) {
-            let guestMoved = false;
-            let newGuestPosition = guestPlayerPosition;
-            
-            if (keys['o']) {
-                newGuestPosition = Math.max(0, newGuestPosition - paddleSpeed);
-                guestMoved = true;
-            }
-            
-            if (keys['l']) {
-                newGuestPosition = Math.min(100, newGuestPosition + paddleSpeed);
-                guestMoved = true;
-            }
-
-            if (guestMoved && newGuestPosition !== guestPlayerPosition) {
-                const enginePos = Math.round((newGuestPosition / 100) * maxEnginePosition);
-                
-                try {
-                    // Send guest move with isGuest flag
-                    ws.sendMove(enginePos, true); // true = isGuest
-                } catch (error) {
-                    console.error('❌ Failed to send guest move:', error);
-                }
-                
-                // Update local game state
-                if (pongGame && pongGame.gameState) {
-                    pongGame.gameState.player2Pos = enginePos;
-                }
-                
-                guestPlayerPosition = newGuestPosition;
-                lastGuestSentTime = now;
-            }
-        }
-    }, 16);
 }
 
 
@@ -416,26 +320,25 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 function syncGameStateFromRoom(state: any): void {
     if (!pongGame || !pongGame.gameState) return;
 
-    const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
-    const currentPlayerId = user?.id?.toString();
-    const playerIndex = room?.players.findIndex((p: any) => p.id === currentPlayerId) ?? -1;
-
-    // Ball position - always sync immediately
-    if (state.ballPosX !== undefined) pongGame.gameState.ballPosX = state.ballPosX;
-    if (state.ballPosY !== undefined) pongGame.gameState.ballPosY = state.ballPosY;
-    
-    // Paddle positions 
-    if (state.player1Pos !== undefined && playerIndex !== 0) {
+    // Merge delta updates - only update fields that are present
+    if (state.ballPosX !== undefined) {
+        pongGame.gameState.ballPosX = state.ballPosX;
+    }
+    if (state.ballPosY !== undefined) {
+        pongGame.gameState.ballPosY = state.ballPosY;
+    }
+    if (state.player1Pos !== undefined) {
         pongGame.gameState.player1Pos = state.player1Pos;
     }
-    if (state.player2Pos !== undefined && playerIndex !== 1) {
+    if (state.player2Pos !== undefined) {
         pongGame.gameState.player2Pos = state.player2Pos;
     }
-    
-    // Scores - always sync
-    if (state.scorePlayer1 !== undefined) pongGame.gameState.scorePlayer1 = state.scorePlayer1;
-    if (state.scorePlayer2 !== undefined) pongGame.gameState.scorePlayer2 = state.scorePlayer2;
+    if (state.scorePlayer1 !== undefined) {
+        pongGame.gameState.scorePlayer1 = state.scorePlayer1;
+    }
+    if (state.scorePlayer2 !== undefined) {
+        pongGame.gameState.scorePlayer2 = state.scorePlayer2;
+    }
 }
 
 // Update remote player position

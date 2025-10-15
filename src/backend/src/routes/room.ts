@@ -123,7 +123,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -180,7 +179,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -241,7 +239,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -282,7 +279,6 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     try {
       const gameMode = room.maxPlayers === 4 ? '4player' : '2player';
-      // Use incremental DB-backed game IDs for cleanliness
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;
       
@@ -308,7 +304,8 @@ async function roomRoutes(fastify: FastifyInstance) {
         scorePlayer2: 0,
         scorePlayer3: 0,
         scorePlayer4: 0,
-        gameMode: gameMode
+        gameMode: gameMode,
+        lastActivity: ''
       };
 
       // Create game engine with proper GameState

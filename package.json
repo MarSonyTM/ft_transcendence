@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "buildx": "^0.1.1"
+  }
+}

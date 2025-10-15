@@ -4,13 +4,14 @@ import { broadcastToGame } from "../websocket/websocketHandler";
 const DEBUG = false;
 
 // Global constants
-const maxX = 400;
+const maxX = 800;
 const minX = 0;
-const maxY = 400;
+const maxY = 800;
 const minY = 0;
-const ballRadius = 10;
-const paddleHeight = 40;
-const paddleWidth = 10;
+const ballRadius = 20;
+const paddleHeight = 80;
+const paddleWidth = 20;
+const paddleSpeed = 10
 
 interface GameEngineOptions {
     maxX?: number;
@@ -38,7 +39,22 @@ export abstract class BaseGameEngine {
     protected aiPlayers: Set<number> = new Set();
 
     protected lastBroadcastTime: number = 0;
-    protected readonly BROADCAST_INTERVAL = 16;
+    protected readonly BROADCAST_INTERVAL = 33;
+
+    protected playerKeyStates: Map<number, { [key: string]: boolean }> = new Map();
+
+    protected lastBroadcastState: {
+        ballPosX?: number;
+        ballPosY?: number;
+        player1Pos?: number;
+        player2Pos?: number;
+        player3Pos?: number;
+        player4Pos?: number;
+        scorePlayer1?: number;
+        scorePlayer2?: number;
+        scorePlayer3?: number;
+        scorePlayer4?: number;
+    } = {};
 
     constructor(gameState: GameState, options?: GameEngineOptions) {
         this.gameState = gameState;
@@ -92,6 +108,8 @@ export abstract class BaseGameEngine {
         if (this.gameTimer) {
             clearTimeout(this.gameTimer);
             this.gameTimer = null;
+
+            this.updateDatabaseState();
             
             broadcastToGame(this.gameState.gameId, {
                 type: 'gameEnd',
@@ -104,6 +122,8 @@ export abstract class BaseGameEngine {
 
     protected gameLoop = (): void => {
         const resetSignal = this.updateBallPosition();
+
+        this.processPlayerInputs();
 
         // Update AI positions if any
         this.updateAIPositions();
@@ -122,10 +142,6 @@ export abstract class BaseGameEngine {
         if (now - this.lastBroadcastTime >= this.BROADCAST_INTERVAL) {
             this.broadcastGameState();
             this.lastBroadcastTime = now;
-        }
-
-        if (this.frameCount % 30 === 0) {
-            this.updateDatabaseState();
         }
 
         this.gameTimer = setTimeout(this.gameLoop, 16);
@@ -150,12 +166,6 @@ export abstract class BaseGameEngine {
     }
 
     protected updateAIPositions(): void {
-        const paddleSpeed = 5;
-        const paddleHeight = 40;
-
-        // Only log every 60 frames (once per second)
-        const shouldLog = this.frameCount % 60 === 0;
-
         // Right paddle (Player 2) AI - ONLY if Player 2 is AI
         if (this.isPlayerAI(2) && this.gameState.player2Pos !== undefined) {
             
@@ -163,10 +173,10 @@ export abstract class BaseGameEngine {
             let targetY = currentY;
 
             if (this.xDir > 0) {
-                const distanceToTravel = 390 - this.gameState.ballPosX;
+                const distanceToTravel = 680 - this.gameState.ballPosX;
                 const timeToIntercept = distanceToTravel / (this.xDir * 2.1);
                 const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
+                targetY = Math.max(0, Math.min(400 - paddleHeight, predictedY - (paddleHeight / 2)));
             }
 
             if (Math.abs(targetY - currentY) > paddleSpeed) {
@@ -180,7 +190,6 @@ export abstract class BaseGameEngine {
 
         // Left paddle (Player 1) AI - ONLY if Player 1 is AI
         if (this.isPlayerAI(1) && this.gameState.player1Pos !== undefined) {
-            if (shouldLog) console.log(`🤖 AI Update for Player 1: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player1Pos.toFixed(1)}`);
             
             const currentY = this.gameState.player1Pos;
             let targetY = currentY;
@@ -200,6 +209,55 @@ export abstract class BaseGameEngine {
                 }
             }
         }
+    }
+
+    public setPlayerKeyState(playerId: number, key: string, pressed: boolean): void {
+        if (!this.playerKeyStates.has(playerId)) {
+            this.playerKeyStates.set(playerId, {});
+        }
+        
+        const playerKeys = this.playerKeyStates.get(playerId)!;
+        playerKeys[key] = pressed;
+    }
+
+    // Process player inputs based on key states
+    protected processPlayerInputs(): void {
+        const maxPos = this.maxY - 40; // Canvas height - paddle height
+        
+        // Process each player's key states
+        this.playerKeyStates.forEach((keys, playerId) => {
+            let newPos: number | undefined;
+            
+            if (playerId === 1 && this.gameState.player1Pos !== undefined) {
+                // Player 1 (left paddle)
+                newPos = this.gameState.player1Pos;
+                
+                if (keys['w']) {
+                    newPos = Math.max(0, newPos - paddleSpeed);
+                }
+                if (keys['s']) {
+                    newPos = Math.min(maxPos, newPos + paddleSpeed);
+                }
+                
+                if (newPos !== this.gameState.player1Pos) {
+                    this.gameState.player1Pos = newPos;
+                }
+            } else if (playerId === 2 && this.gameState.player2Pos !== undefined) {
+                // Player 2 (right paddle)
+                newPos = this.gameState.player2Pos;
+                
+                if (keys['o']) {
+                    newPos = Math.max(0, newPos - paddleSpeed);
+                }
+                if (keys['l']) {
+                    newPos = Math.min(maxPos, newPos + paddleSpeed);
+                }
+                
+                if (newPos !== this.gameState.player2Pos) {
+                    this.gameState.player2Pos = newPos;
+                }
+            }
+        });
     }
 
     public getCurrentState(): GameState {
@@ -356,24 +414,59 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     broadcastGameState(): void {
-        const gameState = {
-            type: 'gameState',
-            gameId: this.gameState.gameId,
-            state: {
-                ballPosX: this.gameState.ballPosX,
-                ballPosY: this.gameState.ballPosY,
-                ballVelX: this.gameState.ballVelX,
-                ballVelY: this.gameState.ballVelY,
-                player1Pos: this.gameState.player1Pos,
-                player2Pos: this.gameState.player2Pos,
-                scorePlayer1: this.gameState.scorePlayer1,
-                scorePlayer2: this.gameState.scorePlayer2,
-                frameCount: this.frameCount,
-                timestamp: Date.now()
-            }
-        };
-
-        broadcastToGame(this.gameState.gameId, gameState);
+        // Build delta state - only include changed values
+        const delta: any = {};
+        let hasChanges = false;
+        
+        // Ball position (always changes, so always include)
+        if (this.gameState.ballPosX !== this.lastBroadcastState.ballPosX) {
+            delta.ballPosX = this.gameState.ballPosX;
+            this.lastBroadcastState.ballPosX = this.gameState.ballPosX;
+            hasChanges = true;
+        }
+        
+        if (this.gameState.ballPosY !== this.lastBroadcastState.ballPosY) {
+            delta.ballPosY = this.gameState.ballPosY;
+            this.lastBroadcastState.ballPosY = this.gameState.ballPosY;
+            hasChanges = true;
+        }
+        
+        // Paddle positions (only if moved)
+        if (this.gameState.player1Pos !== this.lastBroadcastState.player1Pos) {
+            delta.player1Pos = this.gameState.player1Pos;
+            this.lastBroadcastState.player1Pos = this.gameState.player1Pos;
+            hasChanges = true;
+        }
+        
+        if (this.gameState.player2Pos !== this.lastBroadcastState.player2Pos) {
+            delta.player2Pos = this.gameState.player2Pos;
+            this.lastBroadcastState.player2Pos = this.gameState.player2Pos;
+            hasChanges = true;
+        }
+        
+        // Scores (rarely change, big savings here!)
+        if (this.gameState.scorePlayer1 !== this.lastBroadcastState.scorePlayer1) {
+            delta.scorePlayer1 = this.gameState.scorePlayer1;
+            this.lastBroadcastState.scorePlayer1 = this.gameState.scorePlayer1;
+            hasChanges = true;
+        }
+        
+        if (this.gameState.scorePlayer2 !== this.lastBroadcastState.scorePlayer2) {
+            delta.scorePlayer2 = this.gameState.scorePlayer2;
+            this.lastBroadcastState.scorePlayer2 = this.gameState.scorePlayer2;
+            hasChanges = true;
+        }
+        
+        // Only broadcast if something actually changed
+        if (hasChanges) {
+            const message = {
+                type: 'gameState',
+                gameId: this.gameState.gameId,
+                state: delta  // Only changed values!
+            };
+            
+            broadcastToGame(this.gameState.gameId, message);
+        }
     }
 
     updatePlayerPosition(playerId: number, position: number): void {
@@ -408,7 +501,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             gameId: this.gameState.gameId,
             scorePlayer1: this.gameState.scorePlayer1,
             scorePlayer2: this.gameState.scorePlayer2,
-            timestamp: Date.now()
         };
 
         broadcastToGame(this.gameState.gameId, scoreUpdate);
@@ -429,7 +521,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 player1: this.scorePlayer1,
                 player2: this.scorePlayer2
             },
-            timestamp: Date.now()
         };
         broadcastToGame(this.gameState.gameId, gameEndMessage);
     }
@@ -450,7 +541,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
             type: 'ballReset',
             gameId: this.gameState.gameId,
             message: 'Ball reset - get ready!',
-            timestamp: Date.now()
         };
         broadcastToGame(this.gameState.gameId, resetMessage);
         
@@ -637,30 +727,86 @@ export class FourPlayerGameEngine extends BaseGameEngine {
     }
 
     broadcastGameState(): void {
-        const gameState = {
-            type: 'gameState',
-            gameId: this.gameState.gameId,
-            mode: '4player',
-            state: {
-                ballPosX: this.gameState.ballPosX,
-                ballPosY: this.gameState.ballPosY,
-                ballVelX: this.gameState.ballVelX,
-                ballVelY: this.gameState.ballVelY,
-                playerPositions: this.playerPositions,
-                player1Pos: this.playerPositions[0] || 180, // Top player
-                player2Pos: this.playerPositions[1] || 180, // Right player
-                player3Pos: this.playerPositions[2] || 180, // Bottom player
-                player4Pos: this.playerPositions[3] || 180, // Left player
-                scores: this.scores,
-                scorePlayer1: this.scores[3] || 0, // Left player score
-                scorePlayer2: this.scores[1] || 0, // Right player score
-                lastContact: this.lastContact,
-                frameCount: this.frameCount,
-                timestamp: Date.now()
-            }
-        };
-
-        broadcastToGame(this.gameState.gameId, gameState);
+        const delta: any = {};
+        let hasChanges = false;
+        
+        // Ball position
+        if (this.gameState.ballPosX !== this.lastBroadcastState.ballPosX) {
+            delta.ballPosX = this.gameState.ballPosX;
+            this.lastBroadcastState.ballPosX = this.gameState.ballPosX;
+            hasChanges = true;
+        }
+        
+        if (this.gameState.ballPosY !== this.lastBroadcastState.ballPosY) {
+            delta.ballPosY = this.gameState.ballPosY;
+            this.lastBroadcastState.ballPosY = this.gameState.ballPosY;
+            hasChanges = true;
+        }
+        
+        // All 4 paddle positions
+        if (this.playerPositions[0] !== this.lastBroadcastState.player1Pos) {
+            delta.player1Pos = this.playerPositions[0];
+            this.lastBroadcastState.player1Pos = this.playerPositions[0];
+            hasChanges = true;
+        }
+        
+        if (this.playerPositions[1] !== this.lastBroadcastState.player2Pos) {
+            delta.player2Pos = this.playerPositions[1];
+            this.lastBroadcastState.player2Pos = this.playerPositions[1];
+            hasChanges = true;
+        }
+        
+        if (this.playerPositions[2] !== this.lastBroadcastState.player3Pos) {
+            delta.player3Pos = this.playerPositions[2];
+            this.lastBroadcastState.player3Pos = this.playerPositions[2];
+            hasChanges = true;
+        }
+        
+        if (this.playerPositions[3] !== this.lastBroadcastState.player4Pos) {
+            delta.player4Pos = this.playerPositions[3];
+            this.lastBroadcastState.player4Pos = this.playerPositions[3];
+            hasChanges = true;
+        }
+        
+        // Scores (4-player mode)
+        if (this.scores[0] !== this.lastBroadcastState.scorePlayer1) {
+            delta.scorePlayer1 = this.scores[0];
+            this.lastBroadcastState.scorePlayer1 = this.scores[0];
+            hasChanges = true;
+        }
+        
+        if (this.scores[1] !== this.lastBroadcastState.scorePlayer2) {
+            delta.scorePlayer2 = this.scores[1];
+            this.lastBroadcastState.scorePlayer2 = this.scores[1];
+            hasChanges = true;
+        }
+        
+        if (this.scores[2] !== this.lastBroadcastState.scorePlayer3) {
+            delta.scorePlayer3 = this.scores[2];
+            this.lastBroadcastState.scorePlayer3 = this.scores[2];
+            hasChanges = true;
+        }
+        
+        if (this.scores[3] !== this.lastBroadcastState.scorePlayer4) {
+            delta.scorePlayer4 = this.scores[3];
+            this.lastBroadcastState.scorePlayer4 = this.scores[3];
+            hasChanges = true;
+        }
+        
+        // Include arrays for 4-player compatibility
+        if (hasChanges) {
+            delta.playerPositions = this.playerPositions;
+            delta.scores = this.scores;
+            
+            const message = {
+                type: 'gameState',
+                gameId: this.gameState.gameId,
+                mode: '4player',
+                state: delta
+            };
+            
+            broadcastToGame(this.gameState.gameId, message);
+        }
     }
 
     private broadcastScoreUpdate(): void {
@@ -671,7 +817,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             scores: this.scores,
             scorePlayer1: this.scores[3] || 0,
             scorePlayer2: this.scores[1] || 0,
-            timestamp: Date.now()
         };
 
         broadcastToGame(this.gameState.gameId, scoreUpdate);
@@ -719,7 +864,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             winner: winnerId,
             winnerName: `Player ${winnerId}`,
             finalScores: this.scores,
-            timestamp: Date.now()
         };
         broadcastToGame(this.gameState.gameId, gameEndMessage);
         
@@ -743,7 +887,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             type: 'ballReset',
             gameId: this.gameState.gameId,
             message: 'Ball reset - get ready!',
-            timestamp: Date.now()
         };
         broadcastToGame(this.gameState.gameId, resetMessage);
         
@@ -806,7 +949,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
     }
 
     protected updateAIPositions(): void {
-        const paddleSpeed = 5;
         const paddleHeight = 40;
 
         // Player 1 (Right paddle) - Only if AI

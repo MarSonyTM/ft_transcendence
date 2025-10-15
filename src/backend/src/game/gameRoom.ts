@@ -148,7 +148,7 @@ class GameRoomManager {
 
     room.status = 'playing';
     room.gameId = gameId;
-    console.log(`🎮 Game started in room ${roomId}`);
+    console.log(` Game started in room ${roomId}`);
     return true;
   }
 

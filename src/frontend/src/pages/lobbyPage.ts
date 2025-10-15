@@ -2,13 +2,7 @@ import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
-import { 
-  Player, 
-  GameRoom, 
-  getCurrentRoom,
-  setCurrentRoom,
-  clearRoomState
-} from '../utils/roomState';
+import { Player, GameRoom, getCurrentRoom, setCurrentRoom, clearRoomState } from '../utils/roomState';
 
 let currentUserId: string | null = null;
 let pollInterval: number | null = null;
@@ -423,6 +417,7 @@ function renderLobby(root: HTMLElement): void {
   const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
 	const currentPlayer = players.find(p => p.id === currentUserId);
+  let hasGuest = false;
   let hasLocal = players.some(p => p.id === 'local');
   
 	root.innerHTML = `
@@ -573,6 +568,7 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
   const addLocalBtn = document.getElementById('addLocalBtn');
   if (addLocalBtn && canAddMore && isHost) {
     addLocalBtn.addEventListener('click', () => addLocalPlayer());
+    
   }
 
   const removeButtons = document.querySelectorAll('.remove-player-btn');
@@ -714,8 +710,7 @@ async function addLocalPlayer(): Promise<void> {
     if (joinData.success) {
       console.log(`✅ [LOCAL] ${username} joined as local player`);
       
-      // Set hasGuest flag on pongGame if it exists
-      // Note: pongGame might not exist yet since we're in lobby
+      // Set hasGuest flag on pongGame
       // The game page will check for local player when it initializes
       
       await fetchRoomState();

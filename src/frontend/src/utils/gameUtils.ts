@@ -26,7 +26,7 @@ export function endGame(pongGame: PongGame) {
     pongGame.onGameEnd = async (winnerId: number) => {
         console.log(`Game ended, winner is Player ${winnerId}`);
         
-        if (pongGame.isRoomBasedGame && pongGame.roomWS) {
+        if (pongGame.roomWS) {
             const room = getCurrentRoom();
             if (room) {
                 const winner = room.players[winnerId - 1];
@@ -57,7 +57,7 @@ export function endGame(pongGame: PongGame) {
             if (user && user.id) {
                 let didWin = false;
                 const room = getCurrentRoom();
-                if (pongGame.isRoomBasedGame && room && Array.isArray(room.players)) {
+                if (room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
                     didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
                 } else {
@@ -126,7 +126,6 @@ export function cleanupGame(pongGame: PongGame): void {
         pongGame.roomWS = null;
     }
     pongGame.currentGameState = null;
-    pongGame.isRoomBasedGame = false;
     
     if (pongGame) {
         // Your existing cleanup
@@ -161,11 +160,11 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
 
 // Update connection status
 export function updateConnectionStatus(status: string, isConnected: boolean): void {
-    const wsStatus = document.getElementById('wsStatus');
-    if (wsStatus) {
-        wsStatus.textContent = status;
-        wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
-    }
+    // const wsStatus = document.getElementById('wsStatus');
+    // if (wsStatus) {
+    //     wsStatus.textContent = status;
+    //     wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
+    // }
 }
 
 export async function setEffectiveRoom(): Promise<GameRoom | null> {
