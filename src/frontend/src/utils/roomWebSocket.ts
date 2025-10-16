@@ -192,9 +192,10 @@ export class RoomWebSocketManager {
   }
 
   // Send player movement
-  sendMove(position: number): void {
+  sendMove(position: number, customPlayerId?: string): void {
     this.send({
       type: 'move',
+      playerId: customPlayerId || this.config.playerId,
       position,
       timestamp: Date.now()
     });

@@ -4,6 +4,7 @@ export interface Player {
   isReady: boolean;
   avatar?: string;
   isAI?: boolean;
+  isLocal?: boolean;
   socketId?: string;
 }
 

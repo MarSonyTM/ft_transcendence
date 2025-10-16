@@ -16,6 +16,7 @@ interface JoinRoomBody {
   playerId: string;
   username: string;
   isAI?: boolean;
+  isLocal?: boolean;
   isReady?: boolean;
   difficulty?: string;
 }
@@ -93,8 +94,9 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false, isReady: _ignoredIsReady, difficulty } = request.body;
-      const isReady = isAI;
+      const { playerId, username, isAI = false, isLocal = false, isReady = false, difficulty } = request.body;
+      // AI and local players are automatically ready
+      const finalIsReady = isReady || isAI;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -103,7 +105,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady, difficulty);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, finalIsReady, difficulty, isLocal);
 
       if (!result.success) {
         return reply.code(400).send(result);

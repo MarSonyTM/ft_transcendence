@@ -36,6 +36,7 @@ async function renderTwoPlayerGame(): Promise<void> {
     const lobbyPlayers = getLobbyPlayers();
     const player1 = lobbyPlayers[0] || { username: 'Player 1', isAI: false };
     const player2 = lobbyPlayers[1] || { username: 'Player 2', isAI: false };
+    const hasLocalPlayer2 = lobbyPlayers.some(p => p.isLocal);
     
     // Get authenticated user info for fallback
     const user = authService.getCurrentUser();
@@ -77,8 +78,8 @@ async function renderTwoPlayerGame(): Promise<void> {
         </div>
         <canvas id="gameScreen" width="400" height="200"></canvas>
         <div class="controls-info">
-            <p>${player1.username} - Up/Down W/S</p>
-            ${!isRoomBasedGame && !player2.isAI ? '<p>Player 2 - Up/Down O/L</p>' : ''}
+            <p>${player1.username} - W (up) / S (down)</p>
+            ${hasLocalPlayer2 ? '<p>Local Player 2 - O (up) / L (down)</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Lobby</button>
         <hr>
@@ -469,33 +470,54 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
     
     let lastSentTime = 0;
     const throttleMs = 16;
+    let logThrottle = 0; // Throttle console logs
 
-    document.addEventListener('keydown', (e) => {
-        keys[e.key.toLowerCase()] = true;
-        if (['arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
-    });
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        keys[key] = true;
+        if (['arrowup','arrowdown','w','s','o','l'].includes(key)) {
+            e.preventDefault();
+            // Log only once per second
+            if (Date.now() - logThrottle > 1000) {
+                console.log('🎮 Key down:', key);
+                logThrottle = Date.now();
+            }
+        }
+    };
 
-    document.addEventListener('keyup', (e) => {
+    const handleKeyUp = (e: KeyboardEvent) => {
         keys[e.key.toLowerCase()] = false;
-    });
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    let lastPosition2 = 50; // For local player 2
+    let lastSentTime2 = 0;
 
     // Update and send position
     setInterval(() => {
         if (!ws.isConnected()) return;
 
         const now = Date.now();
-        if (now - lastSentTime < throttleMs) return;
-
+        
         let moved = false;
+        let moved2 = false;
         let newPosition = lastPosition;
+        let newPosition2 = lastPosition2;
 
         const room = getCurrentRoom();
         if (!room) return;
 
         const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
         
+        // Get local player 2 fresh each time (in case they joined after game started)
+        const currentLocalPlayer2 = room.players.find((p: any) => p.isLocal);
+        const localPlayer2Index = currentLocalPlayer2 ? room.players.findIndex((p: any) => p.id === currentLocalPlayer2.id) : -1;
+        
         const paddleSpeed = 5;
         
+        // Player 1 controls (W/S) - for the connected player
         if (keys['w'] || keys['arrowup']) {
             newPosition = Math.max(0, newPosition - paddleSpeed);
             moved = true;
@@ -505,7 +527,20 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
             moved = true;
         }
 
-        if (moved && newPosition !== lastPosition) {
+        // Local Player 2 controls (O/L keys) - ONLY if local player exists
+        if (currentLocalPlayer2 && localPlayer2Index >= 0) {
+            if (keys['o']) {
+                newPosition2 = Math.max(0, newPosition2 - paddleSpeed);
+                moved2 = true;
+            }
+            if (keys['l']) {
+                newPosition2 = Math.min(100, newPosition2 + paddleSpeed);
+                moved2 = true;
+            }
+        }
+
+        // Send Player 1 moves
+        if (moved && newPosition !== lastPosition && (now - lastSentTime >= throttleMs)) {
             const enginePos = Math.round((newPosition / 100) * 160);
             ws.sendMove(enginePos);
 
@@ -518,6 +553,22 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
             }
             lastPosition = newPosition;
             lastSentTime = now;
+        }
+
+        // Send Local Player 2 moves
+        if (moved2 && newPosition2 !== lastPosition2 && currentLocalPlayer2 && (now - lastSentTime2 >= throttleMs)) {
+            const enginePos2 = Math.round((newPosition2 / 100) * 160);
+            ws.sendMove(enginePos2, currentLocalPlayer2.id);
+
+            if (pongGame && pongGame.gameState) {
+                if (localPlayer2Index === 0) {
+                    pongGame.gameState.player1Pos = enginePos2;
+                } else if (localPlayer2Index === 1) {
+                    pongGame.gameState.player2Pos = enginePos2;
+                }
+            }
+            lastPosition2 = newPosition2;
+            lastSentTime2 = now;
         }
     }, 16);
 }
