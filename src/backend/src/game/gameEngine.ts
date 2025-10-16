@@ -72,6 +72,10 @@ export abstract class BaseGameEngine {
     protected abstract getUpdateData(): any;
 
     public startGame(): void {
+        // Guard: prevent starting multiple loops for the same engine
+        if (this.gameTimer) {
+            return;
+        }
         this.gameLoop();
     }
 

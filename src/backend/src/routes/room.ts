@@ -340,10 +340,14 @@ async function roomRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // Store and start the game engine
-      activeGames.set(gameId, gameEngine);
-      if (typeof (gameEngine as any).startGame === 'function') {
-        (gameEngine as any).startGame();
+      // Store and start the game engine (guard against duplicate engine/loops)
+      const existingEngine = activeGames.get(gameId);
+      if (!existingEngine) {
+        activeGames.set(gameId, gameEngine);
+      }
+      const engineToStart = existingEngine || gameEngine;
+      if (typeof (engineToStart as any).startGame === 'function') {
+        (engineToStart as any).startGame();
       }
       
       const started = gameRoomManager.startGame(roomId, gameId);
