@@ -321,6 +321,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         gameEngine = new TwoPlayerGameEngine(initialGameState);
       }
 
+      // Attach AI players before first frame
       room.players.forEach((player, index) => {
       const playerId = index + 1; // Player IDs are 1-indexed
       if (player.isAI) {
@@ -328,6 +329,16 @@ async function roomRoutes(fastify: FastifyInstance) {
         gameEngine.setPlayerAI(playerId, true, difficulty);
       }
     });
+
+      // Ensure all runtime state is initialized AFTER AI is attached
+      if (typeof (gameEngine as any).resetGame === 'function') {
+        try {
+          console.log('🔄 Performing pre-start reset to stabilize initial state...');
+          (gameEngine as any).resetGame();
+        } catch (e) {
+          console.warn('⚠️ Pre-start reset failed (continuing):', e);
+        }
+      }
 
       // Store and start the game engine
       activeGames.set(gameId, gameEngine);
