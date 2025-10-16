@@ -1,5 +1,6 @@
 import { GameState, database } from "../database";
 import { broadcastToGame, getGameConnectionCount } from "../websocket/websocketHandler";
+import { AIPongPlayer, AIDifficulty } from "./aiPlayer";
 
 const DEBUG = false;
 
@@ -36,6 +37,7 @@ export abstract class BaseGameEngine {
     protected yDir: number = 1;
 
     protected aiPlayers: Set<number> = new Set();
+    protected aiPlayerInstances: Map<number, AIPongPlayer> = new Map();
 
     constructor(gameState: GameState, options?: GameEngineOptions) {
         this.gameState = gameState;
@@ -124,13 +126,21 @@ export abstract class BaseGameEngine {
         this.gameTimer = setTimeout(this.gameLoop, 16);
     }
 
-    public setPlayerAI(playerId: number, isAI: boolean): void {
+    public setPlayerAI(playerId: number, isAI: boolean, difficulty: AIDifficulty = 'normal'): void {
         if (isAI) {
             this.aiPlayers.add(playerId);
-            console.log(`Player ${playerId} marked as AI`);
+            const side = playerId === 1 || playerId === 3 ? 'left' : 'right';
+            console.log(`🤖 Setting up AI Player ${playerId} (${side}, ${difficulty})`);
+            try {
+                const aiPlayer = new AIPongPlayer(playerId, side, difficulty);
+                this.aiPlayerInstances.set(playerId, aiPlayer);
+            } catch (error) {
+                console.error(`❌ Error creating AI Player ${playerId}:`, error);
+                throw error;
+            }
         } else {
             this.aiPlayers.delete(playerId);
-            console.log(`Player ${playerId} marked as human`);
+            this.aiPlayerInstances.delete(playerId);
         }
     }
 
@@ -146,57 +156,39 @@ export abstract class BaseGameEngine {
         const paddleSpeed = 5;
         const paddleHeight = 40;
 
-        // Only log every 60 frames (once per second)
         const shouldLog = this.frameCount % 60 === 0;
 
-        // Right paddle (Player 2) AI - ONLY if Player 2 is AI
-        if (this.isPlayerAI(2) && this.gameState.player2Pos !== undefined) {
-            if (shouldLog) console.log(`🤖 AI Update for Player 2: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player2Pos.toFixed(1)}`);
-            
-            const currentY = this.gameState.player2Pos;
-            let targetY = currentY;
-
-            if (this.xDir > 0) {
-                const distanceToTravel = 390 - this.gameState.ballPosX;
-                const timeToIntercept = distanceToTravel / (this.xDir * 2.1);
-                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
+        for (const [playerId, aiPlayer] of this.aiPlayerInstances) {
+            // Safety check - skip if game state not initialized
+            if (!this.gameState.ballPosX || !this.gameState.ballPosY) {
+                continue;
             }
 
-            if (Math.abs(targetY - currentY) > paddleSpeed) {
-                if (targetY > currentY) {
-                    this.updatePlayerPosition(2, currentY + paddleSpeed);
-                } else {
-                    this.updatePlayerPosition(2, currentY - paddleSpeed);
+            const paddlePos = playerId === 1 ? this.gameState.player1Pos : this.gameState.player2Pos;
+            const gameView = {
+                ballPosX: this.gameState.ballPosX,
+                ballPosY: this.gameState.ballPosY,
+                ballVelX: this.xDir * 2.1,
+                ballVelY: this.yDir * 1.8,
+                paddlePos: paddlePos || 80, // Default to center if undefined
+                lastUpdate: Date.now()
+            };
+
+            aiPlayer.updateAIView(gameView);
+            const keys = aiPlayer.getKeyStates();
+
+            if (keys.up || keys.down) {
+                const currentY = playerId === 1 ? this.gameState.player1Pos : this.gameState.player2Pos;
+                if (currentY !== undefined && currentY !== null) {
+                    let newY = currentY;
+                    if (keys.up) {
+                        newY = Math.max(0, currentY - paddleSpeed);
+                    } else if (keys.down) {
+                        newY = Math.min(200 - paddleHeight, currentY + paddleSpeed);
+                    }
+                    this.updatePlayerPosition(playerId, newY);
                 }
             }
-        } else if (shouldLog && this.gameState.player2Pos !== undefined) {
-            console.log(`👤 Skipping AI update for Player 2 (Human player)`);
-        }
-
-        // Left paddle (Player 1) AI - ONLY if Player 1 is AI
-        if (this.isPlayerAI(1) && this.gameState.player1Pos !== undefined) {
-            if (shouldLog) console.log(`🤖 AI Update for Player 1: ballX=${this.gameState.ballPosX.toFixed(1)}, paddleY=${this.gameState.player1Pos.toFixed(1)}`);
-            
-            const currentY = this.gameState.player1Pos;
-            let targetY = currentY;
-
-            if (this.xDir < 0) {
-                const distanceToTravel = this.gameState.ballPosX - 10;
-                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1);
-                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
-            }
-
-            if (Math.abs(targetY - currentY) > paddleSpeed) {
-                if (targetY > currentY) {
-                    this.updatePlayerPosition(1, currentY + paddleSpeed);
-                } else {
-                    this.updatePlayerPosition(1, currentY - paddleSpeed);
-                }
-            }
-        } else if (shouldLog && this.gameState.player1Pos !== undefined) {
-            console.log(`👤 Skipping AI update for Player 1 (Human player)`);
         }
     }
 
@@ -240,6 +232,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         this.scorePlayer1 = this.gameState.scorePlayer1;
         this.scorePlayer2 = this.gameState.scorePlayer2;
         
+        console.log(`🎯 Game initialized with scores: ${this.scorePlayer1} - ${this.scorePlayer2}`);
+        
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
         
@@ -249,6 +243,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
+        // Store previous position for collision detection
+        const prevX = this.gameState.ballPosX;
+        
         this.gameState.ballPosX += (this.xDir * 2.1);
         this.gameState.ballPosY += (this.yDir * 1.8);
         
@@ -269,13 +266,14 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         }
         
         // Right paddle collision - paddle is at x=390 (canvas width 400 - paddle width 10)
-        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius) && prevX < (390 - ballRadius)) {
             const rightPaddleTop = this.gameState.player2Pos || 0;
             const rightPaddleBottom = rightPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= rightPaddleTop && 
-                this.gameState.ballPosY <= rightPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= rightPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= rightPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
@@ -298,20 +296,22 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = 390 - ballRadius;
-            } else if (this.gameState.ballPosX >= 400) {
+            } else {
+                // Missed paddle - score for Player 1
                 this.updateScoreBoard(1);
                 return 1;
             }
         }
         
         // Left paddle collision - paddle is at x=0
-        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius) && prevX > (paddleWidth + ballRadius)) {
             const leftPaddleTop = this.gameState.player1Pos || 0;
             const leftPaddleBottom = leftPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= leftPaddleTop && 
-                this.gameState.ballPosY <= leftPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= leftPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= leftPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2; // -1 to 1 range
@@ -334,7 +334,7 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = paddleWidth + ballRadius;
-            } else if (this.gameState.ballPosX <= 0) {
+            } else {
                 // Missed paddle - Goal for Player 2
                 this.updateScoreBoard(2);
                 return 1;
@@ -369,9 +369,6 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     const maxPosition = 200 - paddleHeight;
     const clampedPos = Math.max(0, Math.min(position, maxPosition));
     
-    const isAI = this.isPlayerAI(playerId);
-    console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
-    
     if (playerId === 1) {
         this.gameState.player1Pos = clampedPos;
     } else if (playerId === 2) {
@@ -383,9 +380,11 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         if (player === 1) {
             this.scorePlayer1 += 1;
             this.gameState.scorePlayer1 = this.scorePlayer1;
+            console.log(`⚽ GOAL! Player 1 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         } else if (player === 2) {
             this.scorePlayer2 += 1;
             this.gameState.scorePlayer2 = this.scorePlayer2;
+            console.log(`⚽ GOAL! Player 2 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         }
 
         this.broadcastScoreUpdate();
@@ -669,10 +668,6 @@ export class FourPlayerGameEngine extends BaseGameEngine {
             } else {
                 clampedPos = Math.max(paddleWidth, Math.min(position, this.maxY - paddleWidth - paddleHeight));
             }
-            
-            // 🔍 DEBUG: Log position updates with AI status
-            const isAI = this.isPlayerAI(playerId);
-            console.log(`🎮 4P Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
             
             this.playerPositions[playerId - 1] = clampedPos;
             

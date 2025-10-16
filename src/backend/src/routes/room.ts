@@ -16,7 +16,9 @@ interface JoinRoomBody {
   playerId: string;
   username: string;
   isAI?: boolean;
+  isLocal?: boolean;
   isReady?: boolean;
+  difficulty?: string;
 }
 
 interface ToggleReadyBody {
@@ -92,8 +94,9 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
-      const isReady = isAI;
+      const { playerId, username, isAI = false, isLocal = false, isReady = false, difficulty } = request.body;
+      // AI and local players are automatically ready
+      const finalIsReady = isReady || isAI;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -102,7 +105,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, finalIsReady, difficulty, isLocal);
 
       if (!result.success) {
         return reply.code(400).send(result);
@@ -321,10 +324,8 @@ async function roomRoutes(fastify: FastifyInstance) {
       room.players.forEach((player, index) => {
       const playerId = index + 1; // Player IDs are 1-indexed
       if (player.isAI) {
-        gameEngine.setPlayerAI(playerId, true);
-        console.log(`🤖 Marked Player ${playerId} (${player.username}) as AI`);
-      } else {
-        console.log(`👤 Player ${playerId} (${player.username}) is human`);
+        const difficulty = (player.difficulty as any) || 'normal';
+        gameEngine.setPlayerAI(playerId, true, difficulty);
       }
     });
 

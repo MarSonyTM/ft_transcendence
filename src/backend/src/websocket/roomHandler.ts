@@ -100,7 +100,14 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
     case 'move':
       // Handle player movement
       if (typeof message.position === 'number' && room.gameId) {
-        const playerNum = getPlayerNumber(room, playerId);
+        // Use playerId from message if provided (for local player 2), otherwise use connection playerId
+        const targetPlayerId = message.playerId || playerId;
+        const playerNum = getPlayerNumber(room, targetPlayerId);
+        
+        if (DEBUG) {
+          console.log(`🎮 Move received: roomId=${roomId}, connectionId=${playerId}, targetPlayerId=${targetPlayerId}, playerNum=${playerNum}, position=${message.position}`);
+        }
+        
         const gameEngine = activeGames.get(room.gameId);
         if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
           gameEngine.updatePlayerPosition(playerNum, message.position);
@@ -109,9 +116,9 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
         // Broadcast movement to all players in room (for UI sync)
         broadcastToRoom(roomId, {
           type: 'playerMove',
-          playerId,
+          playerId: targetPlayerId,
           position: message.position
-        }, playerId); // Exclude sender
+        }, playerId); // Exclude sender from broadcast (still use connection playerId)
       }
       break;
 
