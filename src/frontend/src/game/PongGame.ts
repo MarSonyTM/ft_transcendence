@@ -393,7 +393,7 @@ export class PongGame {
         if (getCurrentRoom()) return;
         
         let newPosition = this.paddlePosition;
-        const paddleSpeed = 4;
+        const paddleSpeed = 5;
         
         const is4Player = this.gameState.mode === '4player' || getCurrentGameMode() === '4player';
         
