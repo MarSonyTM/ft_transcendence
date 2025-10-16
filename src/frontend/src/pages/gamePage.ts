@@ -90,7 +90,16 @@ async function renderTwoPlayerGame(): Promise<void> {
 
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
-        backBtn.addEventListener('click', () => {
+        backBtn.addEventListener('click', async () => {
+            try {
+                const room = getCurrentRoom();
+                if (room?.roomId) {
+                    await fetch(`/api/room/${room.roomId}/end`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` }
+                    });
+                }
+            } catch {}
             cleanupGame();
             history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
@@ -180,7 +189,16 @@ async function renderFourPlayerGame(): Promise<void> {
 
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
-        backBtn.addEventListener('click', () => {
+        backBtn.addEventListener('click', async () => {
+            try {
+                const room = getCurrentRoom();
+                if (room?.roomId) {
+                    await fetch(`/api/room/${room.roomId}/end`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` }
+                    });
+                }
+            } catch {}
             cleanupGame();
             history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');

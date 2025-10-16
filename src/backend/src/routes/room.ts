@@ -368,6 +368,49 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // End the current game and reset room to waiting for a fresh start
+  fastify.post('/api/room/:roomId/end', async (request, reply) => {
+    const { roomId } = request.params as { roomId: string };
+    const room = gameRoomManager.getRoom(roomId);
+    if (!room) {
+      return reply.status(404).send({ success: false, message: 'Room not found' });
+    }
+
+    try {
+      const gameId = room.gameId;
+      if (gameId) {
+        const engine = activeGames.get(gameId);
+        if (engine && typeof (engine as any).endGame === 'function') {
+          (engine as any).endGame();
+        }
+        activeGames.delete(gameId);
+      }
+
+      // Reset room for a new game
+      room.status = 'waiting';
+      room.gameId = undefined;
+      room.players = room.players.map(p => ({ ...p, isReady: false }));
+
+      broadcastToRoom(roomId, {
+        type: 'roomState',
+        room: {
+          roomId: room.roomId,
+          hostId: room.hostId,
+          players: room.players,
+          status: room.status,
+          maxPlayers: room.maxPlayers,
+          gameId: room.gameId
+        },
+        timestamp: Date.now()
+      });
+
+      return reply.send({ success: true, message: 'Game ended and room reset', room });
+    } catch (error) {
+      fastify.log.error('Failed to end game:', error);
+      return reply.status(500).send({ success: false, message: 'Failed to end game' });
+    }
+  });
+
   // List all active rooms
   fastify.get('/api/rooms', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
