@@ -280,39 +280,64 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
+      const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
       // Use incremental DB-backed game IDs for cleanliness
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;
       
       console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
+      const positions = gameMode === '4P' 
+        ? ['left', 'top', 'right', 'bottom'] 
+        : ['left', 'right'];
+      
+      const players = room.players.map((roomPlayer, index) => {
+        let playerId: number;
+        const parsedId = parseInt(roomPlayer.id);
+        
+        if (!isNaN(parsedId) && parsedId > 0) {
+          playerId = parsedId;
+          
+          try {
+            const position = positions[index] || 'left';
+            database.players.addPlayerToGame(gameId, playerId, position);
+          } catch (err) {
+            console.warn(`⚠️ Could not add player ${playerId} to database (user might not exist), using in-memory only`);
+          }
+        } else {
+          playerId = index + 1;
+          console.log(`ℹ️ Using index-based ID ${playerId} for ${roomPlayer.username} (AI/guest)`);
+        }
+        
+        return {
+          id: playerId,
+          name: roomPlayer.username,
+          gameId: gameId,
+          pos: gameMode === '4P' ? 160 : 80,
+          material: null,
+          color: { r: 1, g: 1, b: 1 },
+          score: 0,
+          connectionStatus: 'connected',
+          lastActivity: new Date().toISOString()
+        };
+      });
+
       // Create a proper GameState object
       const initialGameState: GameState = {
         id: 0, // Optional: engine updates guard errors internally
         gameId: gameId,
-        player1Id: 0,
-        player2Id: 0,
-        player3Id: 0,
-        player4Id: 0,
+        players: players,
         ballPosX: 200,
-        ballPosY: 100,
+        ballPosY: gameMode === '4P' ? 200 : 100,
         ballVelX: 0,
         ballVelY: 0,
-        player1Pos: 80,
-        player2Pos: 80,
-        player3Pos: 180,
-        player4Pos: 180,
-        scorePlayer1: 0,
-        scorePlayer2: 0,
-        scorePlayer3: 0,
-        scorePlayer4: 0,
-        gameMode: gameMode
+        mode: gameMode,
+        lastActivity: new Date().toISOString(),
       };
 
       // Create game engine with proper GameState
       let gameEngine;
-      if (gameMode === '4player') {
+      if (gameMode === '4P') {
         gameEngine = new FourPlayerGameEngine(initialGameState);
       } else {
         gameEngine = new TwoPlayerGameEngine(initialGameState);
@@ -328,11 +353,7 @@ async function roomRoutes(fastify: FastifyInstance) {
       }
     });
 
-      // Store and start the game engine
       activeGames.set(gameId, gameEngine);
-      if (typeof (gameEngine as any).startGame === 'function') {
-        (gameEngine as any).startGame();
-      }
       
       const started = gameRoomManager.startGame(roomId, gameId);
       if (!started) {

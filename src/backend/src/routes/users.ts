@@ -1,8 +1,7 @@
-// src/backend/src/routes/users.ts
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { database, User } from '../database/index';
+import { database } from '../database/index';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config/index'; // ⬅️ IMPORTANT: Import from config
+import { JWT_SECRET } from '../config/index';
 
 // Types
 export interface CreateUserInput {
@@ -84,7 +83,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            const user = await database.users.getUserById(userId);
+            const user = database.users.getUserById(userId);
             
             if (!user) {
                 reply.code(404).send({
@@ -126,7 +125,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             const updateData = request.body as Partial<CreateUserInput>;
             
-            const updatedUser = await database.users.updateUser(userId, updateData);
+            const updatedUser = database.users.updateUser(userId, updateData);
             
             if (!updatedUser) {
                 reply.code(404).send({
@@ -195,7 +194,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         try {
             const userId = (request as any).user.id;
             
-            const user = await database.users.getUserById(userId);
+            const user = database.users.getUserById(userId);
             
             if (!user) {
                 reply.code(404).send({
@@ -213,7 +212,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 data: userWithoutPassword
             });
         } catch (error) {
-            fastify.log.error('Error fetching user profile:', error);
+            fastify.log.error(error);
             reply.code(500).send({
                 success: false,
                 message: 'Failed to fetch user profile'

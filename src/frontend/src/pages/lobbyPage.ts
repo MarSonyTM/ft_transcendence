@@ -1,13 +1,12 @@
 import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
-import { initRoomWebSocket, disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { 
   Player, 
   GameRoom, 
   getCurrentRoom,
   setCurrentRoom,
-  getLobbyPlayers,
   clearRoomState
 } from '../utils/roomState';
 
@@ -85,7 +84,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '1v1' ? 2 : 4;
+  const maxPlayers = gameMode === '2P' ? 2 : 4;
 
   const token = authService.getToken();
   const response = await fetch('/api/room/create', {
@@ -97,6 +96,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     body: JSON.stringify({
       hostId: userId,
       hostUsername: username,
+      maxPlayers
     })
   });
 

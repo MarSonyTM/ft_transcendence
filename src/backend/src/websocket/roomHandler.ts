@@ -12,78 +12,73 @@ const playerRoomMap = new Map<string, string>();
 
 // Register room-based WebSocket routes
 async function roomWebSocketRoutes(fastify: FastifyInstance) {
-  // Don't register @fastify/websocket again if already registered
-  // It should be registered once at the top level in server.ts
+  
+  // Room-based WebSocket endpoint - registered directly on fastify instance
+  fastify.get('/room/:roomId/ws', { websocket: true }, (connection: any, req: any) => {
+    const { roomId } = req.params;
+    const queryParams = new URLSearchParams(req.url.split('?')[1] || '');
+    const playerId = queryParams.get('playerId') || 'unknown';
 
-  (fastify as any).register(async function (fastify: any) {
-    // Room-based WebSocket endpoint
-    fastify.get('/room/:roomId/ws', { websocket: true }, (connection: any, req: any) => {
-      const { roomId } = req.params;
-      const queryParams = new URLSearchParams(req.url.split('?')[1] || '');
-      const playerId = queryParams.get('playerId') || 'unknown';
-
-      // Verify room exists
-      const room = gameRoomManager.getRoom(roomId);
-      if (!room) {
-        console.log(`❌ Room ${roomId} not found`);
-        if (connection.socket) {
-          connection.socket.close(1008, 'Room not found');
-        }
-        return;
+    // Verify room exists
+    const room = gameRoomManager.getRoom(roomId);
+    if (!room) {
+      console.log(`❌ Room ${roomId} not found`);
+      if (connection.socket) {
+        connection.socket.close(1008, 'Room not found');
       }
+      return;
+    }
 
-      let socket = connection;
-      if (!socket) {
-        console.log('❌ Invalid socket connection');
-        return;
-      }
+    let socket = connection;
+    if (!socket) {
+      console.log('❌ Invalid socket connection');
+      return;
+    }
 
-      // Initialize room connections map
-      if (!roomConnections.has(roomId)) {
-        roomConnections.set(roomId, new Map());
-      }
-      
-      const roomSockets = roomConnections.get(roomId)!;
-      roomSockets.set(playerId, socket);
-      playerRoomMap.set(playerId, roomId);
+    // Initialize room connections map
+    if (!roomConnections.has(roomId)) {
+      roomConnections.set(roomId, new Map());
+    }
+    
+    const roomSockets = roomConnections.get(roomId)!;
+    roomSockets.set(playerId, socket);
+    playerRoomMap.set(playerId, roomId);
 
-      // Associate socket with player in room manager
-      gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
+    // Associate socket with player in room manager
+    gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
 
-      // Handle incoming messages
-      if (typeof socket.on === 'function') {
-        socket.on('message', (data: any) => {
-          try {
-            const message = JSON.parse(data.toString());
-            handleRoomMessage(roomId, playerId, message, socket);
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-          }
-        });
-
-        socket.on('close', () => {
-          removePlayerFromRoom(roomId, playerId);
-        });
-
-        socket.on('error', (error: any) => {
-          console.error(`❌ WebSocket error for player ${playerId}:`, error);
-          removePlayerFromRoom(roomId, playerId);
-        });
-      }
-
-      // Send connection confirmation
-      if (typeof socket.send === 'function') {
-        socket.send(JSON.stringify({
-          type: 'connected',
-          roomId,
-          playerId,
-          message: 'Connected to room successfully'
-        }));
-
-        // Send current room state
-        sendRoomState(roomId, playerId);
+    // Handle incoming messages
+    socket.on('message', (data: any) => {
+      try {
+        const message = JSON.parse(data.toString());
+        handleRoomMessage(roomId, playerId, message, socket);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
     });
+
+    socket.on('close', () => {
+      console.log(`🔌 Player ${playerId} disconnected from room ${roomId}`);
+      removePlayerFromRoom(roomId, playerId);
+    });
+
+    socket.on('error', (error: any) => {
+      console.error(`❌ WebSocket error for player ${playerId}:`, error);
+      removePlayerFromRoom(roomId, playerId);
+    });
+
+    // Send connection confirmation
+    if (typeof socket.send === 'function') {
+      socket.send(JSON.stringify({
+        type: 'connected',
+        roomId,
+        playerId,
+        message: 'Connected to room successfully'
+      }));
+
+      // Send current room state
+      sendRoomState(roomId, playerId);
+    }
   });
 }
 

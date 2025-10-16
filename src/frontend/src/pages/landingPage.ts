@@ -10,7 +10,7 @@ export function renderLandingPage(): void {
     if (!authService.isAuthenticated()) {
         root.innerHTML = `
         <div class="landing-container">
-        <h1 class="main-title">PING PONG</h1>
+            <h1 class="main-title">PING PONG</h1>
             <button id="loginBtn" class="btn btn-login">Login</button>
             <button id="registerBtn" class="btn btn-register">Register</button>
         </div>

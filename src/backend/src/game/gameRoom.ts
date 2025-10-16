@@ -39,7 +39,7 @@ class GameRoomManager {
       players: [{
         id: hostId,
         username: hostUsername,
-        isReady: true,
+        isReady: false,
         isAI: false
       }],
       maxPlayers,

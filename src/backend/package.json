@@ -34,6 +34,7 @@
     "@types/node": "^24.0.15",
     "@types/web": "^0.0.250",
     "@types/ws": "^8.18.1",
+    "fastify-tsconfig": "^3.0.0",
     "pino-pretty": "^13.0.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

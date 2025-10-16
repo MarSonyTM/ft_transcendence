@@ -2,7 +2,8 @@ import { setCurrentPage, getCurrentUser, getCurrentGameMode } from '../utils/glo
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
-import { getLobbyPlayers, Player, getCurrentRoom } from '../utils/roomState';
+import { toggleTournaments } from '../tournament';
+import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 
 let roomWS: RoomWebSocketManager | null = null;
@@ -10,6 +11,7 @@ let currentGameState: any = null;
 let isRoomBasedGame = false;
 
 export let pongGame: PongGame | null = null;
+let game3DInstance: any | null = null;
 
 export async function renderGamePage(): Promise<void> {
     const gameMode = getCurrentGameMode();
@@ -17,10 +19,12 @@ export async function renderGamePage(): Promise<void> {
     
     isRoomBasedGame = room !== null;
     
-    if (gameMode === '4player') {
+    if (gameMode === "2P") {
+        await renderTwoPlayerGame();
+    } else if (gameMode === "4P") {
         await renderFourPlayerGame();
     } else {
-        await renderTwoPlayerGame();
+        console.log("Unrecognized game mode:", gameMode);
     }
     
     if (isRoomBasedGame && room) {
@@ -39,7 +43,6 @@ async function renderTwoPlayerGame(): Promise<void> {
     
     // Get authenticated user info for fallback
     const user = authService.getCurrentUser();
-    const displayName = user?.username || getCurrentUser() || player1.username;
     
     root.innerHTML = `
         <h1 class="main-title">Pong Game</h1>
@@ -75,7 +78,9 @@ async function renderTwoPlayerGame(): Promise<void> {
                 <span id="player2score" class="player2-score">0</span>
             </div>
         </div>
-        <canvas id="gameScreen" width="400" height="200"></canvas>
+        <div class="threeD-wrapper">
+            <canvas id="renderCanvas"></canvas>
+        </div>
         <div class="controls-info">
             <p>${player1.username} - Up/Down W/S</p>
             ${!isRoomBasedGame && !player2.isAI ? '<p>Player 2 - Up/Down O/L</p>' : ''}
@@ -146,26 +151,27 @@ async function renderFourPlayerGame(): Promise<void> {
             <span id="player4Name" class="player4-name">${players[3].username}</span>
         </div>
         <div class="score-container">
-            <span id="player1score" class="player1-score">0</span> 
-            <span class="score-separator">-</span> 
-            <span id="player2score" class="player2-score">0</span>
-            <span class="score-separator">-</span> 
-            <span id="player3score" class="player3-score">0</span>
-            <span class="score-separator">-</span> 
-            <span id="player4score" class="player4-score">0</span>
+            <span style="font-size: 12px; opacity: 0.7;">Left:</span> <span id="player1score" class="player1-score" style="color: #ff4444; font-weight: bold;">0</span> 
+            <span class="score-separator">|</span> 
+            <span style="font-size: 12px; opacity: 0.7;">Top:</span> <span id="player2score" class="player2-score" style="color: #4488ff; font-weight: bold;">0</span>
+            <span class="score-separator">|</span> 
+            <span style="font-size: 12px; opacity: 0.7;">Right:</span> <span id="player3score" class="player3-score" style="color: #ffdd44; font-weight: bold;">0</span>
+            <span class="score-separator">|</span> 
+            <span style="font-size: 12px; opacity: 0.7;">Bottom:</span> <span id="player4score" class="player4-score" style="color: #44ff44; font-weight: bold;">0</span>
         </div>
-        
-        <canvas id="gameScreen" width="400" height="400"></canvas>
+        <div class="threeD-wrapper">
+            <canvas id="renderCanvas"></canvas>
+        </div>
         
         <div class="controls-info" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 5px; margin-top: 15px;">
             <div class="four-player-controls">
                 ${isRoomBasedGame ? 
                     '<p style="color: #34d399; font-weight: bold; text-align: center;">🌐 You control one paddle, other players control theirs remotely!</p>' 
                     : 
-                    `<p style="color: #60a5fa; font-weight: bold;">${players[0].username} (Top): A / D</p>
-                    <p style="color: #f87171; font-weight: bold;">${players[1].username} (Right): Up / Down Arrow</p>
-                    <p style="color: #facc15; font-weight: bold;">${players[2].username} (Bottom): J / L</p>
-                    <p style="color: #1be71b; font-weight: bold;">${players[3].username} (Left): W / S</p>`
+                    `<p style="color: #ff4444; font-weight: bold;">${players[0].username} (Left): W / S</p>
+                    <p style="color: #4488ff; font-weight: bold;">${players[1].username} (Top): A / D</p>
+                    <p style="color: #ffdd44; font-weight: bold;">${players[2].username} (Right): Up / Down Arrow</p>
+                    <p style="color: #44ff44; font-weight: bold;">${players[3].username} (Bottom): J / L</p>`
                 }
                 <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
             </div>
@@ -232,82 +238,108 @@ async function setupGameButtons(): Promise<void> {
         const localUser = authService.getCurrentUser();
         if (localUser && effectiveRoom.players) {
             const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
-            if (idx === 1) pongGame.viewIndexMap = [1, 0, 2, 3];
+            // if (idx === 1) pongGame.viewIndexMap = [1, 0, 2, 3];// TODO: always on the left side version -> didnt work for me 
         }
         
         // Manually initialize canvas without creating a new game
-        pongGame.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
+        pongGame.canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
         if (!pongGame.canvas) {
             console.error('❌ Canvas not found!');
             return;
         }
-        pongGame.ctx = pongGame.canvas.getContext('2d');
+        
+        pongGame.canvas.style.width = '800px';
+        pongGame.canvas.style.height = '500px';
         
         try {
             await pongGame.connectWebSocket();
             console.log('✅ Connected to shared game WebSocket');
             pongGame.updateStatus("Connected - Click Start to begin");
-            if (pongGame.startRenderLoop) pongGame.startRenderLoop();
+            pongGame.startRenderLoop();
+            
+            const { baby3D } = await import('../game/game3D');
+            if (!game3DInstance)
+                game3DInstance = new baby3D(pongGame);
+            else
+                game3DInstance.attachGame(pongGame);
+            await game3DInstance.createScene();
         } catch (error) {
             console.error('❌ Failed to connect to game WebSocket:', error);
         }
     } else {
         console.log('Local game - creating new game instance');
         await pongGame.init();
+        
+        const { baby3D } = await import('../game/game3D');
+        if (!game3DInstance)
+            game3DInstance = new baby3D(pongGame);
+        else
+            game3DInstance.attachGame(pongGame);
+        await game3DInstance.createScene();
+        
+        // Set canvas size for local game
+        const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+        if (canvas) {
+            canvas.style.width = '800px';
+            canvas.style.height = '500px';
+        }
     }
     
     pongGame.onGameEnd = async (winnerId: number) => {
         console.log(`Game ended, winner is Player ${winnerId}`);
         
-        if (isRoomBasedGame && roomWS) {
+        if (pongGame && pongGame.gameId) {
+            try {
+                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+                const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ winnerId })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    console.error('Failed to update winner:', data.message);
+                }
+
+                const user = authService.getCurrentUser();
+                if (user && user.id) {
+                    let didWin = false;
+                    const room = getCurrentRoom();
+                    if (isRoomBasedGame && room && Array.isArray(room.players)) {
+                        const winnerPlayer = room.players[winnerId - 1];
+                        didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
+                    } else {
+                        didWin = (winnerId === 1);
+                    }
+                    try {
+                        await fetch(`${apiEndpoint}/api/users/stats`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
+                            body: JSON.stringify({ won: didWin })
+                        });
+                    } catch (e) {
+                        console.warn('Unable to update user stats:', e);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating winner or stats:', error);
+            }
+        }
+        
+        if (isRoomBasedGame) {
             const room = getCurrentRoom();
-            if (room) {
-                const winner = room.players[winnerId - 1];
+            if (room && room.players) {
+                const winnerIndex = typeof winnerId === 'number' ? winnerId - 1 : parseInt(winnerId) - 1;
+                const winner = room.players[winnerIndex];
+                
                 if (winner) {
                     showGameEndScreen(winner.id, winner.username);
-                }
-            }
-        }
-        
-        if (!pongGame || !pongGame.gameId) {
-            console.error('No game ID available to update winner');
-            return;
-        }
-        
-        try {
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-            const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ winnerId })
-            });
-            const data = await response.json();
-            if (!data.success) {
-                console.error('Failed to update winner:', data.message);
-            }
-
-            const user = authService.getCurrentUser();
-            if (user && user.id) {
-                let didWin = false;
-                const room = getCurrentRoom();
-                if (isRoomBasedGame && room && Array.isArray(room.players)) {
-                    const winnerPlayer = room.players[winnerId - 1];
-                    didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
                 } else {
-                    didWin = (winnerId === 1);
-                }
-                try {
-                    await fetch(`${apiEndpoint}/api/users/stats`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
-                        body: JSON.stringify({ won: didWin })
-                    });
-                } catch (e) {
-                    console.warn('Unable to update user stats:', e);
+                    const positions = ['Left', 'Top', 'Right', 'Bottom'];
+                    const positionName = positions[winnerIndex] || `Player ${winnerId}`;
+                    showGameEndScreen('unknown', positionName);
                 }
             }
-        } catch (error) {
-            console.error('Error updating winner or stats:', error);
         }
     };
 
@@ -347,7 +379,7 @@ async function setupGameButtons(): Promise<void> {
     if (reconnectBtn) {
         reconnectBtn.addEventListener('click', async () => {
             if (pongGame) {
-                await pongGame.reconnectWebSocket();
+                pongGame.reconnectWebSocket();
             }
             if (isRoomBasedGame && roomWS) {
                 try {
@@ -360,12 +392,7 @@ async function setupGameButtons(): Promise<void> {
     }
 
     if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', () => {
-            const tournamentRoot = document.getElementById('tournamentRoot');
-            if (tournamentRoot) {
-                tournamentRoot.style.display = tournamentRoot.style.display === 'none' ? 'block' : 'none';
-            }
-        });
+        tournamentsBtn.addEventListener('click', toggleTournaments);
     }
 }
 
@@ -386,15 +413,31 @@ async function initRoomBasedGame(room: any): Promise<void> {
         gameId: room.gameId
     });
 
+    try {
+        const response = await fetch(`/api/room/${room.roomId}`);
+        if (!response.ok) {
+            console.error(`❌ Room ${room.roomId} not found on backend`);
+            alert('Room no longer exists. Please create a new room.');
+            window.location.href = '/';
+            return;
+        }
+        const roomData = await response.json();
+        console.log('✅ Room verified on backend:', roomData);
+    } catch (error) {
+        console.error('❌ Failed to verify room:', error);
+        alert('Failed to connect to game server. Please try again.');
+        return;
+    }
+
     if (pongGame && room.gameId) {
         pongGame.gameId = room.gameId;
         console.log(`✅ Using shared game ID from room: ${room.gameId}`);
-        const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
-        if (idx === 1) {
-            pongGame.viewIndexMap = [1, 0, 2, 3];
-        } else {
-            pongGame.viewIndexMap = [0, 1, 2, 3];
-        }
+        // const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
+        // if (idx === 1) {
+        //     pongGame.viewIndexMap = [1, 0, 2, 3];
+        // } else {
+        //     pongGame.viewIndexMap = [0, 1, 2, 3];
+        // }
     }
 
     // Initialize WebSocket connection to room
@@ -436,11 +479,17 @@ async function initRoomBasedGame(room: any): Promise<void> {
             updateScoreDisplay(scores);
         },
         
-        onGameEnd: (winnerId) => {
-            console.log('Game ended in room, winner:', winnerId);
-            const winner = room.players.find((p: any) => p.id === winnerId);
-            if (winner) {
-                alert(`Game Over! ${winner.username} wins!`);
+        onGameEnd: (data) => {
+            const room = getCurrentRoom();
+            if (room && room.players && data.winnerId) {
+                const winnerIndex = (typeof data.winnerId === 'number' ? data.winnerId : parseInt(data.winnerId)) - 1;
+                const winner = room.players[winnerIndex];
+                
+                if (winner) {
+                    alert(`Game Over! ${winner.username} wins!`);
+                } else if (data.winnerName) {
+                    alert(`Game Over! ${data.winnerName} wins!`);
+                }
             }
         }
     });
@@ -453,18 +502,18 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls for room-based game
-function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+async function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): Promise<void> {
     const keys: { [key: string]: boolean } = {};
     
-    let lastPosition = 50;
-    if (pongGame && pongGame.gameState) {
-        const room = getCurrentRoom();
-        const idx = room?.players.findIndex((p: any) => p.id === playerId) ?? 0;
-        if (idx === 0 && typeof pongGame.gameState.player1Pos === 'number') {
-            lastPosition = Math.max(0, Math.min(100, (pongGame.gameState.player1Pos / 160) * 100));
-        } else if (idx === 1 && typeof pongGame.gameState.player2Pos === 'number') {
-            lastPosition = Math.max(0, Math.min(100, (pongGame.gameState.player2Pos / 160) * 100));
-        }
+    const room = getCurrentRoom();
+    if (!room) return;
+    
+    const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
+    if (playerIndex === -1) return;
+    
+    let lastPosition = 160;
+    if (pongGame && pongGame.gameState && pongGame.gameState.players[playerIndex]) {
+        lastPosition = pongGame.gameState.players[playerIndex].pos || 160;
     }
     
     let lastSentTime = 0;
@@ -472,7 +521,7 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
 
     document.addEventListener('keydown', (e) => {
         keys[e.key.toLowerCase()] = true;
-        if (['arrowup','arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
+        if (['w', 's', 'arrowup', 'arrowdown'].includes(e.key.toLowerCase())) e.preventDefault();
     });
 
     document.addEventListener('keyup', (e) => {
@@ -488,33 +537,26 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
 
         let moved = false;
         let newPosition = lastPosition;
-
-        const room = getCurrentRoom();
-        if (!room) return;
-
-        const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
         
-        const paddleSpeed = 5;
+        const gameMode = getCurrentGameMode();
+        const paddleSpeed = gameMode === '4P' ? 8 : 4;
+        
+        const maxPos = gameMode === '4P' ? 320 : 160;
         
         if (keys['w'] || keys['arrowup']) {
             newPosition = Math.max(0, newPosition - paddleSpeed);
             moved = true;
         }
         if (keys['s'] || keys['arrowdown']) {
-            newPosition = Math.min(100, newPosition + paddleSpeed);
+            newPosition = Math.min(maxPos, newPosition + paddleSpeed);
             moved = true;
         }
 
         if (moved && newPosition !== lastPosition) {
-            const enginePos = Math.round((newPosition / 100) * 160);
-            ws.sendMove(enginePos);
+            ws.sendMove(newPosition);
 
-            if (pongGame && pongGame.gameState) {
-                if (playerIndex === 0) {
-                    pongGame.gameState.player1Pos = enginePos;
-                } else if (playerIndex === 1) {
-                    pongGame.gameState.player2Pos = enginePos;
-                }
+            if (pongGame && pongGame.gameState && pongGame.gameState.players[playerIndex]) {
+                pongGame.gameState.players[playerIndex].pos = newPosition;
             }
             lastPosition = newPosition;
             lastSentTime = now;
@@ -523,44 +565,35 @@ function setupRoomKeyboardControls(ws: RoomWebSocketManager, playerId: string): 
 }
 
 // Sync game state from room WebSocket
-function syncGameStateFromRoom(state: any): void {
+async function syncGameStateFromRoom(state: any): Promise<void> {
     if (!pongGame || !pongGame.gameState) return;
 
     // Update local game state with server state
     if (state.ballPosX !== undefined) pongGame.gameState.ballPosX = state.ballPosX;
     if (state.ballPosY !== undefined) pongGame.gameState.ballPosY = state.ballPosY;
-    if (state.player1Pos !== undefined) pongGame.gameState.player1Pos = state.player1Pos;
-    if (state.player2Pos !== undefined) pongGame.gameState.player2Pos = state.player2Pos;
-    if (state.player3Pos !== undefined) pongGame.gameState.player3Pos = state.player3Pos;
-    if (state.player4Pos !== undefined) pongGame.gameState.player4Pos = state.player4Pos;
-    if (state.scorePlayer1 !== undefined) pongGame.gameState.scorePlayer1 = state.scorePlayer1;
-    if (state.scorePlayer2 !== undefined) pongGame.gameState.scorePlayer2 = state.scorePlayer2;
-    if (state.scorePlayer3 !== undefined) pongGame.gameState.scorePlayer3 = state.scorePlayer3;
-    if (state.scorePlayer4 !== undefined) pongGame.gameState.scorePlayer4 = state.scorePlayer4;
+    if (Array.isArray(state.players)) {
+        state.players.forEach((p: any, idx: number) => {
+            if (pongGame && pongGame.gameState && pongGame.gameState.players[idx]) {
+                if (p.pos !== undefined) pongGame.gameState.players[idx].pos = p.pos;
+                if (p.score !== undefined) pongGame.gameState.players[idx].score = p.score;
+            }
+        });
+    }
 }
 
 // Update remote player position
-function updateRemotePlayerPosition(playerId: string, position: number): void {
+async function updateRemotePlayerPosition(playerId: string, position: number): Promise<void> {
     if (!pongGame || !pongGame.gameState) return;
 
     const room = getCurrentRoom();
     if (!room) return;
 
     const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
-    
-    if (playerIndex === 0) {
-        pongGame.gameState.player1Pos = position;
-    } else if (playerIndex === 1) {
-        pongGame.gameState.player2Pos = position;
-    } else if (playerIndex === 2) {
-        pongGame.gameState.player3Pos = position;
-    } else if (playerIndex === 3) {
-        pongGame.gameState.player4Pos = position;
-    }
+    pongGame.gameState.players[playerIndex].pos = position;
 }
 
 // Update score display
-function updateScoreDisplay(scores: any): void {
+async function updateScoreDisplay(scores: any): Promise<void> {
     const scoreP1 = document.getElementById('player1score');
     const scoreP2 = document.getElementById('player2score');
     const scoreP3 = document.getElementById('player3score');
@@ -581,7 +614,7 @@ function updateScoreDisplay(scores: any): void {
 }
 
 // Update connection status
-function updateConnectionStatus(status: string, isConnected: boolean): void {
+async function updateConnectionStatus(status: string, isConnected: boolean): Promise<void> {
     const wsStatus = document.getElementById('wsStatus');
     if (wsStatus) {
         wsStatus.textContent = status;
@@ -590,7 +623,7 @@ function updateConnectionStatus(status: string, isConnected: boolean): void {
 }
 
 // Show game end screen
-function showGameEndScreen(winnerId: string, winnerName: string): void {
+async function showGameEndScreen(winnerId: string, winnerName: string): Promise<void> {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
         position: fixed;
@@ -613,15 +646,13 @@ function showGameEndScreen(winnerId: string, winnerName: string): void {
                 ${winnerName} wins!
             </p>
             <div style="display: flex; gap: 1em; justify-content: center;">
-                <button id="backToLobbyBtn" style="background: rgb(99 102 241); color: white; border: none; padding: 1em 2em; border-radius: 8px; font-size: 1.1em; cursor: pointer; font-weight: 600; transition: background 0.2s;">
-                    Back to Lobby
-                </button>
+                <button id="backToLobbyBtn" class="btn btn-back" style="cursor: pointer; pointer-events: auto;">Back to Lobby</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(overlay);
-
+    
     document.getElementById('backToLobbyBtn')?.addEventListener('click', () => {
         overlay.remove();
         cleanupGame();
@@ -631,7 +662,7 @@ function showGameEndScreen(winnerId: string, winnerName: string): void {
 }
 
 // Show player disconnected notification
-function showPlayerDisconnectedMessage(playerName: string): void {
+async function showPlayerDisconnectedMessage(playerName: string): Promise<void> {
     const notification = document.createElement('div');
     notification.style.cssText = `
         position: fixed;
@@ -658,16 +689,8 @@ function showPlayerDisconnectedMessage(playerName: string): void {
 
 // Cleanup function
 export function cleanupGame(): void {
-    if (roomWS) {
-        disconnectRoomWebSocket();
-        roomWS = null;
-    }
-    currentGameState = null;
-    isRoomBasedGame = false;
     
-    if (pongGame) {
-        // Your existing cleanup
-    }
+    
 }
 
 // Add CSS animations

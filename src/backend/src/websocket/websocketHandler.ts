@@ -69,8 +69,8 @@ async function webSocketRoutes(fastify: FastifyInstance) {
                   const currentState = gameEngine.getCurrentState();
                   socket.send(JSON.stringify({
                     type: 'score',
-                    scorePlayer1: currentState.scorePlayer1,
-                    scorePlayer2: currentState.scorePlayer2
+                    players: currentState.players,
+                    mode: (currentState as any).mode || '2P'
                   }));
                 }
                 break;

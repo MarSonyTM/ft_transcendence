@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@babylonjs/core": "^7.0.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {

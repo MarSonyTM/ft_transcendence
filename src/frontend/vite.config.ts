@@ -2,6 +2,12 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   root: './src',
+  optimizeDeps: {
+    include: ['@babylonjs/core'],
+    esbuildOptions: {
+      target: 'es2020'
+    }
+  },
   build: {
     outDir: '../dist',
     emptyOutDir: true,

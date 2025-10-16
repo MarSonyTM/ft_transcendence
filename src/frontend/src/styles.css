@@ -14,6 +14,25 @@ body {
   padding: 1.25rem; /* p-5 */
 }
 
+#renderCanvas {
+  border: 2px solid #ffffff33;
+  background: #11151c;
+  display: block;
+  margin: 1rem auto 2rem auto;
+  outline: none;
+  touch-action: none;
+  image-rendering: auto;
+}
+
+.threeD-wrapper {
+  max-width: 820px;
+  margin: 0 auto 1rem auto;
+  position: relative;
+  box-shadow: 0 0 12px rgba(0,0,0,0.6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
 h2 {
   font-size: 2em; 
   margin-bottom: 1em;
@@ -252,20 +271,20 @@ h3 {
 }
 
 .player1-name {
-  color: rgb(96 165 250); /* text-blue-400 */
+  color: rgb(248 113 113);
 }
 
 .player2-name {
-  color: rgb(248 113 113); /* text-red-400 */
+  color: rgb(96 165 250);
   
 }
 
 .player3-name {
-  color: rgb(243, 255, 17); /* text-ye-400 */
+  color: rgb(243, 255, 17);
 }
 
 .player4-name {
-  color: rgb(27, 231, 27); /* text-green-400 */
+  color: rgb(27, 231, 27);
 }
 
 .vs-text {
@@ -280,11 +299,11 @@ h3 {
 }
 
 .left-score {
-  color: rgb(96 165 250); /* text-blue-400 */
+  color: rgb(248 113 113);
 }
 
 .right-score {
-  color: rgb(248 113 113); /* text-red-400 */
+  color: rgb(96 165 250);
 }
 
 .score-separator {

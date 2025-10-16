@@ -44,7 +44,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
       timestamp: Date.now(),
       apiEndpoint: `${protocol}://${host}`,
       wsEndpoint: `${wsProtocol}://${host}`,
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
     };
 
     const scriptTag = `
@@ -74,7 +74,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
 
       let html = readFileSync(indexPath, 'utf-8');
       html = injectGameData(html, null, null, 'Guest', 'landing', request);
-      
+
       reply.type('text/html');
       return reply.send(html);
     } catch (error) {
@@ -96,7 +96,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
 
       let html = readFileSync(indexPath, 'utf-8');
       html = injectGameData(html, null, null, 'Guest', 'login', request);
-      
+
       reply.type('text/html');
       return reply.send(html);
     } catch (error) {
@@ -121,7 +121,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
 
       if (gameId) {
         parsedGameId = parseInt(gameId, 10);
-        const game = database.prepare('SELECT * FROM games WHERE id = ?').get(parsedGameId);
+        const game = database.games.getGameById(parsedGameId);
         
         if (game) {
           gameState = {
@@ -129,13 +129,13 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
             mode: game.mode,
             status: game.status,
             difficulty: game.difficulty,
-            createdAt: game.created_at
+            createdAt: game.createdAt
           };
         }
       }
 
       html = injectGameData(html, gameState, parsedGameId, 'Guest', 'game', request);
-      
+
       reply.type('text/html');
       return reply.send(html);
     } catch (error) {
@@ -157,7 +157,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
 
       let html = readFileSync(indexPath, 'utf-8');
       html = injectGameData(html, null, null, 'Guest', 'unknown', request);
-      
+
       reply.type('text/html');
       return reply.send(html);
     } catch (error) {

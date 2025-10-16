@@ -38,7 +38,7 @@ const start = async (): Promise<void> => {
   try {
     // Enable CORS for frontend communication
     await server.register(require('@fastify/cors'), {
-      origin: (origin, cb) => {
+      origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
         
         if (!origin) {
           return cb(null, true);
