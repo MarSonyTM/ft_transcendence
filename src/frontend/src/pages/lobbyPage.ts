@@ -227,7 +227,7 @@ async function startGame(): Promise<void> {
       stopRoomPolling();
       
       // Navigate to game
-      history.pushState({ page: 'game', roomId: currentRoom.roomId }, '', '#game');
+      history.pushState({ page: 'game', roomId: currentRoom.roomId }, '', '/game');
       setCurrentPage('game');
       renderApp();
     } else {
@@ -284,7 +284,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       }
       
       console.log('Navigating to game page...');
-      history.pushState({ page: 'game', roomId }, '', '#game');
+      history.pushState({ page: 'game', roomId }, '', '/game');
       setCurrentPage('game');
       renderApp();
     },
@@ -633,7 +633,7 @@ async function leaveRoom(): Promise<void> {
     stopRoomPolling();
     clearRoomState();
     
-    history.pushState({ page: 'landing' }, '', '#');
+    history.pushState({ page: 'landing' }, '', '/');
     setCurrentPage('landing');
     renderApp();
   } catch (error) {

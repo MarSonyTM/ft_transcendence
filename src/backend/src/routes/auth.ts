@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
 import {JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FRONTEND_URL} from '../config/index';
 import { OAuth2Client } from 'google-auth-library';
+import crypto from 'crypto';
+import { sendVerificationEmail } from '../config/email';
 
 // Types
 export interface CreateUserInput {
@@ -11,6 +13,7 @@ export interface CreateUserInput {
   lastName: string;
   email?: string;
   username?: string;
+  emailVerified?: boolean;
   password?: string;
   avatar?: string;
 }
@@ -35,10 +38,10 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 	fastify.post('/create', async (request, reply) => {
 		try {
 			const userData = request.body as CreateUserInput;
-			if (userData.email?.trim() && !validateEmail(userData.email)) {
+			if (userData.email?.trim() && !validateEmail(userData.email) || !userData.email) {
 				reply.code(400).send({
 					success: false,
-					message: 'Invalid email format'
+					message: 'Invalid email format or email is required'
 				});
 				return;
 			}
@@ -61,10 +64,23 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 			const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
 			userData.password = hashedPassword;
 			const newUser = await database.users.createUser(userData);
+
+			const verificationCode = crypto.randomInt(100000, 999999).toString();
+            
+            // Create verification request
+            const verification = database.emailVerifications.createVerificationRequest(
+                newUser.id, 
+                newUser.email, 
+                verificationCode
+            );
+
+			const emailSent = await sendVerificationEmail(newUser.email, verificationCode, newUser?.username || '');
+			newUser.password = '';
+
 			reply.code(201).send({
 				success: true,
 				message: 'User created successfully',
-				data: newUser
+				data: newUser,
 			});
 		} catch (error) {
 			fastify.log.error(error);
@@ -85,6 +101,150 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 		}
 	});
 
+	// ==== Verify email after registration ====
+	fastify.post('/verify-email', async (request, reply) => {
+		try {
+			const { verificationCode, email } = request.body as { verificationCode: string; email?: string };
+
+			if (!verificationCode || verificationCode.length !== 6 || !email) {
+				reply.code(400).send({
+					success: false,
+					message: 'Valid 6-digit verification code and email are required'
+				});
+				return;
+			}
+
+			// Find user by email if provided, otherwise try to find by verification code
+			let user;
+			if (email) {
+				user = await database.users.getUserByEmail(email);
+			} else {
+				// Try to find user by looking up the verification record first
+				const verification = database.emailVerifications.getVerificationByCode(verificationCode);
+				if (verification) {
+					user = await database.users.getUserById(verification.userId);
+				}
+			}
+
+
+			if (!user) {
+				reply.code(404).send({
+					success: false,
+					message: 'User not found'
+				});
+				return;
+			}
+
+			// Verify the code
+			const verification = database.emailVerifications.verifyEmail(verificationCode, user.id);
+			if (!verification) {
+				reply.code(400).send({
+					success: false,
+					message: 'Invalid or expired verification code'
+				});
+				return;
+			}
+			// Update user email verification status
+			const updatedUser =  database.users.updateUser(user.id, {
+				emailVerified: true
+			});
+
+			if (!updatedUser) {
+				reply.code(404).send({
+					success: false,
+					message: 'User not found'
+				});
+				return;
+			}
+
+			console.log(updatedUser);
+
+
+			const { password, ...userWithoutPassword } = updatedUser;
+
+			reply.code(200).send({
+				success: true,
+				message: 'Email verified successfully',
+				data: userWithoutPassword
+			});
+		} catch (error) {
+			fastify.log.error(error);
+			reply.code(500).send({
+				success: false,
+				message: 'Failed to verify email'
+			});
+		}
+	});
+
+	// ==== Resend verification email ====
+	fastify.post('/resend-verification', async (request, reply) => {
+		try {
+			const { email } = request.body as { email: string };
+
+			if (!email || !validateEmail(email)) {
+				reply.code(400).send({
+					success: false,
+					message: 'Valid email address is required'
+				});
+				return;
+			}
+
+			// Find user by email
+			const user = await database.users.getUserByEmail(email);
+			if (!user) {
+				reply.code(404).send({
+					success: false,
+					message: 'User not found'
+				});
+				return;
+			}
+
+			// Check if already verified
+			if (user.emailVerified) {
+				reply.code(400).send({
+					success: false,
+					message: 'Email is already verified'
+				});
+				return;
+			}
+
+			// Generate new verification code
+			const verificationCode = crypto.randomInt(100000, 999999).toString();
+			
+			// Create new verification request
+			const verification = database.emailVerifications.createVerificationRequest(
+				user.id, 
+				user.email, 
+				verificationCode
+			);
+
+			// Send verification email
+			const emailSent = await sendVerificationEmail(user.email, verificationCode, user.username);
+			
+			if (!emailSent) {
+				reply.code(500).send({
+					success: false,
+					message: 'Failed to send verification email'
+				});
+				return;
+			}
+
+			reply.code(200).send({
+				success: true,
+				message: 'Verification email sent successfully',
+				data: {
+					verificationId: verification.id,
+					expiresAt: verification.expiresAt
+				}
+			});
+		} catch (error) {
+			fastify.log.error(error);
+			reply.code(500).send({
+				success: false,
+				message: 'Failed to resend verification email'
+			});
+		}
+	});
 
 	fastify.post('/login', async (request, reply) => {
 		try {
@@ -127,14 +287,14 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 			if (!passwordMatch) {
 				reply.code(401).send({
 					success: false,
-					message: 'Invalid username/emailgkjgh or password'
+					message: 'Invalid username/email or password'
 				});
 				return;
 			}
 			// check later
 			const token = jwt.sign(
-				{ id: res.id, email: res.email || '', username: res.username || '' }, // Payload: any user info you want to include
-				JWT_SECRET,
+				{ id: res.id, email: res.email || '', username: res.username || '' },
+				JWT_SECRET!,
 				{ expiresIn: '1w' } // Token expiration (1 week)
 			);
 
@@ -227,20 +387,39 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 					email: email || undefined,
 					username,
 					googleId,
-					avatar: avatar || undefined
+					avatar: avatar || undefined,
+					gamesWon: 0,
+					gamesLost: 0
 				});
+			}
+
+			let needEmailVerification = false;
+			if (!user.emailVerified) {
+				const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+				needEmailVerification = true;
+				// Create verification request
+				const verification = database.emailVerifications.createVerificationRequest(
+					user.id, 
+					user.email, 
+					verificationCode
+				);
+
+				const emailSent = await sendVerificationEmail(user.email, verificationCode, user?.username || '');
 			}
 
 			// Generate JWT token
 			const token = jwt.sign(
 				{ id: user.id, email: user.email || '', username: user.username || '' },
-				JWT_SECRET,
+				JWT_SECRET!,
 				{ expiresIn: '1w' }
 			);
 
+			
+
 			// Redirect to frontend with token
 			const frontendUrl = FRONTEND_URL || 'http://localhost:5173';
-			reply.redirect(`${frontendUrl}/auth/callback?token=${token}&success=true`);
+			reply.redirect(`${frontendUrl}/auth/callback?token=${token}&success=true&email=${email}${needEmailVerification ? '&needEmailVerification=true' : ''}`);
 
 		} catch (error) {
 			fastify.log.error(error);
@@ -322,14 +501,16 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 					email: email || undefined,
 					username,
 					googleId,
-					avatar: avatar || undefined
+					avatar: avatar || undefined,
+					gamesWon: 0,
+					gamesLost: 0
 				});
 			}
 
 			// Generate JWT token
 			const jwtToken = jwt.sign(
 				{ id: user.id, email: user.email || '', username: user.username || '' },
-				JWT_SECRET,
+				JWT_SECRET!,
 				{ expiresIn: '1w' }
 			);
 

@@ -4,29 +4,11 @@ import { API_BASE } from '../config';
 interface RegisterResult {
 	success: boolean;
 	username?: string;
+	emailVerified?: boolean;
+	token?: string;
 	error?: string;
 }
-
-//export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-// 		const res = await fetch(`${API_BASE}/api/auth/login`, {
-//		method: 'POST',
-//		headers: { 'Content-Type': 'application/json' },
-//		body: JSON.stringify({ username, password })
-//	});
-//	if (res.ok) {
-//		const data = await res.json().catch(() => ({}));
-//        if (data?.token) setAccessToken(data.token);
-//		return data;
-//	}
-//    if (res.status === 404) {
-//        return { success: false, error: 'API not available (404)' };
-//    } else if ( res.status === 401 ) {
-//        return { success: false, error: 'Invalid username/email or password' };
-//    }
-//	return { success: false, error: `Server error (${res.status})` };
-//}
-
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; error?: string }> {
+export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; emailVerified?: boolean; error?: string }> {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
     
     const res = await fetch(`${apiEndpoint}/api/auth/login`, {
@@ -37,9 +19,13 @@ export async function loginUser(username: string, password: string): Promise<{ s
     
     if (res.ok) {
         const data = await res.json().catch(() => ({}));
+		if (data?.data && !data.data.emailVerified) {
+			localStorage.setItem('pendingEmailVerification', data.data.email || '');
+		}
         return {
             success: data.success || false,
             username: data.data?.username,
+			emailVerified: data.data?.emailVerified,
             token: data.token,
             error: data.message
         };
@@ -140,6 +126,72 @@ export async function registerUser(
 		return {
 			success: false,
 			error: error instanceof Error ? error.message : 'Network error - please try again'
+		};
+	}
+}
+
+// Verify email with verification code
+export async function verifyEmail(verificationCode: string, email: string): Promise<{ success: boolean; message?: string; error?: string }> {
+	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+	
+	try {
+		const res = await fetch(`${apiEndpoint}/api/auth/verify-email`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json',
+			 },
+			body: JSON.stringify({ verificationCode, email })
+		});
+		
+		const data = await res.json().catch(() => ({}));
+		
+		if (res.ok) {
+			return {
+				success: true,
+				message: data.message || 'Email verified successfully'
+			};
+		}
+		
+		return {
+			success: false,
+			error: data.message || `Verification failed (${res.status})`
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: 'Network error - please try again'
+		};
+	}
+}
+
+// Resend verification email
+export async function resendVerificationEmail(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
+	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+	
+	try {
+		const res = await fetch(`${apiEndpoint}/api/auth/resend-verification`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json',
+			 },
+			body: JSON.stringify({ email })
+		});
+		
+		const data = await res.json().catch(() => ({}));
+		
+		if (res.ok) {
+			return {
+				success: true,
+				message: data.message || 'Verification email sent successfully'
+			};
+		}
+		
+		return {
+			success: false,
+			error: data.message || `Failed to resend email (${res.status})`
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: 'Network error - please try again'
 		};
 	}
 }

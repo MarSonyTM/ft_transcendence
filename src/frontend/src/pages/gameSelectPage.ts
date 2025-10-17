@@ -23,7 +23,7 @@ export function renderGameSelectPage(): void {
                 setCurrentUser('Player 1');
             }
             setCurrentGameMode('1v1');
-            history.pushState({ page: 'lobby' }, '', '#lobby');
+            history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
             renderApp();
         });
@@ -36,7 +36,7 @@ export function renderGameSelectPage(): void {
                 setCurrentUser('Player 1');
             }
             setCurrentGameMode('4player');
-            history.pushState({ page: 'lobby' }, '', '#lobby');
+            history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
             renderApp();
         });
@@ -45,7 +45,7 @@ export function renderGameSelectPage(): void {
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
-            history.pushState({ page: 'landing' }, '', '#');
+            history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();
         });

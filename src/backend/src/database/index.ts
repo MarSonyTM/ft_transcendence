@@ -12,11 +12,12 @@ export interface User {
   id: number;
   firstName: string;
   lastName: string;
-  email?: string;
+  email: string;
   username: string;
   password: string;
   avatar: string;
   googleId: string;
+  emailVerified: boolean;
   gamesWon: number;
   gamesLost: number;
   createdAt: string;
@@ -83,6 +84,25 @@ export interface GameInvitation {
   status: 'pending' | 'accepted' | 'rejected' | 'expired';
   createdAt: string;
   expiresAt: string;
+}
+
+export interface EmailVerification {
+  id: number;
+  userId: number;
+  email: string;
+  verificationCode: string;
+  status: 'pending' | 'verified' | 'expired';
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface UsernameChange {
+  id: number;
+  userId: number;
+  oldUsername: string;
+  newUsername: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
 }
 
 // Base database manager class
@@ -155,7 +175,9 @@ class UserDatabaseManager {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, userData.password, userData.avatar, userData.googleId, userData.gamesWon, userData.gamesLost);
+    // Handle Google OAuth users who don't have passwords
+    const password = userData.password || (userData.googleId ? '' : null);
+    const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, password, userData.avatar, userData.googleId, userData.gamesWon || 0, userData.gamesLost || 0);
     const insertedUser = this.getUserById(result.lastInsertRowid as number);
     
     if (!insertedUser) {
@@ -190,7 +212,7 @@ class UserDatabaseManager {
     return this.getUserById(userId);
   }
 
-  updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string }>): User | undefined {
+  updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string; username?: string; emailVerified?: boolean }>): User | undefined {
     const fields: string[] = [];
     const values: any[] = [];
     
@@ -207,6 +229,16 @@ class UserDatabaseManager {
     if (userData.email !== undefined) {
       fields.push('email = ?');
       values.push(userData.email);
+    }
+
+    if (userData.emailVerified !== undefined) {
+      fields.push('emailVerified = ?');
+      values.push(userData.emailVerified ? 1 : 0);
+    }
+    
+    if (userData.username) {
+      fields.push('username = ?');
+      values.push(userData.username);
     }
     
     if (fields.length === 0) {
@@ -667,6 +699,121 @@ class FriendDatabaseManager {
   }
 }
 
+class EmailVerificationDatabaseManager {
+  private db: Database.Database;
+
+  constructor(database: Database.Database) {
+    this.db = database;
+  }
+
+  // Create email verification request
+  createVerificationRequest(userId: number, email: string, verificationCode: string): EmailVerification {
+    // Set expiration to 15 minutes from now
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    
+    const stmt = this.db.prepare(`
+      INSERT INTO email_verifications (userId, email, verificationCode, status, expiresAt) 
+      VALUES (?, ?, ?, 'pending', ?)
+    `);
+    
+    const result = stmt.run(userId, email, verificationCode, expiresAt);
+    return this.getVerificationById(result.lastInsertRowid as number)!;
+  }
+
+  getVerificationById(id: number): EmailVerification | undefined {
+    const stmt = this.db.prepare('SELECT * FROM email_verifications WHERE id = ?');
+    return stmt.get(id) as EmailVerification | undefined;
+  }
+
+  getVerificationByCode(verificationCode: string): EmailVerification | undefined {
+    const stmt = this.db.prepare('SELECT * FROM email_verifications WHERE verificationCode = ? AND status = "pending"');
+    return stmt.get(verificationCode) as EmailVerification | undefined;
+  }
+
+  getPendingVerification(userId: number, email: string): EmailVerification | undefined {
+    const stmt = this.db.prepare(`
+      SELECT * FROM email_verifications 
+      WHERE userId = ? AND email = ? AND status = 'pending'
+      AND datetime(expiresAt) > datetime('now')
+      ORDER BY createdAt DESC LIMIT 1
+    `);
+    return stmt.get(userId, email) as EmailVerification | undefined;
+  }
+
+  verifyEmail(verificationCode: string, userId: number): EmailVerification | undefined {
+    const stmt = this.db.prepare(`
+      UPDATE email_verifications 
+      SET status = 'verified' 
+      WHERE verificationCode = ? AND userId = ? AND status = 'pending'
+      AND datetime(expiresAt) > datetime('now')
+    `);
+    
+    const result = stmt.run(verificationCode, userId);
+    if (result.changes === 0) return undefined;
+    
+    return this.db.prepare(
+      'SELECT * FROM email_verifications WHERE verificationCode = ? AND userId = ?'
+    ).get(verificationCode, userId) as EmailVerification | undefined;
+  }
+
+  cleanupExpiredVerifications(): void {
+    const stmt = this.db.prepare(`
+      UPDATE email_verifications 
+      SET status = 'expired' 
+      WHERE status = 'pending' 
+      AND datetime(expiresAt) <= datetime('now')
+    `);
+    stmt.run();
+  }
+}
+
+class UsernameChangeDatabaseManager {
+  private db: Database.Database;
+
+  constructor(database: Database.Database) {
+    this.db = database;
+  }
+
+  // Create username change request
+  createUsernameChangeRequest(userId: number, oldUsername: string, newUsername: string): UsernameChange {
+    const stmt = this.db.prepare(`
+      INSERT INTO username_changes (userId, oldUsername, newUsername, status) 
+      VALUES (?, ?, ?, 'pending')
+    `);
+    
+    const result = stmt.run(userId, oldUsername, newUsername);
+    return this.getUsernameChangeById(result.lastInsertRowid as number)!;
+  }
+
+  getUsernameChangeById(id: number): UsernameChange | undefined {
+    const stmt = this.db.prepare('SELECT * FROM username_changes WHERE id = ?');
+    return stmt.get(id) as UsernameChange | undefined;
+  }
+
+  getPendingUsernameChanges(userId: number): UsernameChange[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM username_changes 
+      WHERE userId = ? AND status = 'pending'
+      ORDER BY createdAt DESC
+    `);
+    return stmt.all(userId) as UsernameChange[];
+  }
+
+  // Check if username is available
+  isUsernameAvailable(username: string): boolean {
+    const stmt = this.db.prepare('SELECT id FROM users WHERE username = ?');
+    const result = stmt.get(username);
+    return !result;
+  }
+
+  // Check if username is available excluding current user
+  isUsernameAvailableForUser(username: string, userId: number): boolean {
+    const stmt = this.db.prepare('SELECT id FROM users WHERE username = ? AND id != ?');
+    const result = stmt.get(username, userId);
+    return !result;
+  }
+}
+
 class InvitationDatabaseManager {
   private db: Database.Database;
 
@@ -768,6 +915,8 @@ export class DatabaseManager extends BaseDatabaseManager {
   public players: PlayerDatabaseManager;
   public friends: FriendDatabaseManager;
   public invitations: InvitationDatabaseManager;
+  public emailVerifications: EmailVerificationDatabaseManager;
+  public usernameChanges: UsernameChangeDatabaseManager;
 
   constructor() {
     super();
@@ -777,6 +926,8 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.players = new PlayerDatabaseManager(this.db);
     this.friends = new FriendDatabaseManager(this.db);
     this.invitations = new InvitationDatabaseManager(this.db);
+    this.emailVerifications = new EmailVerificationDatabaseManager(this.db);
+    this.usernameChanges = new UsernameChangeDatabaseManager(this.db);
   }
 
   protected initializeTables() {
@@ -786,6 +937,9 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.initializeGameStateTable();
     this.initializeFriendsTable();
     this.initializeInvitationsTable();
+    this.initializeEmailVerificationsTable();
+    this.initializeUsernameChangesTable();
+    this.createSeedUser();
   }
 
   private initializeUsersTable() {
@@ -799,6 +953,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         password TEXT,
         avatar TEXT,
         googleId TEXT UNIQUE,
+        emailVerified BOOLEAN DEFAULT FALSE,
         gamesWon INTEGER DEFAULT 0,
         gamesLost INTEGER DEFAULT 0,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -916,6 +1071,74 @@ export class DatabaseManager extends BaseDatabaseManager {
     `;
     
     this.db.exec(createInvitationsTable);
+  }
+
+  private initializeEmailVerificationsTable() {
+    const createEmailVerificationsTable = `
+      CREATE TABLE IF NOT EXISTS email_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        verificationCode TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'verified', 'expired')) DEFAULT 'pending',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expiresAt DATETIME NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `;
+    
+    this.db.exec(createEmailVerificationsTable);
+  }
+
+  private initializeUsernameChangesTable() {
+    const createUsernameChangesTable = `
+      CREATE TABLE IF NOT EXISTS username_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        oldUsername TEXT NOT NULL,
+        newUsername TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `;
+    
+    this.db.exec(createUsernameChangesTable);
+  }
+
+  private createSeedUser() {
+    try {
+      // Check if seed user already exists
+      const existingUser = this.db.prepare('SELECT id FROM users WHERE username = ?').get('seeduser');
+      
+      if (existingUser) {
+        console.log('Seed user already exists');
+        return;
+      }
+
+      // Create seed user with verified email
+      const stmt = this.db.prepare(`
+        INSERT INTO users (
+          firstName, lastName, email, username, password, 
+          emailVerified, gamesWon, gamesLost
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        'test',           // firstName
+        'User',           // lastName
+        'test@example.com',  // email
+        'testuser',       // username
+        '$2a$10$11CaXhwOlAB4VgvhIWBog./z1Pg3yY5KrtW3LYnkD9JuQ6Pt3.41u',               // password (empty for seed user)
+        1,                // emailVerified (true)
+        0,                // gamesWon
+        0                 // gamesLost
+      );
+
+      console.log(`Seed user created with ID: ${result.lastInsertRowid}`);
+    } catch (error) {
+      console.error('Failed to create seed user:', error);
+    }
   }
 }
 

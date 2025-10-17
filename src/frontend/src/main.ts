@@ -11,14 +11,29 @@ import renderAuthCallbackPage from './pages/authCallback';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 import { renderFriendsPage } from './pages/friendsPage';
+import { renderEditProfilePage } from './pages/editProfilePage';
+import { renderChangeUsernamePage } from './pages/changeUsernamePage';
+import { renderChangeEmailPage } from './pages/changeEmailPage';
+import { renderVerifyEmailPage } from './pages/verifyEmail';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
+
+const publicPages = ['/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
 
 // Centralized routing handler
 function handleRouting(): void {
   const path = window.location.pathname;
   const hash = window.location.hash;
+
+  if (!publicPages.includes(path)) {
+    const currentUser = localStorage.getItem('needEmailVerification');
+    if (currentUser === 'true') {
+      history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
+  }
 
   // Handle /join/:roomId URLs (path-based routing)
   const joinMatch = path.match(/^\/join\/([a-z0-9]+)$/i);
@@ -26,41 +41,6 @@ function handleRouting(): void {
     currentRoomId = joinMatch[1];
     console.log('Joining room:', currentRoomId);
     setCurrentPage('join');
-    renderApp();
-    return;
-  }
-
-  // Handle hash-based routing
-  if (hash) {
-    const hashPage = hash.replace('#', '');
-    switch (hashPage) {
-      case 'game':
-        setCurrentPage('game');
-        break;
-      case 'login':
-        setCurrentPage('login');
-        break;
-      case 'gameSelect':
-        setCurrentPage('gameSelect');
-        break;
-      case 'profile':
-        setCurrentPage('profile');
-        break;
-      case 'lobby':
-        setCurrentPage('lobby');
-        break;
-      case 'register':
-        setCurrentPage('register');
-        break;
-      case 'authCallback':
-        setCurrentPage('authCallback');
-        break;
-      case 'friends':
-        setCurrentPage('friends');
-        break;
-      default:
-        setCurrentPage('landing');
-    }
     renderApp();
     return;
   }
@@ -89,8 +69,23 @@ function handleRouting(): void {
     case '/profile':
       setCurrentPage('profile');
       break;
+    case '/edit-profile':
+      setCurrentPage('editProfile');
+      break;
+    case '/change-username':
+      setCurrentPage('changeUsername');
+      break;
+    case '/change-email':
+      setCurrentPage('changeEmail');
+      break;
+    case '/friends':
+        setCurrentPage('friends');
+        break;
     case '/auth/callback':
       setCurrentPage('authCallback');
+      break;
+    case '/verify-email':
+      setCurrentPage('verifyEmail');
       break;
     default:
       setCurrentPage('landing');
@@ -98,12 +93,16 @@ function handleRouting(): void {
   renderApp();
 }
 
+
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
   
   if (page !== 'lobby' && page !== 'game') {
     cleanupLobby();
   }
+
+
+
 
   switch (page) {
     case 'landing':
@@ -143,11 +142,23 @@ export async function renderApp(): Promise<void> {
     case 'profile':
       renderProfilePage();
       break;
+    case 'editProfile':
+      renderEditProfilePage();
+      break;
+    case 'changeUsername':
+      renderChangeUsernamePage();
+      break;
+    case 'changeEmail':
+      renderChangeEmailPage();
+      break;
     case 'game':
       renderGamePage();
       break;
     case 'friends':
       renderFriendsPage();
+      break;
+    case 'verifyEmail':
+      renderVerifyEmailPage();
       break;
     default:
       renderLandingPage();
@@ -178,12 +189,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   handleRouting();
 });
-
-// Add types for SSR support
-declare global {
-  interface Window {
-    __INITIAL_STATE__?: any;
-    __CURRENT_PAGE__?: string;
-    __USERNAME__?: string;
-  }
-}

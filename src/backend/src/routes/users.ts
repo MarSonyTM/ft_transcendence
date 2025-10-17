@@ -1,8 +1,8 @@
 // src/backend/src/routes/users.ts
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, User } from '../database/index';
-import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config/index'; // ⬅️ IMPORTANT: Import from config
+import { sendVerificationEmail } from '../config/email';
+import crypto from 'crypto';
 
 // Types
 export interface CreateUserInput {
@@ -14,40 +14,6 @@ export interface CreateUserInput {
   avatar?: string;
 }
 
-async function verifyToken(request: any, reply: any) {
-    try {
-        const authHeader = request.headers.authorization;
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            reply.code(401).send({
-                success: false,
-                message: 'No token provided'
-            });
-            return;
-        }
-
-        const token = authHeader.substring(7);
-
-        try {
-            // Now using JWT_SECRET from config
-            const decoded = jwt.verify(token, JWT_SECRET!) as { id: string; email: string; username: string };
-            request.user = decoded;
-        } catch (err) {
-            console.error('Token verification error:', err);
-            reply.code(401).send({
-                success: false,
-                message: 'Invalid or expired token'
-            });
-            return; // ⬅️ IMPORTANT: Added return to prevent further execution
-        }
-    } catch (error) {
-        console.error('Authentication error:', error);
-        reply.code(500).send({
-            success: false,
-            message: 'Authentication error'
-        });
-    }
-}
 
 // Plugin function that registers all user routes
 async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -191,7 +157,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Get current user profile (protected) ====
-    fastify.get('/profile', { preHandler: verifyToken }, async (request, reply) => {
+    fastify.get('/profile', async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             
@@ -221,8 +187,298 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         }
     });
 
+    // ==== Update current user profile (protected) ====
+    fastify.put('/me', async (request, reply) => {
+        try {
+            const userId = (request as any).user.id;
+            const updateData = request.body as Partial<CreateUserInput>;
+            
+            const updatedUser = await database.users.updateUser(userId, updateData);
+            
+            if (!updatedUser) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'User not found'
+                });
+                return;
+            }
+            
+            // Don't send sensitive data
+            const { password, ...userWithoutPassword } = updatedUser;
+            
+            return {
+                success: true,
+                message: 'Profile updated successfully',
+                data: userWithoutPassword
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to update profile'
+            });
+        }
+    });
+
+    // ==== Delete current user account (protected) ====
+    fastify.delete('/me', async (request, reply) => {
+        try {
+            const userId = (request as any).user.id;
+            
+            const deleted = database.users.deleteUser(userId);
+            
+            if (!deleted) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'User not found'
+                });
+                return;
+            }
+            
+            return {
+                success: true,
+                message: 'Account deleted successfully'
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to delete account'
+            });
+        }
+    });
+
+    // ==== Request email change (protected) ====
+    fastify.post('/request-email-change', async (request, reply) => {
+        try {
+            const userId = (request as any).user.id;
+            const { email } = request.body as { email: string };
+
+            if (!email || !email.includes('@')) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Valid email address is required'
+                });
+                return;
+            }
+
+            // Check if email is already in use
+            const existingUser = await database.users.getUserByEmail(email);
+            if (existingUser && existingUser.id !== userId) {
+                reply.code(409).send({
+                    success: false,
+                    message: 'Email address is already in use'
+                });
+                return;
+            }
+
+            // Generate verification code
+            const verificationCode = crypto.randomInt(100000, 999999).toString();
+            
+            // Create verification request
+            const verification = database.emailVerifications.createVerificationRequest(
+                userId, 
+                email, 
+                verificationCode
+            );
+
+            // Send verification email
+            const user = await database.users.getUserById(userId);
+            if (!user) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'User not found'
+                });
+                return;
+            }
+
+            const emailSent = await sendVerificationEmail(email, verificationCode, user.username);
+            
+            if (!emailSent) {
+                reply.code(500).send({
+                    success: false,
+                    message: 'Failed to send verification email'
+                });
+                return;
+            }
+
+            reply.code(200).send({
+                success: true,
+                message: 'Verification email sent successfully',
+                data: {
+                    verificationId: verification.id,
+                    expiresAt: verification.expiresAt
+                }
+            });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to request email change'
+            });
+        }
+    });
+
+    // ==== Verify email change (protected) ====
+    fastify.post('/verify-email-change', async (request, reply) => {
+        try {
+            const userId = (request as any).user.id;
+            const { verificationCode } = request.body as { verificationCode: string };
+
+            if (!verificationCode || verificationCode.length !== 6) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Valid 6-digit verification code is required'
+                });
+                return;
+            }
+
+            // Verify the code
+            const verification = database.emailVerifications.verifyEmail(verificationCode, userId);
+            
+            if (!verification) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Invalid or expired verification code'
+                });
+                return;
+            }
+
+            // Update user email
+            const updatedUser = await database.users.updateUser(userId, {
+                email: verification.email
+            });
+
+            if (!updatedUser) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'User not found'
+                });
+                return;
+            }
+
+            // Don't send sensitive data
+            const { password, ...userWithoutPassword } = updatedUser;
+
+            reply.code(200).send({
+                success: true,
+                message: 'Email updated successfully',
+                data: userWithoutPassword
+            });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to verify email change'
+            });
+        }
+    });
+
+    // ==== Check username availability ====
+    fastify.get('/check-username/:username', async (request, reply) => {
+        try {
+            const { username } = request.params as { username: string };
+            
+            if (!username || username.length < 3) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Username must be at least 3 characters long'
+                });
+                return;
+            }
+
+            const isAvailable = database.usernameChanges.isUsernameAvailable(username);
+
+            reply.code(200).send({
+                success: true,
+                data: {
+                    username,
+                    available: isAvailable
+                }
+            });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to check username availability'
+            });
+        }
+    });
+
+    // ==== Change username (protected) ====
+    fastify.post('/change-username', async (request, reply) => {
+        try {
+            const userId = (request as any).user.id;
+            const { newUsername } = request.body as { newUsername: string };
+
+            if (!newUsername || newUsername.length < 3) {
+                reply.code(400).send({
+                    success: false,
+                    message: 'Username must be at least 3 characters long'
+                });
+                return;
+            }
+
+            // Check if username is available
+            const isAvailable = database.usernameChanges.isUsernameAvailableForUser(newUsername, userId);
+            
+            if (!isAvailable) {
+                reply.code(409).send({
+                    success: false,
+                    message: 'Username is already taken'
+                });
+                return;
+            }
+
+            // Get current user
+            const currentUser = await database.users.getUserById(userId);
+            if (!currentUser) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'User not found'
+                });
+                return;
+            }
+
+            // Create username change request
+            const changeRequest = database.usernameChanges.createUsernameChangeRequest(
+                userId,
+                currentUser.username,
+                newUsername
+            );
+
+            // Update username directly (since we've verified it's available)
+            const updatedUser = await database.users.updateUser(userId, {
+                username: newUsername
+            });
+
+            if (!updatedUser) {
+                reply.code(500).send({
+                    success: false,
+                    message: 'Failed to update username'
+                });
+                return;
+            }
+
+            // Don't send sensitive data
+            const { password, ...userWithoutPassword } = updatedUser;
+
+            reply.code(200).send({
+                success: true,
+                message: 'Username updated successfully',
+                data: userWithoutPassword
+            });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to change username'
+            });
+        }
+    });
+
     // ==== Update game statistics (protected) ====
-    fastify.post('/stats', { preHandler: verifyToken }, async (request, reply) => {
+    fastify.post('/stats', async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             const { won } = request.body as { won: boolean };
