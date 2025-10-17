@@ -11,7 +11,7 @@ export let pongGame: PongGame | null = null;
 export async function render2PlayerGame(): Promise<void> {
     const room = getCurrentRoom();
     
-    const gameScreenHeight = 800;
+    const gameScreenHeight = 200;
     const gameScreenWidth = 400
     pongGame = new PongGame();
 

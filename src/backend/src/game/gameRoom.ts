@@ -4,6 +4,7 @@ interface Player {
   isReady: boolean;
   isAI?: boolean;
   isLocal: boolean;
+  difficulty?: string;
   socketId?: string;
 }
 
@@ -61,7 +62,7 @@ class GameRoomManager {
 
   // Join an existing room
   joinRoom(roomId: string, playerId: string, username: string, isAI: boolean, isReady: 
-            boolean, isLocal: boolean): { success: boolean; message: string; room?: GameRoom } {
+            boolean, isLocal: boolean, difficulty?: string): { success: boolean; message: string; room?: GameRoom } {
 
     const room = this.rooms.get(roomId);
 
@@ -87,7 +88,8 @@ class GameRoomManager {
       username,
       isReady: isReady,
       isAI: isAI,
-      isLocal: isLocal
+      isLocal: isLocal,
+      difficulty: difficulty
     });
 
     console.log(`✅ ${username} ${isAI ? '(AI)' : ''} joined room ${roomId}`);

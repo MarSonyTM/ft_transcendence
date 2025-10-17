@@ -404,6 +404,20 @@ function renderLobby(root: HTMLElement): void {
 	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
 	  return;
 	}
+
+  const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
+  let selectedDifficulty = difficultySelect?.value;
+
+  // If no selection exists, try to get difficulty from the last AI player
+  if (!selectedDifficulty) {
+      const aiPlayers = currentRoom.players.filter(p => p.isAI);
+      if (aiPlayers.length > 0) {
+          selectedDifficulty = aiPlayers[aiPlayers.length - 1].difficulty || 'normal';
+      }
+  }
+
+  // Default to normal if no difficulty is found
+  selectedDifficulty = selectedDifficulty || 'normal';
   
 	const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
 	const preservedValue = existingInput ? existingInput.value : '';
@@ -483,21 +497,32 @@ function renderLobby(root: HTMLElement): void {
 			</button>
 		  ` : ''}
 
-      ${canAddMore && !hasLocal ? `
-        <button id="addLocalBtn" 
-                style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-                      background: rgb(99 102 241); color: white;">
-          Add Local Opponent
-        </button>
-      ` : ''}
-
 		  ${canAddMore && isHost ? `
-      <button id="addAIBtn" 
-              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-                    background: rgb(99 102 241); color: white;">
-        Add AI Opponent
-      </button>
-      ` : ''}
+            <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1em;">
+                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em;">Add Player</div>
+                
+                ${!hasLocal ? '<button id="addLocalBtn" style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em; background: rgb(34 197 94); color: white;"> 🎮 Add Local Player (O/L keys)</button>' : ''}
+                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em; margin-top: 1em;">AI Opponent Settings</div>
+                <select id="aiDifficulty" 
+                    style="width: 100%; padding: 0.75em; border: 1px solid rgb(75 85 99); border-radius: 8px; font-size: 1em; margin-bottom: 0.75em; background: rgb(31 41 55); color: white;">
+                    <option value="easy" ${selectedDifficulty === 'easy' ? 'selected' : ''}>Easy - Good for beginners</option>
+                    <option value="normal" ${selectedDifficulty === 'normal' ? 'selected' : ''}>Normal - Balanced challenge</option>
+                    <option value="hard" ${selectedDifficulty === 'hard' ? 'selected' : ''}>Hard - Extremely challenging</option>
+                </select>
+                <div style="color: rgb(156 163 175); font-size: 0.8em; font-style: italic; margin-bottom: 0.75em; text-align: center;">
+                    ${selectedDifficulty === 'easy' ? 
+                        '🟢 Slower reactions, less accurate - Perfect for learning the game' : 
+                    selectedDifficulty === 'normal' ? 
+                        '🟡 Moderate speed and accuracy - Good for regular practice' : 
+                        '🔴 Lightning-fast reactions, perfect accuracy - Ultimate challenge'}
+                </div>
+                <button id="addAIBtn" 
+                    style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
+                        background: rgb(99 102 241); color: white;">
+                    🤖 Add AI Opponent
+                </button>
+            </div>
+		  ` : ''}
 		  
 		  ${isHost ? `
       <button id="startGameBtn"

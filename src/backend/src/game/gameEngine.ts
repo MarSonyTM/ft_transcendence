@@ -1,17 +1,18 @@
 import { GameState, database } from "../database";
 import { broadcastToGame } from "../websocket/websocketHandler";
+import { AIPongPlayer, AIDifficulty } from "./aiPlayer";
 
 const DEBUG = false;
 
 // Global constants
-const maxX = 800;
+const maxX = 400;
 const minX = 0;
-const maxY = 800;
+const maxY = 400;
 const minY = 0;
-const ballRadius = 20;
-const paddleHeight = 80;
-const paddleWidth = 20;
-const paddleSpeed = 10
+const ballRadius = 10;
+const paddleHeight = 40;
+const paddleWidth = 10;
+const paddleSpeed = 5
 
 interface GameEngineOptions {
     maxX?: number;
@@ -35,8 +36,10 @@ export abstract class BaseGameEngine {
     // Ball movement
     protected xDir: number = 1;
     protected yDir: number = 1;
+    protected ballSpeed: number = 5;
 
     protected aiPlayers: Set<number> = new Set();
+    protected aiPlayerInstances: Map<number, AIPongPlayer> = new Map();
 
     protected lastBroadcastTime: number = 0;
     protected readonly BROADCAST_INTERVAL = 33;
@@ -89,6 +92,9 @@ export abstract class BaseGameEngine {
     protected abstract getUpdateData(): any;
 
     public startGame(): void {
+        if (this.gameTimer) {
+            return;
+        }
         this.gameLoop();
     }
 
@@ -147,13 +153,21 @@ export abstract class BaseGameEngine {
         this.gameTimer = setTimeout(this.gameLoop, 16);
     }
 
-    public setPlayerAI(playerId: number, isAI: boolean): void {
+    public setPlayerAI(playerId: number, isAI: boolean, difficulty: AIDifficulty = 'normal'): void {
         if (isAI) {
             this.aiPlayers.add(playerId);
-            console.log(`Player ${playerId} marked as AI`);
+            const side = playerId === 1 || playerId === 3 ? 'left' : 'right';
+            console.log(`🤖 Setting up AI Player ${playerId} (${side}, ${difficulty})`);
+            try {
+                const aiPlayer = new AIPongPlayer(playerId, side, difficulty);
+                this.aiPlayerInstances.set(playerId, aiPlayer);
+            } catch (error) {
+                console.error(`❌ Error creating AI Player ${playerId}:`, error);
+                throw error;
+            }
         } else {
             this.aiPlayers.delete(playerId);
-            console.log(`Player ${playerId} marked as human`);
+            this.aiPlayerInstances.delete(playerId);
         }
     }
 
@@ -166,46 +180,36 @@ export abstract class BaseGameEngine {
     }
 
     protected updateAIPositions(): void {
-        // Right paddle (Player 2) AI - ONLY if Player 2 is AI
-        if (this.isPlayerAI(2) && this.gameState.player2Pos !== undefined) {
-            
-            const currentY = this.gameState.player2Pos;
-            let targetY = currentY;
 
-            if (this.xDir > 0) {
-                const distanceToTravel = 680 - this.gameState.ballPosX;
-                const timeToIntercept = distanceToTravel / (this.xDir * 2.1);
-                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                targetY = Math.max(0, Math.min(400 - paddleHeight, predictedY - (paddleHeight / 2)));
+        for (const [playerId, aiPlayer] of this.aiPlayerInstances) {
+            // Safety check - skip if game state not initialized
+            if (!this.gameState.ballPosX || !this.gameState.ballPosY) {
+                continue;
             }
 
-            if (Math.abs(targetY - currentY) > paddleSpeed) {
-                if (targetY > currentY) {
-                    this.updatePlayerPosition(2, currentY + paddleSpeed);
-                } else {
-                    this.updatePlayerPosition(2, currentY - paddleSpeed);
-                }
-            }
-        }
+            const paddlePos = playerId === 1 ? this.gameState.player1Pos : this.gameState.player2Pos;
+            const gameView = {
+                ballPosX: this.gameState.ballPosX,
+                ballPosY: this.gameState.ballPosY,
+                ballVelX: this.xDir * 2.1,
+                ballVelY: this.yDir * 1.8,
+                paddlePos: paddlePos || 80, // Default to center if undefined
+                lastUpdate: Date.now()
+            };
 
-        // Left paddle (Player 1) AI - ONLY if Player 1 is AI
-        if (this.isPlayerAI(1) && this.gameState.player1Pos !== undefined) {
-            
-            const currentY = this.gameState.player1Pos;
-            let targetY = currentY;
+            aiPlayer.updateAIView(gameView);
+            const keys = aiPlayer.getKeyStates();
 
-            if (this.xDir < 0) {
-                const distanceToTravel = this.gameState.ballPosX - 10;
-                const timeToIntercept = distanceToTravel / (Math.abs(this.xDir) * 2.1);
-                const predictedY = this.gameState.ballPosY + (this.yDir * 1.8 * timeToIntercept);
-                targetY = Math.max(0, Math.min(200 - paddleHeight, predictedY - (paddleHeight / 2)));
-            }
-
-            if (Math.abs(targetY - currentY) > paddleSpeed) {
-                if (targetY > currentY) {
-                    this.updatePlayerPosition(1, currentY + paddleSpeed);
-                } else {
-                    this.updatePlayerPosition(1, currentY - paddleSpeed);
+            if (keys.up || keys.down) {
+                const currentY = playerId === 1 ? this.gameState.player1Pos : this.gameState.player2Pos;
+                if (currentY !== undefined && currentY !== null) {
+                    let newY = currentY;
+                    if (keys.up) {
+                        newY = Math.max(0, currentY - paddleSpeed);
+                    } else if (keys.down) {
+                        newY = Math.min(200 - paddleHeight, currentY + paddleSpeed);
+                    }
+                    this.updatePlayerPosition(playerId, newY);
                 }
             }
         }
@@ -611,15 +615,14 @@ export class FourPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
-        const speed = 4;
         
         // Move ball first
-        this.gameState.ballPosX += speed * this.xDir;
-        this.gameState.ballPosY += speed * this.yDir;
+        this.gameState.ballPosX += this.ballSpeed * this.xDir;
+        this.gameState.ballPosY += this.ballSpeed * this.yDir;
         
         // Update velocity for client prediction
-        this.gameState.ballVelX = speed * this.xDir;
-        this.gameState.ballVelY = speed * this.yDir;
+        this.gameState.ballVelX = this.ballSpeed * this.xDir;
+        this.gameState.ballVelY = this.ballSpeed * this.yDir;
         
         // Check each paddle independently (not with else-if!)
         
