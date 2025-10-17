@@ -313,6 +313,8 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         this.scorePlayer1 = this.gameState.scorePlayer1;
         this.scorePlayer2 = this.gameState.scorePlayer2;
         
+        console.log(`🎯 Game initialized with scores: ${this.scorePlayer1} - ${this.scorePlayer2}`);
+        
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
         
@@ -322,6 +324,9 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
     }
 
     updateBallPosition(): number {
+        // Store previous position for collision detection
+        const prevX = this.gameState.ballPosX;
+        
         this.gameState.ballPosX += (this.xDir * 2.1);
         this.gameState.ballPosY += (this.yDir * 1.8);
         
@@ -342,13 +347,14 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         }
         
         // Right paddle collision - paddle is at x=390 (canvas width 400 - paddle width 10)
-        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir > 0 && this.gameState.ballPosX >= (390 - ballRadius) && prevX < (390 - ballRadius)) {
             const rightPaddleTop = this.gameState.player2Pos || 0;
             const rightPaddleBottom = rightPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= rightPaddleTop && 
-                this.gameState.ballPosY <= rightPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= rightPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= rightPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - rightPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2;
@@ -371,20 +377,22 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = 390 - ballRadius;
-            } else if (this.gameState.ballPosX >= 400) {
+            } else {
+                // Missed paddle - score for Player 1
                 this.updateScoreBoard(1);
                 return 1;
             }
         }
         
         // Left paddle collision - paddle is at x=0
-        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius)) {
+        // Check if ball crossed the paddle zone (prevents ball from skipping through)
+        if (this.xDir < 0 && this.gameState.ballPosX <= (paddleWidth + ballRadius) && prevX > (paddleWidth + ballRadius)) {
             const leftPaddleTop = this.gameState.player1Pos || 0;
             const leftPaddleBottom = leftPaddleTop + paddleHeight;
             
-            // Check if ball hits paddle
-            if (this.gameState.ballPosY >= leftPaddleTop && 
-                this.gameState.ballPosY <= leftPaddleBottom) {
+            // Check if ball hits paddle (account for ball radius on Y axis too)
+            if (this.gameState.ballPosY + ballRadius >= leftPaddleTop && 
+                this.gameState.ballPosY - ballRadius <= leftPaddleBottom) {
                 
                 const hitPosition = (this.gameState.ballPosY - leftPaddleTop) / paddleHeight;
                 const relativeHit = (hitPosition - 0.5) * 2;
@@ -407,7 +415,7 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
                 if (Math.abs(this.yDir) > maxSpeed) this.yDir = Math.sign(this.yDir) * maxSpeed;
                 
                 this.gameState.ballPosX = paddleWidth + ballRadius;
-            } else if (this.gameState.ballPosX <= 0) {
+            } else {
                 // Missed paddle - Goal for Player 2
                 this.updateScoreBoard(2);
                 return 1;
@@ -490,9 +498,11 @@ export class TwoPlayerGameEngine extends BaseGameEngine {
         if (player === 1) {
             this.scorePlayer1 += 1;
             this.gameState.scorePlayer1 = this.scorePlayer1;
+            console.log(`⚽ GOAL! Player 1 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         } else if (player === 2) {
             this.scorePlayer2 += 1;
             this.gameState.scorePlayer2 = this.scorePlayer2;
+            console.log(`⚽ GOAL! Player 2 scored! Score: ${this.scorePlayer1} - ${this.scorePlayer2}`);
         }
 
         this.broadcastScoreUpdate();

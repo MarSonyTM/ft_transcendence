@@ -92,7 +92,7 @@ class GameRoomManager {
       difficulty: difficulty
     });
 
-    console.log(`✅ ${username} ${isAI ? '(AI)' : ''} joined room ${roomId}`);
+    console.log(`✅ ${username} ${isAI ? `(${difficulty || 'normal'}) (AI)` : ''} joined room ${roomId}`);
     return { success: true, message: 'Joined successfully', room };
   }
 

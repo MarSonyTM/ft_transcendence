@@ -195,6 +195,7 @@ export class RoomWebSocketManager {
   sendMove(position: number, isGuest: boolean = false): void {
     this.send({
       type: 'move',
+      playerId: customPlayerId || this.config.playerId,
       position,
       isGuest,  // Add this flag
     });
