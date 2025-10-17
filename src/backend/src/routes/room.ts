@@ -18,6 +18,7 @@ interface JoinRoomBody {
   isAI?: boolean;
   isLocal?: boolean;
   isReady?: boolean;
+  isLocal: boolean;
   difficulty?: string;
 }
 
@@ -94,9 +95,8 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false, isLocal = false, isReady = false, difficulty } = request.body;
-      // AI and local players are automatically ready
-      const finalIsReady = isReady || isAI;
+      const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
+      const isReady = (isAI || isLocal) ? true : false;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -105,7 +105,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, finalIsReady, difficulty, isLocal);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady, isLocal, difficulty);
 
       if (!result.success) {
         return reply.code(400).send(result);
@@ -125,7 +125,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -182,7 +181,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -243,7 +241,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -283,8 +280,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
-      // Use incremental DB-backed game IDs for cleanliness
+      const gameMode = room.maxPlayers === 4 ? '4player' : '2player';
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;
       
@@ -310,7 +306,8 @@ async function roomRoutes(fastify: FastifyInstance) {
         scorePlayer2: 0,
         scorePlayer3: 0,
         scorePlayer4: 0,
-        gameMode: gameMode
+        gameMode: gameMode,
+        lastActivity: ''
       };
 
       // Create game engine with proper GameState

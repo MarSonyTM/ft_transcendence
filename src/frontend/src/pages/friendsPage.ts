@@ -287,7 +287,7 @@ async function inviteToGame(friendId: number) {
       },
       body: JSON.stringify({ 
         friendId,
-        gameMode: '1v1' // or get from user selection
+        gameMode: '2player' // or get from user selection
       })
     });
 

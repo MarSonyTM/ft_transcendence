@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { StringAsNumber } from 'fastify/types/utils';
 
 // Use environment variable for Docker compatibility, fallback to local path
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
@@ -63,6 +62,7 @@ export interface GameState {
   scorePlayer2: number;
   scorePlayer3: number;
   scorePlayer4: number;
+  gameMode: string;
   lastActivity: string;
 }
 
@@ -263,7 +263,7 @@ class GameDatabaseManager {
     `);
     
     const result = stmt.run(
-      gameData.mode || '1v1',
+      gameData.mode || '2player',
       gameData.difficulty || 'normal'
     );
     
@@ -816,7 +816,7 @@ export class DatabaseManager extends BaseDatabaseManager {
       CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         status TEXT NOT NULL DEFAULT 'waiting',
-        mode TEXT NOT NULL DEFAULT '1v1',
+        mode TEXT NOT NULL DEFAULT '2player',
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         startedAt DATETIME NULL,
         endedAt DATETIME NULL,
@@ -869,7 +869,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         scorePlayer2 INTEGER NOT NULL DEFAULT 0,
         scorePlayer3 INTEGER NOT NULL DEFAULT 0,
         scorePlayer4 INTEGER NOT NULL DEFAULT 0,
-        gameMode TEXT NOT NULL DEFAULT '1v1',
+        gameMode TEXT NOT NULL DEFAULT '2player',
         lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
         FOREIGN KEY (player1Id) REFERENCES users(id),

@@ -5,12 +5,14 @@ import { renderLandingPage } from './pages/landingPage';
 import { renderLoginPage } from './pages/loginPage';
 import { renderGameSelectPage } from './pages/gameSelectPage';
 import { renderProfilePage } from './pages/profilePage';
-import { renderGamePage, pongGame } from './pages/gamePage';
+import { render2PlayerGame } from './pages/2PlayerGame';
+import { render4PlayerGame } from './pages/4PlayerGame';
 import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 import { renderFriendsPage } from './pages/friendsPage';
+import { renderTempLoginPage } from './pages/tempLoginPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -34,9 +36,6 @@ function handleRouting(): void {
   if (hash) {
     const hashPage = hash.replace('#', '');
     switch (hashPage) {
-      case 'game':
-        setCurrentPage('game');
-        break;
       case 'login':
         setCurrentPage('login');
         break;
@@ -57,6 +56,15 @@ function handleRouting(): void {
         break;
       case 'friends':
         setCurrentPage('friends');
+        break;
+      case '2playergame':
+        setCurrentPage('2playergame');
+        break;
+      case '4playergame':
+        setCurrentPage('4playergame');
+        break;
+      case 'tempLogin':
+        setCurrentPage('tempLogin');
         break;
       default:
         setCurrentPage('landing');
@@ -80,9 +88,6 @@ function handleRouting(): void {
     case '/lobby':
       setCurrentPage('lobby');
       break;
-    case '/game':
-      setCurrentPage('game');
-      break;
     case '/gameSelect':
       setCurrentPage('gameSelect');
       break;
@@ -92,6 +97,15 @@ function handleRouting(): void {
     case '/auth/callback':
       setCurrentPage('authCallback');
       break;
+    case '/2playergame':
+      setCurrentPage('2playergame');
+      break;
+    case '/4playergame':
+      setCurrentPage('4playergame');
+      break;
+    case 'tempLogin':
+        setCurrentPage('tempLogin');
+        break;
     default:
       setCurrentPage('landing');
   }
@@ -101,7 +115,7 @@ function handleRouting(): void {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
   
-  if (page !== 'lobby' && page !== 'game') {
+  if (page !== 'lobby' && page !== '2playergame' && page !== '4playergame') {
     cleanupLobby();
   }
 
@@ -143,11 +157,17 @@ export async function renderApp(): Promise<void> {
     case 'profile':
       renderProfilePage();
       break;
-    case 'game':
-      renderGamePage();
+    case '2playergame':
+      render2PlayerGame();
+      break;
+    case '4playergame':
+      render4PlayerGame();
       break;
     case 'friends':
       renderFriendsPage();
+      break;
+    case 'tempLogin':
+      renderTempLoginPage();
       break;
     default:
       renderLandingPage();
