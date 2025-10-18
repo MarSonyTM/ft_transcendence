@@ -842,7 +842,7 @@ async function leaveRoom(): Promise<void> {
     stopRoomPolling();
     clearRoomState();
     
-    history.pushState({ page: 'landing' }, '', '#');
+    history.pushState({ page: 'landing' }, '', '/');
     setCurrentPage('landing');
     renderApp();
   } catch (error) {

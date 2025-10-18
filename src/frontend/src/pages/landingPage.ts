@@ -57,7 +57,7 @@ export function renderLandingPage(): void {
     const playBtn = document.getElementById('playBtn');
     if (playBtn) {
         playBtn.addEventListener('click', () => {
-            history.pushState({ page: 'gameSelect' }, '', '#gameSelect');
+            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
             setCurrentPage('gameSelect');
             renderApp();
         });
@@ -66,7 +66,7 @@ export function renderLandingPage(): void {
     const profileBtn = document.getElementById('profileBtn');
     if (profileBtn) {
         profileBtn.addEventListener('click', () => {
-            history.pushState({ page: 'profile' }, '', '#profile');
+            history.pushState({ page: 'profile' }, '', '/profile');
             setCurrentPage('profile');
             renderApp();
         });

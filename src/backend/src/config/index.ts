@@ -12,6 +12,13 @@ if (!JWT_SECRET || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIREC
 	throw new Error('Missing environment variables, please add the .env file inside the backend folder ');
 }
 
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
+
+if (!EMAIL_USER || !EMAIL_PASSWORD) {
+	throw new Error('Missing environment variables, please add the .env file inside the backend folder ');
+}
+
 // Print Auth Credentials
 //console.log("JWT_SECRET", JWT_SECRET);
 //console.log("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID);
@@ -24,5 +31,7 @@ export {
 	GOOGLE_CLIENT_ID,
 	GOOGLE_CLIENT_SECRET,
 	GOOGLE_REDIRECT_URI,
-	FRONTEND_URL
+	FRONTEND_URL,
+	EMAIL_USER,
+	EMAIL_PASSWORD
 };

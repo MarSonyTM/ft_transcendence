@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config';
+import { FRONTEND_URL, JWT_SECRET } from '../config';
+import { database } from '../database';
 
 type JwtUser = { id: number; email: string; username: string };
 
@@ -23,6 +24,8 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     '/health',
     '/ping',
     '/api',
+    '/api/auth/verify-email',
+    '/api/auth/resend-verification',
     
     // Auth endpoints
     '/api/auth/create',
@@ -50,6 +53,8 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     '/game/',             // WebSocket game routes
     '/room/',
     '/join/',             // Join room links
+    '/verify-email',
+    '/resend-verification',
   ];
 
   if (publicPrefixes.some(prefix => url.startsWith(prefix))) {
@@ -70,7 +75,25 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET || '') as unknown as JwtUser;
-    (request as any).user = decoded;
+    const user = await database.users.getUserById(decoded.id);
+    if (!user) {
+      reply.code(401).send({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+    if (!user.emailVerified) {
+      reply.code(403).send({
+        success: false,
+        message: 'Email verification required',
+        redirectUrl: `${FRONTEND_URL}/verify-email?email=${user.email}&needEmailVerification=true`,
+        email: user.email,
+        needEmailVerification: true
+      });
+      return;
+    }
+    (request as any).user = user;
   } catch (err: any) {
     const isExpired = err?.name === 'TokenExpiredError';
     reply.code(401).send({ 
