@@ -28,6 +28,10 @@ export interface GoogleAuthInput {
   token: string;
 }
 
+export interface GuestUserInput {
+  username?: string;
+}
+
 function validateEmail(email: string): boolean {
   const validationEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return validationEmailRegex.test(email);
@@ -529,6 +533,111 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 			});
 		}
 	});
+
+	fastify.post('/guest', async (request, reply) => {
+	try {
+		const { username } = request.body as GuestUserInput;
+		
+		let guestUsername: string;
+		
+		if (username?.trim()) {
+		// User provided a custom name - use it as-is
+		guestUsername = username.trim();
+		} else {
+		// No name provided - generate Guest_random
+		const randomStr = Math.random().toString(36).substring(2, 8);
+		guestUsername = `Guest_${randomStr}`;
+		}
+		
+		// Create a temporary guest user
+		const randomPassword = Math.random().toString(36).substring(2, 15);
+		const guestUser = await database.users.createUser({
+		firstName: 'Guest',
+		lastName: 'User',
+		username: guestUsername,
+		password: randomPassword,
+		email: undefined,
+		avatar: undefined
+		});
+
+		// Generate JWT token with shorter expiration
+		const token = jwt.sign(
+		{ 
+			id: guestUser.id, 
+			email: guestUser.email || '', 
+			username: guestUser.username || '',
+			isGuest: true
+		},
+		JWT_SECRET,
+		{ expiresIn: '24h' }
+		);
+
+		reply.code(201).send({
+		success: true,
+		message: 'Guest user created successfully',
+		token,
+		data: {
+			id: guestUser.id,
+			username: guestUser.username,
+			isGuest: true
+		}
+		});
+	} catch (error) {
+		fastify.log.error(error);
+		
+		// If username conflict, add random suffix and retry
+		if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+		const { username } = request.body as GuestUserInput;
+		const randomStr = Math.random().toString(36).substring(2, 15);
+		const retryUsername = username?.trim() 
+			? `${username.trim()}_${randomStr}` 
+			: `Guest_${randomStr}`;
+		
+		try {
+			const randomPassword = Math.random().toString(36).substring(2, 15);
+			const guestUser = await database.users.createUser({
+			firstName: 'Guest',
+			lastName: 'User',
+			username: retryUsername,
+			password: randomPassword,
+			email: undefined,
+			avatar: undefined
+			});
+
+			const token = jwt.sign(
+			{ 
+				id: guestUser.id, 
+				email: guestUser.email || '', 
+				username: guestUser.username || '',
+				isGuest: true
+			},
+			JWT_SECRET,
+			{ expiresIn: '24h' }
+			);
+
+			reply.code(201).send({
+			success: true,
+			message: 'Guest user created successfully',
+			token,
+			data: {
+				id: guestUser.id,
+				username: guestUser.username,
+				isGuest: true
+			}
+			});
+			return;
+		} catch (retryError) {
+			fastify.log.error(retryError);
+		}
+		}
+		
+		reply.code(500).send({
+		success: false,
+		message: 'Failed to create guest user'
+		});
+	}
+	});
+
 }
 
 export default userRoutes;

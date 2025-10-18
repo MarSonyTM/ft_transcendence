@@ -34,7 +34,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
         });
       }
 
-      const { friendId, gameMode = '1v1' } = request.body;
+      const { friendId, gameMode = '2player' } = request.body;
 
       if (!friendId || friendId === userId) {
         return reply.code(400).send({

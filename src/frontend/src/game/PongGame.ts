@@ -1,11 +1,10 @@
 import { GameState, WebSocketMessage } from '../types';
 import { getCurrentGameMode, getCurrentUser } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
+import { RoomWebSocketManager } from '../utils/roomWebSocket';
 
 export class PongGame {
     gameId: number | null = null;
-    // Display mapping from server player indices -> local view indices
-    // Default: identity [0,1,2,3]. For 1v1, right-side client can use [1,0,2,3]
     viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
@@ -14,6 +13,10 @@ export class PongGame {
     fpsStartTime: number = performance.now();
     frameCount: number = 0;
     lastPingTime: number = 0;
+    private lastMoveTime: number = 0;
+    private readonly MOVE_THROTTLE = 16;
+    private lastSentPosition: number = 0;
+
     gameState: GameState = {
         ballPosX: 200,
         ballPosY: 100,
@@ -26,7 +29,7 @@ export class PongGame {
         scorePlayer3: 0,
         scorePlayer4: 0,
         gameMode: "",
-        mode: "1v1",
+        mode: "2player",
         playerPositions: [180, 80, 180, 80],
         scores: [0, 0, 0, 0],
         lastContact: 0
@@ -39,9 +42,23 @@ export class PongGame {
     player4Id: number = 4;
     paddlePosition: number = 80;
     onGameEnd?: (winnerId: number) => Promise<void>;
+    roomWS: RoomWebSocketManager | null = null;
+    currentGameState: any = null;
     private renderLoopRunning: boolean = false;
     private animationFrameId: number | null = null;
     private shouldReconnect: boolean = true;
+    hasLocal: boolean = false;
+    isGuest: boolean = false;
+
+    private interpolatedState = {
+        ballPosX: 200,
+        ballPosY: 100,
+        player1Pos: 80,
+        player2Pos: 80,
+        player3Pos: 180,
+        player4Pos: 180
+    };
+    private lerpFactor = 1;
     
     constructor() {
         this.setupKeyboardControls();
@@ -56,61 +73,6 @@ export class PongGame {
             console.log('Using SSR game ID:', this.gameId);
         }
     }
-
-    async init(): Promise<void> {
-        this.canvas = document.getElementById("gameScreen") as HTMLCanvasElement;
-        this.ctx = this.canvas ? this.canvas.getContext("2d") : null;
-
-        if (!this.canvas || !this.ctx) return;
-        
-        const is4Player = getCurrentGameMode() === '4player';
-        if (is4Player) {
-            this.paddlePosition = 180;
-        } else {
-            this.paddlePosition = 80;
-        }
-        
-        this.updateStatus("Ready to start...");
-        
-        try {
-            const room = getCurrentRoom();
-            
-            // If gameId was already set externally (from gamePage), use it
-            if (this.gameId) {
-                console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
-            }
-            // If there's a room with a gameId, use it
-            else if (room && room.gameId) {
-                this.gameId = room.gameId;
-                console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
-            }
-            //  Create a new game if there's NO room AND no gameId set
-            else if (!room) {
-                console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
-                await this.createGame();
-                console.log(`✅ [PONGGAME] Created new standalone game ID: ${this.gameId}`);
-            }
-            // Priority 4: Room exists but no gameId yet - wait for host to start
-            else {
-                console.warn(`⏳ [PONGGAME] Room exists but no gameId - game not started yet`);
-                this.updateStatus("Waiting for host to start game...");
-                return; // Don't initialize yet
-            }
-            
-            // Connect to WebSocket only after gameId is confirmed
-            if (this.gameId) {
-                await this.connectWebSocket();
-                this.updateStatus("Connected - Click Start to begin");
-                this.startRenderLoop();
-            } else {
-                throw new Error("Failed to establish game ID");
-            }
-        } catch (error) {
-            console.error("❌ [PONGGAME] Initialization error:", error);
-            this.updateStatus(`Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
 
     async createGame(): Promise<void> {
         try {
@@ -202,53 +164,50 @@ export class PongGame {
                 break;
                 
             case 'gameState':
-                if (message.state) {
-                    const nextState = {
-                        ballPosX: message.state.ballPosX ?? this.gameState.ballPosX,
-                        ballPosY: message.state.ballPosY ?? this.gameState.ballPosY,
-                        player1Pos: message.state.player1Pos ?? this.gameState.player1Pos,
-                        player2Pos: message.state.player2Pos ?? this.gameState.player2Pos,
-                        player3Pos: message.state.player3Pos ?? this.gameState.player3Pos,
-                        player4Pos: message.state.player4Pos ?? this.gameState.player4Pos,
-                        scorePlayer1: message.state.scorePlayer1 ?? 0,
-                        scorePlayer2: message.state.scorePlayer2 ?? 0,
-                        scorePlayer3: message.state.scorePlayer3 ?? 0,
-                        scorePlayer4: message.state.scorePlayer4 ?? 0,
-                        gameMode: message.state.gameMode ?? this.gameState.gameMode,
-                        mode: message.mode ?? message.state.mode ?? this.gameState.mode,
-                        playerPositions: message.state.playerPositions ?? this.gameState.playerPositions,
-                        scores: message.state.scores ?? this.gameState.scores,
-                        lastContact: message.state.lastContact ?? this.gameState.lastContact
-                    };
-
-                    // Apply display mapping for 1v1 when the local view swaps left/right
-                    const swapLeftRight =
-                        (nextState.mode === '1v1' || nextState.gameMode === '1v1') &&
-                        this.viewIndexMap.length >= 2 &&
-                        this.viewIndexMap[0] === 1 && this.viewIndexMap[1] === 0;
-
-                    if (swapLeftRight) {
-                        const width = (this.canvas && this.canvas.width) ? this.canvas.width : 400;
-                        const mirrored = { ...nextState } as any;
-                        mirrored.ballPosX = width - (nextState.ballPosX ?? 0);
-                        mirrored.player1Pos = nextState.player2Pos ?? 0;
-                        mirrored.player2Pos = nextState.player1Pos ?? 0;
-                        mirrored.scorePlayer1 = nextState.scorePlayer2 ?? 0;
-                        mirrored.scorePlayer2 = nextState.scorePlayer1 ?? 0;
-                        this.gameState = mirrored;
-                    } else {
-                        this.gameState = nextState;
-                    }
-                    
-                    if (this.playerId === 1) {
-                        this.paddlePosition = this.gameState.player1Pos ?? 80;
-                    } else if (this.playerId === 2) {
-                        this.paddlePosition = this.gameState.player2Pos ?? 80;
-                    }
-                    
-                    this.updateScoreDisplay();
+            if (message.state) {
+                // Delta merge - only update provided fields
+                if (message.state.ballPosX !== undefined) {
+                    this.gameState.ballPosX = message.state.ballPosX;
                 }
-                break;
+                if (message.state.ballPosY !== undefined) {
+                    this.gameState.ballPosY = message.state.ballPosY;
+                }
+                if (message.state.player1Pos !== undefined) {
+                    this.gameState.player1Pos = message.state.player1Pos;
+                }
+                if (message.state.player2Pos !== undefined) {
+                    this.gameState.player2Pos = message.state.player2Pos;
+                }
+                if (message.state.player3Pos !== undefined) {
+                    this.gameState.player3Pos = message.state.player3Pos;
+                }
+                if (message.state.player4Pos !== undefined) {
+                    this.gameState.player4Pos = message.state.player4Pos;
+                }
+                if (message.state.scorePlayer1 !== undefined) {
+                    this.gameState.scorePlayer1 = message.state.scorePlayer1;
+                }
+                if (message.state.scorePlayer2 !== undefined) {
+                    this.gameState.scorePlayer2 = message.state.scorePlayer2;
+                }
+                if (message.state.scorePlayer3 !== undefined) {
+                    this.gameState.scorePlayer3 = message.state.scorePlayer3;
+                }
+                if (message.state.scorePlayer4 !== undefined) {
+                    this.gameState.scorePlayer4 = message.state.scorePlayer4;
+                }
+                
+                // Update arrays for 4-player mode
+                if (message.state.scores) {
+                    this.gameState.scores = message.state.scores;
+                }
+                if (message.state.playerPositions) {
+                    // Store for 4-player rendering
+                }
+                
+                this.updateScoreDisplay();
+            }
+            break;
                 
             case 'ballReset':
                 console.log('Ball reset:', message.message);
@@ -365,12 +324,16 @@ export class PongGame {
         if (this.renderLoopRunning) return;
         
         this.renderLoopRunning = true;
+
+        if (this.ctx) {
+            this.ctx.imageSmoothingEnabled = false;
+            this.ctx.imageSmoothingQuality = 'low';
+        }
         
         const renderFrame = () => {
             if (!this.renderLoopRunning) return;
             
             this.updateFPS();
-            this.handleInput();
             this.render();
             this.animationFrameId = requestAnimationFrame(renderFrame);
         };
@@ -386,121 +349,153 @@ export class PongGame {
         }
     }
 
-    handleInput(): void {
-        if (!this.isActive) return;
-        // In room-based games, input is handled by room WS logic in gamePage.ts
-        // to correctly attribute controls per connected player. Avoid double-sending here.
-        if (getCurrentRoom()) return;
-        
-        let newPosition = this.paddlePosition;
-        const paddleSpeed = 4;
-        
-        const is4Player = this.gameState.mode === '4player' || getCurrentGameMode() === '4player';
-        
-        if (is4Player) {
-            const maxPos = 400 - 40 - 10;
-            const minPos = 10;
-            
-            if (this.keys['KeyW'] && newPosition > minPos) {
-                newPosition = Math.max(minPos, newPosition - paddleSpeed);
-            }
-            if (this.keys['KeyS'] && newPosition < maxPos) {
-                newPosition = Math.min(maxPos, newPosition + paddleSpeed);
-            }
-        } else {
-            if (this.keys['KeyW'] && newPosition > 0) {
-                newPosition = Math.max(0, newPosition - paddleSpeed);
-            }
-            if (this.keys['KeyS'] && newPosition < 160) {
-                newPosition = Math.min(160, newPosition + paddleSpeed);
-            }
-        }
-            
-        if (newPosition !== this.paddlePosition) {
-            this.paddlePosition = newPosition;
-            this.sendPlayerMove(newPosition);
-        }
-    }
 
     sendPlayerMove(position: number): void {
-        // Do not send moves over the game socket when playing a room-based game;
-        // room WebSocket handles authoritative input routing.
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: 1,
                 position: position,
-                timestamp: Date.now()
             }));
         }
     }
 
     render(): void {
         if (!this.ctx || !this.canvas) return;
-
-        const ballPosX = this.gameState.ballPosX || 200;
-        const ballPosY = this.gameState.ballPosY || 100;
-
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
+    
         const is4Player = this.gameState.mode === '4player' || getCurrentGameMode() === '4player';
 
+        this.interpolatedState.ballPosX += (this.gameState.ballPosX - this.interpolatedState.ballPosX) * this.lerpFactor;
+        this.interpolatedState.ballPosY += (this.gameState.ballPosY - this.interpolatedState.ballPosY) * this.lerpFactor;
+        this.interpolatedState.player1Pos += (this.gameState.player1Pos - this.interpolatedState.player1Pos) * this.lerpFactor;
+        this.interpolatedState.player2Pos += (this.gameState.player2Pos - this.interpolatedState.player2Pos) * this.lerpFactor;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    
         if (is4Player) {
-            this.render4Player(ballPosX, ballPosY);
+            this.interpolatedState.player3Pos += (this.gameState.player3Pos - this.interpolatedState.player3Pos) * this.lerpFactor;
+            this.interpolatedState.player4Pos += (this.gameState.player4Pos - this.interpolatedState.player4Pos) * this.lerpFactor;
+            
+            const rotatedBall = this.getRotatedBallPosition(
+                this.interpolatedState.ballPosX, 
+                this.interpolatedState.ballPosY
+            );
+            
+            this.render4Player();
+            
+            this.ctx.beginPath();
+            this.ctx.arc(rotatedBall.x, rotatedBall.y, 10, 0, 2 * Math.PI);
+            this.ctx.fillStyle = "white";
+            this.ctx.fill();
         } else {
-            this.render2Player(ballPosX, ballPosY);
+            // Use interpolated values
+            this.render2Player(this.interpolatedState.ballPosX, this.interpolatedState.ballPosY);
+            
+            this.ctx.beginPath();
+            this.ctx.arc(this.interpolatedState.ballPosX, this.interpolatedState.ballPosY, 10, 0, 2 * Math.PI);
+            this.ctx.fillStyle = "white";
+            this.ctx.fill();
+        }
+        
+            // Draw game ID
+            this.ctx.font = "12px Arial";
+            this.ctx.fillStyle = "white";
+            this.ctx.textAlign = "center";
+            this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
         }
 
-        this.ctx.beginPath();
-        this.ctx.arc(ballPosX, ballPosY, 10, 0, 2 * Math.PI);
-        this.ctx.fillStyle = "white";
-        this.ctx.fill();
-
-        this.ctx.font = "12px Arial";
-        this.ctx.fillStyle = "white";
-        this.ctx.textAlign = "center";
-        this.ctx.fillText(`Game ${this.gameId}`, this.canvas.width / 2, 15);
+    private getRotatedBallPosition(ballX: number, ballY: number): { x: number, y: number } {
+        if (!this.canvas) return { x: ballX, y: ballY };
+        
+        // Check if rotation is needed (viewIndexMap is not identity)
+        if (this.viewIndexMap[0] === 0) {
+            return { x: ballX, y: ballY };
+        }
+        
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        
+        // Determine rotation angle from viewIndexMap
+        // viewIndexMap[0] tells us where server position 0 (top) goes visually
+        const rotation = this.viewIndexMap[0]; // 0=no rotation, 1=90°CCW, 2=180°, 3=90°CW
+        
+        let rotatedX = ballX;
+        let rotatedY = ballY;
+        
+        switch(rotation) {
+            case 1: // 90° CCW (server bottom -> visual left)
+                rotatedX = ballY;
+                rotatedY = this.canvas.height - ballX;
+                break;
+            case 2: // 180° (server right -> visual left)
+                rotatedX = this.canvas.width - ballX;
+                rotatedY = this.canvas.height - ballY;
+                break;
+            case 3: // 90° CW (server top -> visual left)
+                rotatedX = this.canvas.width - ballY;
+                rotatedY = ballX;
+                break;
+        }
+        
+        return { x: rotatedX, y: rotatedY };
     }
 
     render2Player(ballPosX: number, ballPosY: number): void {
         if (!this.ctx || !this.canvas) return;
 
-        const player1Pos = this.gameState.player1Pos ?? 80;
-        const player2Pos = this.gameState.player2Pos ?? 80;
+        const player1Pos = this.interpolatedState.player1Pos ?? 80;
+        const player2Pos = this.interpolatedState.player2Pos ?? 80;
 
+        this.ctx.save();
+        
+        // Draw center line
         this.ctx.strokeStyle = "white";
         this.ctx.setLineDash([5, 15]);
         this.ctx.beginPath();
         this.ctx.moveTo(this.canvas.width / 2, 0);
         this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
         this.ctx.stroke();
-        this.ctx.setLineDash([]);
-
+        
+        this.ctx.restore();
+        this.ctx.save();
+        
+        // Draw paddles (no line dash)
         this.ctx.fillStyle = "grey";
         this.ctx.fillRect(0, player1Pos, 10, 40);
         this.ctx.fillRect(this.canvas.width - 10, player2Pos, 10, 40);
+        
+        this.ctx.restore();
     }
 
-    render4Player(ballPosX: number, ballPosY: number): void {
+    render4Player(): void {
         if (!this.ctx || !this.canvas) return;
 
-        const playerPositions = this.gameState.playerPositions || [180, 180, 180, 180];
+        // ✅ Use interpolated positions for smooth paddles
+        const serverPositions = [
+            this.interpolatedState.player1Pos ?? 180,
+            this.interpolatedState.player2Pos ?? 180,
+            this.interpolatedState.player3Pos ?? 180,
+            this.interpolatedState.player4Pos ?? 180
+        ];
+
+        // Apply view rotation
+        const visualPositions = [0, 0, 0, 0];
+        for (let serverPos = 0; serverPos < 4; serverPos++) {
+            const visualPos = this.viewIndexMap[serverPos];
+            visualPositions[visualPos] = serverPositions[serverPos];
+        }
         
+        this.ctx.save();
         this.ctx.fillStyle = "grey";
 
-        const topPaddleX = playerPositions[0] ?? 180;
-        this.ctx.fillRect(topPaddleX, 0, 40, 10);
+        // Draw paddles at rotated visual positions
+        this.ctx.fillRect(visualPositions[0], 0, 40, 10);
+        this.ctx.fillRect(this.canvas.width - 10, visualPositions[1], 10, 40);
+        this.ctx.fillRect(visualPositions[2], this.canvas.height - 10, 40, 10);
+        this.ctx.fillRect(0, visualPositions[3], 10, 40);
 
-        const rightPaddleY = playerPositions[1] ?? 180;
-        this.ctx.fillRect(this.canvas.width - 10, rightPaddleY, 10, 40);
-
-        const bottomPaddleX = playerPositions[2] ?? 180;
-        this.ctx.fillRect(bottomPaddleX, this.canvas.height - 10, 40, 10);
-
-        const leftPaddleY = playerPositions[3] ?? 180;
-        this.ctx.fillRect(0, leftPaddleY, 10, 40);
-
+        // Draw center lines
         this.ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
         this.ctx.setLineDash([3, 10]);
         
@@ -515,6 +510,7 @@ export class PongGame {
         this.ctx.stroke();
         
         this.ctx.setLineDash([]);
+        this.ctx.restore();
     }
 
     setupKeyboardControls(): void {
@@ -544,17 +540,17 @@ export class PongGame {
     }
 
     updateFPS(): void {
-        const now = performance.now();
-        this.frameCount++;
-        const elapsed = now - this.fpsStartTime;
+        // const now = performance.now();
+        // this.frameCount++;
+        // const elapsed = now - this.fpsStartTime;
         
-        if (elapsed >= 1000) {
-            const fps = Math.round((this.frameCount * 1000) / elapsed);
-            const fpsCounter = document.getElementById('fpsCounter');
-            if (fpsCounter) fpsCounter.textContent = fps.toString();
-            this.fpsStartTime = now;
-            this.frameCount = 0;
-        }
+        // if (elapsed >= 1000) {
+        //     const fps = Math.round((this.frameCount * 1000) / elapsed);
+        //     const fpsCounter = document.getElementById('fpsCounter');
+        //     if (fpsCounter) fpsCounter.textContent = fps.toString();
+        //     this.fpsStartTime = now;
+        //     this.frameCount = 0;
+        // }
     }
 
     updatePlayerInfo(): void {

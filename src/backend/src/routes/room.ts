@@ -16,7 +16,10 @@ interface JoinRoomBody {
   playerId: string;
   username: string;
   isAI?: boolean;
+  isLocal?: boolean;
   isReady?: boolean;
+  isLocal: boolean;
+  difficulty?: string;
 }
 
 interface ToggleReadyBody {
@@ -92,8 +95,8 @@ async function roomRoutes(fastify: FastifyInstance) {
   ) => {
     try {
       const { roomId } = request.params;
-      const { playerId, username, isAI = false, isReady: _ignoredIsReady } = request.body;
-      const isReady = isAI;
+      const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
+      const isReady = (isAI || isLocal) ? true : false;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -102,7 +105,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady);
+      const result = gameRoomManager.joinRoom(roomId, playerId, username, isAI, isReady, isLocal, difficulty);
 
       if (!result.success) {
         return reply.code(400).send(result);
@@ -122,7 +125,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -179,7 +181,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -240,7 +241,6 @@ async function roomRoutes(fastify: FastifyInstance) {
             maxPlayers: room.maxPlayers,
             gameId: room.gameId
           },
-          timestamp: Date.now()
         });
       }
 
@@ -280,8 +280,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4player' : '1v1';
-      // Use incremental DB-backed game IDs for cleanliness
+      const gameMode = room.maxPlayers === 4 ? '4player' : '2player';
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;
       
@@ -307,7 +306,8 @@ async function roomRoutes(fastify: FastifyInstance) {
         scorePlayer2: 0,
         scorePlayer3: 0,
         scorePlayer4: 0,
-        gameMode: gameMode
+        gameMode: gameMode,
+        lastActivity: ''
       };
 
       // Create game engine with proper GameState
@@ -318,20 +318,33 @@ async function roomRoutes(fastify: FastifyInstance) {
         gameEngine = new TwoPlayerGameEngine(initialGameState);
       }
 
+      // Attach AI players before first frame
       room.players.forEach((player, index) => {
       const playerId = index + 1; // Player IDs are 1-indexed
       if (player.isAI) {
-        gameEngine.setPlayerAI(playerId, true);
-        console.log(`🤖 Marked Player ${playerId} (${player.username}) as AI`);
-      } else {
-        console.log(`👤 Player ${playerId} (${player.username}) is human`);
+        const difficulty = (player.difficulty as any) || 'normal';
+        gameEngine.setPlayerAI(playerId, true, difficulty);
       }
     });
 
-      // Store and start the game engine
-      activeGames.set(gameId, gameEngine);
-      if (typeof (gameEngine as any).startGame === 'function') {
-        (gameEngine as any).startGame();
+      // Ensure all runtime state is initialized AFTER AI is attached
+      if (typeof (gameEngine as any).resetGame === 'function') {
+        try {
+          console.log('🔄 Performing pre-start reset to stabilize initial state...');
+          (gameEngine as any).resetGame();
+        } catch (e) {
+          console.warn('⚠️ Pre-start reset failed (continuing):', e);
+        }
+      }
+
+      // Store and start the game engine (guard against duplicate engine/loops)
+      const existingEngine = activeGames.get(gameId);
+      if (!existingEngine) {
+        activeGames.set(gameId, gameEngine);
+      }
+      const engineToStart = existingEngine || gameEngine;
+      if (typeof (engineToStart as any).startGame === 'function') {
+        (engineToStart as any).startGame();
       }
       
       const started = gameRoomManager.startGame(roomId, gameId);
@@ -353,6 +366,49 @@ async function roomRoutes(fastify: FastifyInstance) {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error'
       });
+    }
+  });
+
+  // End the current game and reset room to waiting for a fresh start
+  fastify.post('/api/room/:roomId/end', async (request, reply) => {
+    const { roomId } = request.params as { roomId: string };
+    const room = gameRoomManager.getRoom(roomId);
+    if (!room) {
+      return reply.status(404).send({ success: false, message: 'Room not found' });
+    }
+
+    try {
+      const gameId = room.gameId;
+      if (gameId) {
+        const engine = activeGames.get(gameId);
+        if (engine && typeof (engine as any).endGame === 'function') {
+          (engine as any).endGame();
+        }
+        activeGames.delete(gameId);
+      }
+
+      // Reset room for a new game
+      room.status = 'waiting';
+      room.gameId = undefined;
+      room.players = room.players.map(p => ({ ...p, isReady: false }));
+
+      broadcastToRoom(roomId, {
+        type: 'roomState',
+        room: {
+          roomId: room.roomId,
+          hostId: room.hostId,
+          players: room.players,
+          status: room.status,
+          maxPlayers: room.maxPlayers,
+          gameId: room.gameId
+        },
+        timestamp: Date.now()
+      });
+
+      return reply.send({ success: true, message: 'Game ended and room reset', room });
+    } catch (error) {
+      fastify.log.error('Failed to end game:', error);
+      return reply.status(500).send({ success: false, message: 'Failed to end game' });
     }
   });
 

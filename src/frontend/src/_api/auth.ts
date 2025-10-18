@@ -130,68 +130,43 @@ export async function registerUser(
 	}
 }
 
-// Verify email with verification code
-export async function verifyEmail(verificationCode: string, email: string): Promise<{ success: boolean; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
-	
-	try {
-		const res = await fetch(`${apiEndpoint}/api/auth/verify-email`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json',
-			 },
-			body: JSON.stringify({ verificationCode, email })
-		});
-		
-		const data = await res.json().catch(() => ({}));
-		
-		if (res.ok) {
-			return {
-				success: true,
-				message: data.message || 'Email verified successfully'
-			};
-		}
-		
-		return {
-			success: false,
-			error: data.message || `Verification failed (${res.status})`
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error: 'Network error - please try again'
-		};
-	}
-}
-
-// Resend verification email
-export async function resendVerificationEmail(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
-	
-	try {
-		const res = await fetch(`${apiEndpoint}/api/auth/resend-verification`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json',
-			 },
-			body: JSON.stringify({ email })
-		});
-		
-		const data = await res.json().catch(() => ({}));
-		
-		if (res.ok) {
-			return {
-				success: true,
-				message: data.message || 'Verification email sent successfully'
-			};
-		}
-		
-		return {
-			success: false,
-			error: data.message || `Failed to resend email (${res.status})`
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error: 'Network error - please try again'
-		};
-	}
+export async function createGuestUser(username?: string): Promise<{ 
+  success: boolean; 
+  username?: string; 
+  token?: string; 
+  isGuest?: boolean;
+  error?: string;
+}> {
+  const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+  
+  try {
+    const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username || undefined })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        success: data.success || false,
+        username: data.data?.username,
+        token: data.token,
+        isGuest: data.data?.isGuest || true,
+        error: data.message
+      };
+    }
+    
+    if (res.status === 404) {
+      return { success: false, error: 'API not available (404)' };
+    }
+    
+    return { success: false, error: `Server error (${res.status})` };
+  } catch (error) {
+    console.error('Guest user creation error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Network error' 
+    };
+  }
 }

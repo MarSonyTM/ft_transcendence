@@ -192,11 +192,12 @@ export class RoomWebSocketManager {
   }
 
   // Send player movement
-  sendMove(position: number): void {
+  sendMove(position: number, isGuest: boolean = false): void {
     this.send({
       type: 'move',
+      playerId: customPlayerId || this.config.playerId,
       position,
-      timestamp: Date.now()
+      isGuest,  // Add this flag
     });
   }
 
@@ -205,7 +206,6 @@ export class RoomWebSocketManager {
     this.send({
       type: 'ready',
       isReady,
-      timestamp: Date.now()
     });
   }
 
@@ -215,7 +215,6 @@ export class RoomWebSocketManager {
       type: 'chat',
       username,
       text,
-      timestamp: Date.now()
     });
   }
 
@@ -223,10 +222,17 @@ export class RoomWebSocketManager {
   requestState(): void {
     this.send({
       type: 'requestState',
-      timestamp: Date.now()
     });
   }
 
+  sendKeyState(key: string, pressed: boolean, isGuest: boolean = false): void {
+    this.send({
+      type: 'keyState',
+      key,
+      pressed,
+      isGuest,
+    });
+  }
   // Generic send method
   private send(message: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -308,3 +314,4 @@ export function disconnectRoomWebSocket(): void {
     globalRoomWS = null;
   }
 }
+

@@ -303,6 +303,8 @@ h3 {
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 /* Controls info */
@@ -326,10 +328,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button:not(:disabled):hover {
+/* button:not(:disabled):hover {
   transform: scale(1.05);
-  transition: transform 150ms;
-}
+  transition: transform 150ms; 
+}   */
 
 .connected {
   color: rgb(74 222 128); /* text-green-400 */
@@ -637,4 +639,40 @@ button:not(:disabled):hover {
 .btn-archive {
   font-size: .75rem;
   padding: .3rem .6rem;
+}
+
+/* Countdown */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    /* transform: scale(1); */
+    opacity: 1;
+  }
+  50% {
+    /* transform: scale(1.2); */
+    opacity: 0.8;
+  }
+}
+
+#countdown-overlay {
+  user-select: none;
+  pointer-events: all;
 }

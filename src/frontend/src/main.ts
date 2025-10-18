@@ -5,16 +5,14 @@ import { renderLandingPage } from './pages/landingPage';
 import { renderLoginPage } from './pages/loginPage';
 import { renderGameSelectPage } from './pages/gameSelectPage';
 import { renderProfilePage } from './pages/profilePage';
-import { renderGamePage, pongGame } from './pages/gamePage';
+import { render2PlayerGame } from './pages/2PlayerGame';
+import { render4PlayerGame } from './pages/4PlayerGame';
 import renderRegisterPage from './pages/registerPage';
 import renderAuthCallbackPage from './pages/authCallback';
 import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 import { renderFriendsPage } from './pages/friendsPage';
-import { renderEditProfilePage } from './pages/editProfilePage';
-import { renderChangeUsernamePage } from './pages/changeUsernamePage';
-import { renderChangeEmailPage } from './pages/changeEmailPage';
-import { renderVerifyEmailPage } from './pages/verifyEmail';
+import { renderTempLoginPage } from './pages/tempLoginPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -45,6 +43,47 @@ function handleRouting(): void {
     return;
   }
 
+  // Handle hash-based routing
+  if (hash) {
+    const hashPage = hash.replace('#', '');
+    switch (hashPage) {
+      case 'login':
+        setCurrentPage('login');
+        break;
+      case 'gameSelect':
+        setCurrentPage('gameSelect');
+        break;
+      case 'profile':
+        setCurrentPage('profile');
+        break;
+      case 'lobby':
+        setCurrentPage('lobby');
+        break;
+      case 'register':
+        setCurrentPage('register');
+        break;
+      case 'authCallback':
+        setCurrentPage('authCallback');
+        break;
+      case 'friends':
+        setCurrentPage('friends');
+        break;
+      case '2playergame':
+        setCurrentPage('2playergame');
+        break;
+      case '4playergame':
+        setCurrentPage('4playergame');
+        break;
+      case 'tempLogin':
+        setCurrentPage('tempLogin');
+        break;
+      default:
+        setCurrentPage('landing');
+    }
+    renderApp();
+    return;
+  }
+
   // Handle path-based routing
   switch (path) {
     case '/':
@@ -59,9 +98,6 @@ function handleRouting(): void {
       break;
     case '/lobby':
       setCurrentPage('lobby');
-      break;
-    case '/game':
-      setCurrentPage('game');
       break;
     case '/gameSelect':
       setCurrentPage('gameSelect');
@@ -84,9 +120,15 @@ function handleRouting(): void {
     case '/auth/callback':
       setCurrentPage('authCallback');
       break;
-    case '/verify-email':
-      setCurrentPage('verifyEmail');
+    case '/2playergame':
+      setCurrentPage('2playergame');
       break;
+    case '/4playergame':
+      setCurrentPage('4playergame');
+      break;
+    case 'tempLogin':
+        setCurrentPage('tempLogin');
+        break;
     default:
       setCurrentPage('landing');
   }
@@ -97,7 +139,7 @@ function handleRouting(): void {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
   
-  if (page !== 'lobby' && page !== 'game') {
+  if (page !== 'lobby' && page !== '2playergame' && page !== '4playergame') {
     cleanupLobby();
   }
 
@@ -142,23 +184,17 @@ export async function renderApp(): Promise<void> {
     case 'profile':
       renderProfilePage();
       break;
-    case 'editProfile':
-      renderEditProfilePage();
+    case '2playergame':
+      render2PlayerGame();
       break;
-    case 'changeUsername':
-      renderChangeUsernamePage();
-      break;
-    case 'changeEmail':
-      renderChangeEmailPage();
-      break;
-    case 'game':
-      renderGamePage();
+    case '4playergame':
+      render4PlayerGame();
       break;
     case 'friends':
       renderFriendsPage();
       break;
-    case 'verifyEmail':
-      renderVerifyEmailPage();
+    case 'tempLogin':
+      renderTempLoginPage();
       break;
     default:
       renderLandingPage();
