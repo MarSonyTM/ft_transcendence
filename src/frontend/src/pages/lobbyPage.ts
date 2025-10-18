@@ -585,11 +585,6 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
     toggleReadyBtn.addEventListener('click', () => toggleReady());
   }
 
-  const addLocalPlayerBtn = document.getElementById('addLocalPlayerBtn');
-  if (addLocalPlayerBtn && canAddMore && isHost) {
-    addLocalPlayerBtn.addEventListener('click', () => addLocalPlayer());
-  }
-
   const addAIBtn = document.getElementById('addAIBtn');
   if (addAIBtn && canAddMore && isHost) {
     addAIBtn.addEventListener('click', () => addAIOpponent());
@@ -649,56 +644,6 @@ async function toggleReady(): Promise<void> {
   } catch (error) {
     console.error('Error toggling ready:', error);
   }
-}
-
-async function addLocalPlayer(): Promise<void> {
-    const currentRoom = getCurrentRoom();
-    console.log('[LOCAL] addLocalPlayer called, currentRoom:', currentRoom);
-    
-    if (!currentRoom) {
-        console.error('[LOCAL] No current room!');
-        alert('No active room found');
-        return;
-    }
-    
-    try {
-        const localPlayerId = `local-player-${Date.now()}`;
-        const localPlayerUsername = 'Local Player 2';
-        
-        const token = authService.getToken();
-        const joinResponse = await fetch(`/api/room/${currentRoom.roomId}/join`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                playerId: localPlayerId,
-                username: localPlayerUsername,
-                isLocal: true, // Mark as local player
-                isReady: true // Local players are automatically ready
-            })
-        });
-        
-        const joinData = await joinResponse.json();
-        console.log('[LOCAL] Join response:', joinData);
-        
-        if (joinData.success && joinData.room) {
-            setCurrentRoom(joinData.room);
-            console.log('✅ [LOCAL] Local player added successfully');
-            
-            const root = document.getElementById('app-root');
-            if (root) {
-                renderLobby(root);
-            }
-        } else {
-            console.error('[LOCAL] Failed to add local player:', joinData);
-            alert(joinData.message || 'Failed to add local player');
-        }
-    } catch (error) {
-        console.error('[LOCAL] Error adding local player:', error);
-        alert('Failed to add local player');
-    }
 }
 
 async function addAIOpponent(): Promise<void> {
