@@ -91,18 +91,34 @@ export function renderLoginPage(): void {
                 
                 // Update current user
                 setCurrentUser(result.username || username);
-                
-                // Show success message
-                if (errorEl) {
-                    errorEl.style.color = 'green';
-                    errorEl.textContent = 'Login successful! Redirecting...';
+
+                // Check if email is verified
+                if (!result.emailVerified) {
+                    // Show message about email verification
+                    if (errorEl) {
+                        errorEl.style.color = '#f59e0b';
+                        errorEl.textContent = 'Please verify your email address. Redirecting...';
+                    }
+
+                    localStorage.setItem('needEmailVerification', 'true');
+                    // Redirect to verify email page
+                    setTimeout(() => {
+                        history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                    }, 1500);
+                } else {
+                    // Show success message
+                    if (errorEl) {
+                        errorEl.style.color = 'green';
+                        errorEl.textContent = 'Login successful! Redirecting...';
+                    }
+                    
+                    // Redirect to landing page
+                    setTimeout(() => {
+                        history.pushState({ page: 'landing' }, '', '/');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                    }, 500);
                 }
-                
-                // Redirect to landing page
-                setTimeout(() => {
-                    history.pushState({ page: 'landing' }, '', '/');
-                    window.dispatchEvent(new PopStateEvent('popstate'));
-                }, 500);
             } else {
                 if (errorEl) errorEl.textContent = result.error || 'Login failed';
             }

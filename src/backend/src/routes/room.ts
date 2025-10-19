@@ -331,6 +331,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         ballVelX: 0,
         ballVelY: 0,
         mode: gameMode,
+        lastContact: 0,
         lastActivity: new Date().toISOString(),
       };
 

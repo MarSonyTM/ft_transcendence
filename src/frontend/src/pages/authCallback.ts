@@ -7,10 +7,16 @@ export default function renderAuthCallbackPage(): void {
     const token = urlParams.get('token');
     const success = urlParams.get('success');
     const error = urlParams.get('error');
+    const email = urlParams.get('email');
+    const needEmailVerification = urlParams.get('needEmailVerification');
 
     if (success === 'true' && token) {
         // Store the token and redirect to dashboard
         localStorage.setItem('authToken', token);
+        localStorage.setItem('pendingEmailVerification', email || '');
+        if (needEmailVerification === 'true') {
+            localStorage.setItem('needEmailVerification', 'true');
+        }
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
                 <h2 style="color: #4ade80; margin-bottom: 1em;">Authentication Successful!</h2>
@@ -26,8 +32,9 @@ export default function renderAuthCallbackPage(): void {
         `;
         
         // Redirect to dashboard after short delay
+        console.log("it logged in")
         setTimeout(() => {
-            history.pushState({ page: 'dashboard' }, '', '/dashboard');
+            history.pushState({ page: '' }, '', '/');
             window.dispatchEvent(new PopStateEvent('popstate'));
         }, 2000);
     } else {

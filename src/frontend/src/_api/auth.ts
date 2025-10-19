@@ -4,29 +4,11 @@ import { API_BASE } from '../config';
 interface RegisterResult {
 	success: boolean;
 	username?: string;
+	emailVerified?: boolean;
+	token?: string;
 	error?: string;
 }
-
-//export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; error?: string }> {
-// 		const res = await fetch(`${API_BASE}/api/auth/login`, {
-//		method: 'POST',
-//		headers: { 'Content-Type': 'application/json' },
-//		body: JSON.stringify({ username, password })
-//	});
-//	if (res.ok) {
-//		const data = await res.json().catch(() => ({}));
-//        if (data?.token) setAccessToken(data.token);
-//		return data;
-//	}
-//    if (res.status === 404) {
-//        return { success: false, error: 'API not available (404)' };
-//    } else if ( res.status === 401 ) {
-//        return { success: false, error: 'Invalid username/email or password' };
-//    }
-//	return { success: false, error: `Server error (${res.status})` };
-//}
-
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; error?: string }> {
+export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; emailVerified?: boolean; error?: string }> {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
     
     const res = await fetch(`${apiEndpoint}/api/auth/login`, {
@@ -37,9 +19,13 @@ export async function loginUser(username: string, password: string): Promise<{ s
     
     if (res.ok) {
         const data = await res.json().catch(() => ({}));
+		if (data?.data && !data.data.emailVerified) {
+			localStorage.setItem('pendingEmailVerification', data.data.email || '');
+		}
         return {
             success: data.success || false,
             username: data.data?.username,
+			emailVerified: data.data?.emailVerified,
             token: data.token,
             error: data.message
         };

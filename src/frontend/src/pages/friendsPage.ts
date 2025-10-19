@@ -75,7 +75,7 @@ function initFriendsPage(): void {
   const backBtn = document.getElementById('backBtn');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      history.pushState({ page: 'landing' }, '', '#landing');
+      history.pushState({ page: 'landing' }, '', '/landing');
       setCurrentPage('landing');
       renderApp();
     });

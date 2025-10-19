@@ -17,10 +17,21 @@ import { renderTempLoginPage } from './pages/tempLoginPage';
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
+const publicPages = ['/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
+
 // Centralized routing handler
 function handleRouting(): void {
   const path = window.location.pathname;
   const hash = window.location.hash;
+
+  if (!publicPages.includes(path)) {
+    const currentUser = localStorage.getItem('needEmailVerification');
+    if (currentUser === 'true') {
+      history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
+  }
 
   // Handle /join/:roomId URLs (path-based routing)
   const joinMatch = path.match(/^\/join\/([a-z0-9]+)$/i);
@@ -94,6 +105,18 @@ function handleRouting(): void {
     case '/profile':
       setCurrentPage('profile');
       break;
+    case '/edit-profile':
+      setCurrentPage('editProfile');
+      break;
+    case '/change-username':
+      setCurrentPage('changeUsername');
+      break;
+    case '/change-email':
+      setCurrentPage('changeEmail');
+      break;
+    case '/friends':
+        setCurrentPage('friends');
+        break;
     case '/auth/callback':
       setCurrentPage('authCallback');
       break;

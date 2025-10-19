@@ -50,7 +50,7 @@ export async function renderJoinPage(roomId: string): Promise<void> {
     // Redirect to lobby with roomId (and update URL/state)
     // Store intent so main router can pass roomId to lobby
     sessionStorage.setItem('pendingRoomJoin', roomId);
-    history.pushState({ page: 'lobby', roomId }, '', '#lobby');
+    history.pushState({ page: 'lobby', roomId }, '', '/lobby');
     setCurrentPage('lobby');
     renderApp();
   } catch (error) {
