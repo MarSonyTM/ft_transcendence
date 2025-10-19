@@ -35,10 +35,14 @@ Thumbs.db
 src/backend/node_modules/
 src/frontend/node_modules/
 
+
+
 # Database
 *.db-shm
 *.db-wal
 *.db
 src/database/
 
+/src/backend/package-lock.json
+/src/frontend/package-lock.json
 /package-lock.json
