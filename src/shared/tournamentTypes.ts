@@ -1,3 +1,5 @@
+import { GameState, Player } from "../backend/src/database";
+
 export type TournamentStatus = 'idle' | 'in_progress' | 'completed';
 
 // Domain types (backend internal state)
@@ -7,6 +9,7 @@ export interface TournamentPlayer {
 	eliminated: boolean;
 	wins: number;
 	losses: number;
+	profile: Player;//TODO: use this!
 }
 
 export interface TournamentMatchRecord {
@@ -28,6 +31,7 @@ export interface TournamentMatchInternal {
 export interface TournamentState {
 	id: number;
 	status: TournamentStatus;
+	gameStates: GameState[];//TODO: maybe good to have for live tracking?
 	createdAt: string;
 	updatedAt: string;
 	players: TournamentPlayer[];

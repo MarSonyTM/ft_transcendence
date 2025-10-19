@@ -2,14 +2,6 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } f
 import { database } from '../database/index';
 import { gameRoomManager } from '../game/gameRoom';
 
-interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: number;
-    email: string;
-    username: string;
-  };
-}
-
 interface SendInvitationBody {
   friendId: number;
   gameMode?: string;
@@ -19,10 +11,10 @@ interface InvitationParams {
   id: string;
 }
 
-async function invitationRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
+async function invitationRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) { 
   
   // Send game invitation
-  fastify.post('/send', async (request: AuthenticatedRequest & { Body: SendInvitationBody }, reply: FastifyReply) => {
+  fastify.post('/send', async (request: FastifyRequest<{ Body: SendInvitationBody; Params: InvitationParams; Querystring: Record<string, never> }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       const username = request.user?.username;
@@ -34,7 +26,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
         });
       }
 
-      const { friendId, gameMode = '2player' } = request.body;
+      const { friendId, gameMode = '2P' } = request.body;
 
       if (!friendId || friendId === userId) {
         return reply.code(400).send({
@@ -53,7 +45,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
       }
 
       // Create a room for this invitation
-      const maxPlayers = gameMode === '4player' ? 4 : 2;
+      const maxPlayers = gameMode === '4P' ? 4 : 2;
       const room = gameRoomManager.createRoom(userId.toString(), username, maxPlayers);
 
       // Send invitation
@@ -80,7 +72,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
   });
 
   // Get pending invitations (received)
-  fastify.get('/pending', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  fastify.get('/pending', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -125,7 +117,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
   });
 
   // Get sent invitations
-  fastify.get('/sent', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  fastify.get('/sent', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -166,7 +158,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
   });
 
   // Accept invitation
-  fastify.post('/accept/:id', async (request: AuthenticatedRequest & { Params: InvitationParams }, reply: FastifyReply) => {
+  fastify.post('/accept/:id', async (request: FastifyRequest<{ Body: SendInvitationBody; Params: InvitationParams; Querystring: Record<string, never> }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -223,7 +215,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
   });
 
   // Reject invitation
-  fastify.post('/reject/:id', async (request: AuthenticatedRequest & { Params: InvitationParams }, reply: FastifyReply) => {
+  fastify.post('/reject/:id', async (request: FastifyRequest<{ Body: SendInvitationBody; Params: InvitationParams; Querystring: Record<string, never> }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -266,7 +258,7 @@ async function invitationRoutes(fastify: FastifyInstance, options: FastifyPlugin
   });
 
   // Cancel invitation (for sender)
-  fastify.delete('/:id', async (request: AuthenticatedRequest & { Params: InvitationParams }, reply: FastifyReply) => {
+  fastify.delete('/:id', async (request: FastifyRequest<{ Body: SendInvitationBody; Params: InvitationParams; Querystring: Record<string, never> }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       

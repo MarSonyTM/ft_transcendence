@@ -10,7 +10,7 @@ interface RoomWebSocketConfig {
   onPlayerDisconnected?: (playerId: string) => void;
   onScore?: (scores: any) => void;
   onGameStart?: (gameId: number) => void;
-  onGameEnd?: (winnerId: string) => void;
+  onGameEnd?: (data: { winnerId: string; winnerSeat?: string; winnerName?: string; players?: any[] }) => void;
   onChat?: (message: any) => void;
   onError?: (error: Error) => void;
 }
@@ -31,13 +31,10 @@ export class RoomWebSocketManager {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        
-        const wsEndpoint = (window as any).__INITIAL_STATE__?.wsEndpoint || 
-                        `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}://${window.location.hostname}:3000`;
-      
-      const wsUrl = `${wsEndpoint}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : 
+                       `${window.location.hostname}:3000`;
+        const wsUrl = `${wsProtocol}//${wsHost}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
         
         console.log('🔌 Connecting to:', wsUrl);
         
@@ -165,7 +162,12 @@ export class RoomWebSocketManager {
 
       case 'gameEnd':
         if (this.config.onGameEnd) {
-          this.config.onGameEnd(message.winnerId);
+          this.config.onGameEnd({
+            winnerId: message.winner || message.winnerId,
+            winnerSeat: message.winnerSeat,
+            winnerName: message.winnerName,
+            players: message.players
+          });
         }
         break;
 
@@ -195,7 +197,7 @@ export class RoomWebSocketManager {
   sendMove(position: number, isGuest: boolean = false): void {
     this.send({
       type: 'move',
-      playerId: customPlayerId || this.config.playerId,
+      playerId: this.config.playerId,
       position,
       isGuest,  // Add this flag
     });

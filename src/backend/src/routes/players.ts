@@ -1,18 +1,18 @@
 // src/routes/players.ts
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { database, Player } from '../database/index';
+import { database } from '../database/index';
 
 // Types
 export interface CreatePlayerInput {
     gameId: number;
     playerId: number;
-    playerPosition: string;
+    playerPosition: 'left' | 'top' | 'right' | 'bottom';
 }
 
 export interface UpdatePlayerInput {
     currentScore?: number;
     connectionStatus?: string;
-    playerPosition?: string;
+    playerPosition?: 'left' | 'top' | 'right' | 'bottom';
 }
 
 // Plugin function that registers all player routes
@@ -163,7 +163,7 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
             
             for (const game of allGames) {
                 const gamePlayers = database.players.getPlayers(game.id);
-                const userGamePlayers = gamePlayers.filter((p) => p.playerId === userIdNum);
+                const userGamePlayers = gamePlayers.filter((p) => p.id === userIdNum);
                 userPlayers.push(...userGamePlayers);
             }
             
@@ -218,7 +218,9 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
             
             // Check if game is full
             const currentPlayers = database.players.getPlayers(playerData.gameId);
-            if (currentPlayers.length >= 2) {
+            const is4P = game.mode === '4P';
+            const capacity = is4P ? 4 : 2;
+            if (currentPlayers.length >= capacity) {
                 reply.code(400).send({
                     success: false,
                     message: 'Game is full'
@@ -227,11 +229,21 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
             }
             
             // Check if player is already in this game
-            const existingPlayer = currentPlayers.find((p) => p.playerId === playerData.playerId);
+            const existingPlayer = currentPlayers.find((p) => p.id === playerData.playerId);
             if (existingPlayer) {
                 reply.code(400).send({
                     success: false,
                     message: 'Player is already in this game'
+                });
+                return;
+            }
+
+            // Check if requested seat is already taken
+            const seatTaken = (currentPlayers as any[]).some((p) => (p as any).playerPosition === playerData.playerPosition);
+            if (seatTaken) {
+                reply.code(400).send({
+                    success: false,
+                    message: `Seat '${playerData.playerPosition}' is already taken`
                 });
                 return;
             }
@@ -244,7 +256,9 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
             );
             
             // Update game status if needed
-            if (currentPlayers.length === 1) {
+            if (!is4P && currentPlayers.length === 1) {
+                database.games.updateGame(playerData.gameId, { status: 'ready' });
+            } else if (is4P && currentPlayers.length === 3) {
                 database.games.updateGame(playerData.gameId, { status: 'ready' });
             }
             
@@ -311,9 +325,31 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
                     });
                     return;
                 }
+
+                // Validate seat change against mode and seat availability
+                if (updateData.playerPosition) {
+                    const game = database.games.getGameById(playerGameId);
+                    const is4P = game?.mode === '4P';
+                    const allowedPositions = is4P ? ['left', 'top', 'right', 'bottom'] : ['left', 'right'];
+                    if (!allowedPositions.includes(updateData.playerPosition)) {
+                        reply.code(400).send({
+                            success: false,
+                            message: `Invalid playerPosition for mode ${game?.mode}. Allowed: ${allowedPositions.join(', ')}`
+                        });
+                        return;
+                    }
+                    const seatTaken = (gamePlayers as any[]).some((p) => (p as any).playerPosition === updateData.playerPosition && (p as any).id !== playerId);
+                    if (seatTaken) {
+                        reply.code(400).send({
+                            success: false,
+                            message: `Seat '${updateData.playerPosition}' is already taken`
+                        });
+                        return;
+                    }
+                }
                 
                 const updatedPlayer = database.players.updatePlayer(
-                    playerRecord.playerId, 
+                    (playerRecord as any).playerId,
                     playerGameId, 
                     updateData
                 );
@@ -373,7 +409,7 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
                     const foundPlayer = gamePlayers.find((p) => p.id === playerId);
                     if (foundPlayer) {
                         playerGameId = game.id;
-                        playerUserId = foundPlayer.playerId;
+                        playerUserId = (foundPlayer as any).playerId;
                         break;
                     }
                 }
@@ -450,25 +486,16 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
             
             for (const game of allGames) {
                 const gamePlayers = database.players.getPlayers(game.id);
-                const userInGame = gamePlayers.find((p) => p.playerId === playerId);
+                const userInGame = gamePlayers.find((p) => p.id === playerId);
                 
                 if (userInGame) {
                     playerGames.push({
                         gameId: game.id,
-                        gameStatus: game.status,
-                        playerPosition: userInGame.playerPosition,
-                        currentScore: userInGame.currentScore,
-                        createdAt: game.createdAt,
-                        endedAt: game.endedAt
+                        playerPosition: (userInGame as any).playerPosition,
+                        currentScore: (userInGame as any).score,
                     });
                     
-                    totalScore += userInGame.currentScore;
-                    
-                    if (game.status === 'finished' && game.winnerId === playerId) {
-                        gamesWon++;
-                    } else if (game.status === 'finished' && game.winnerId !== playerId) {
-                        gamesLost++;
-                    }
+                    totalScore += (userInGame as any).score || 0;
                 }
             }
             

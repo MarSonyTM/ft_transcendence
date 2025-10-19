@@ -4,6 +4,7 @@ import {
 	TournamentState,
 	TournamentMatchRecord
 } from '../../../shared/tournamentTypes';
+import { GameState, Player, RGBColor } from '../database';
 
 function nowISO(): string {
 	return new Date().toISOString();
@@ -36,6 +37,7 @@ class TournamentManager {
 		const t: TournamentState = {
 			id: this.nextTournamentId++,
 			status: 'idle',
+			gameStates: [],//TODO: maybe good to have for live tracking?
 			createdAt,
 			updatedAt: createdAt,
 			players: [],
@@ -62,10 +64,24 @@ class TournamentManager {
 		const t = this.newTournamentInternal();
 		t.players = cleaned.map(alias => ({
 			id: this.nextPlayerIdGlobal++,
-			alias,
+			alias: alias,
 			eliminated: false,
 			wins: 0,
-			losses: 0
+			losses: 0,
+			profile: {
+				gameId: 0,
+				id: 0,
+				name: alias,
+				avatar: '',
+				createdAt: nowISO(),
+				updatedAt: nowISO(),
+				pos: 0,
+				material: '',
+				color: { r: 0, g: 0, b: 0 },
+				score: 0,
+				connectionStatus: '',
+				lastActivity: nowISO()
+			} as Player
 		}));
 		t.queue = t.players.map((p: TournamentPlayer) => p.id);
 		t.currentMatch = this.createNextMatch(t.queue);
@@ -160,6 +176,7 @@ class TournamentManager {
 		const t: TournamentState = {
 			id: this.nextTournamentId++,
 			status: 'idle',
+			gameStates: [],
 			createdAt,
 			updatedAt: createdAt,
 			players: [],

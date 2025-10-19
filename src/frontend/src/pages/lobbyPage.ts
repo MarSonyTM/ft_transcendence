@@ -2,7 +2,13 @@ import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
-import { Player, GameRoom, getCurrentRoom, setCurrentRoom, clearRoomState } from '../utils/roomState';
+import { 
+  Player, 
+  GameRoom, 
+  getCurrentRoom,
+  setCurrentRoom,
+  clearRoomState
+} from '../utils/roomState';
 
 let currentUserId: string | null = null;
 let pollInterval: number | null = null;
@@ -67,22 +73,35 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '2player' ? 2 : 4;
+  const maxPlayers = gameMode === '2P' ? 2 : 4;
+
+  const token = authService.getToken();
+  const response = await fetch('/api/room/create', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      hostId: userId,
+      hostUsername: username,
+      maxPlayers: maxPlayers
+    })
+  });
+
+  if (!response.ok) {
+    console.error('[CREATE] HTTP Error:', response.status, response.statusText);
+    const text = await response.text();
+    console.error('[CREATE] Response body:', text);
+    throw new Error(`Failed to create room: ${response.status} ${response.statusText}`);
+  }
   
-  try {
-    const token = authService.getToken();
-    const response = await fetch('/api/room/create', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        hostId: userId,
-        hostUsername: username,
-        maxPlayers: maxPlayers
-      })
-    });
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('[CREATE] Non-JSON response:', text);
+    throw new Error('Server returned non-JSON response');
+  }
 
     const data = await response.json();
     
@@ -92,10 +111,6 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     } else {
       throw new Error(data.message || 'Failed to create room');
     }
-  } catch (error) {
-    console.error('[CREATE] Error:', error);
-    throw error;
-  }
 }
 
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
@@ -204,7 +219,7 @@ async function startGame(): Promise<void> {
       
       // Navigate to game based on mode
       const gameMode = getCurrentGameMode();
-      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
       history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();
@@ -337,7 +352,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       console.log('Navigating to game page...');
       const gameMode = getCurrentGameMode();
-      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
       history.pushState({ page: gamePage, roomId: currentRoom?.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();
@@ -585,10 +600,10 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
     toggleReadyBtn.addEventListener('click', () => toggleReady());
   }
 
-  const addLocalPlayerBtn = document.getElementById('addLocalPlayerBtn');
-  if (addLocalPlayerBtn && canAddMore && isHost) {
-    addLocalPlayerBtn.addEventListener('click', () => addLocalPlayer());
-  }
+  // const addLocalPlayerBtn = document.getElementById('addLocalPlayerBtn');
+  // if (addLocalPlayerBtn && canAddMore && isHost) {
+  //   addLocalPlayerBtn.addEventListener('click', () => addLocalPlayer());
+  // }
 
   const addAIBtn = document.getElementById('addAIBtn');
   if (addAIBtn && canAddMore && isHost) {
@@ -651,55 +666,55 @@ async function toggleReady(): Promise<void> {
   }
 }
 
-async function addLocalPlayer(): Promise<void> {
-    const currentRoom = getCurrentRoom();
-    console.log('[LOCAL] addLocalPlayer called, currentRoom:', currentRoom);
+// async function addLocalPlayer(): Promise<void> {
+//     const currentRoom = getCurrentRoom();
+//     console.log('[LOCAL] addLocalPlayer called, currentRoom:', currentRoom);
     
-    if (!currentRoom) {
-        console.error('[LOCAL] No current room!');
-        alert('No active room found');
-        return;
-    }
+//     if (!currentRoom) {
+//         console.error('[LOCAL] No current room!');
+//         alert('No active room found');
+//         return;
+//     }
     
-    try {
-        const localPlayerId = `local-player-${Date.now()}`;
-        const localPlayerUsername = 'Local Player 2';
+//     try {
+//         const localPlayerId = `local-player-${Date.now()}`;
+//         const localPlayerUsername = 'Local Player 2';
         
-        const token = authService.getToken();
-        const joinResponse = await fetch(`/api/room/${currentRoom.roomId}/join`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                playerId: localPlayerId,
-                username: localPlayerUsername,
-                isLocal: true, // Mark as local player
-                isReady: true // Local players are automatically ready
-            })
-        });
+//         const token = authService.getToken();
+//         const joinResponse = await fetch(`/api/room/${currentRoom.roomId}/join`, {
+//             method: 'POST',
+//             headers: { 
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${token}`
+//             },
+//             body: JSON.stringify({
+//                 playerId: localPlayerId,
+//                 username: localPlayerUsername,
+//                 isLocal: true, // Mark as local player
+//                 isReady: true // Local players are automatically ready
+//             })
+//         });
         
-        const joinData = await joinResponse.json();
-        console.log('[LOCAL] Join response:', joinData);
+//         const joinData = await joinResponse.json();
+//         console.log('[LOCAL] Join response:', joinData);
         
-        if (joinData.success && joinData.room) {
-            setCurrentRoom(joinData.room);
-            console.log('✅ [LOCAL] Local player added successfully');
+//         if (joinData.success && joinData.room) {
+//             setCurrentRoom(joinData.room);
+//             console.log('✅ [LOCAL] Local player added successfully');
             
-            const root = document.getElementById('app-root');
-            if (root) {
-                renderLobby(root);
-            }
-        } else {
-            console.error('[LOCAL] Failed to add local player:', joinData);
-            alert(joinData.message || 'Failed to add local player');
-        }
-    } catch (error) {
-        console.error('[LOCAL] Error adding local player:', error);
-        alert('Failed to add local player');
-    }
-}
+//             const root = document.getElementById('app-root');
+//             if (root) {
+//                 renderLobby(root);
+//             }
+//         } else {
+//             console.error('[LOCAL] Failed to add local player:', joinData);
+//             alert(joinData.message || 'Failed to add local player');
+//         }
+//     } catch (error) {
+//         console.error('[LOCAL] Error adding local player:', error);
+//         alert('Failed to add local player');
+//     }
+// }
 
 async function addAIOpponent(): Promise<void> {
   const currentRoom = getCurrentRoom();

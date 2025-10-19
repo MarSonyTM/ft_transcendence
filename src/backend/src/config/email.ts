@@ -5,8 +5,8 @@ import { EMAIL_USER, EMAIL_PASSWORD } from './index';
 export interface EmailConfig {
     service: string;
     auth: {
-        user: string;
-        pass: string;
+        user?: string;
+        pass?: string;
     };
 }
 

@@ -2,21 +2,27 @@ import { PongGame } from "../game/PongGame";
 import { GameRoom, getCurrentRoom } from "./roomState";
 import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
 import { authService } from "./auth";
+import { baby3D } from "../game/game3D";
 
 export async function setGameScreen(pongGame: PongGame) {
-    // Manually initialize canvas without creating a new game
-    pongGame.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
+    pongGame.canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
     if (!pongGame.canvas) {
-        console.error('❌ Canvas not found!');
+        console.error('❌ Render canvas not found');
         return;
     }
-    pongGame.ctx = pongGame.canvas.getContext('2d');
     
     try {
         await pongGame.connectWebSocket();
         console.log('✅ Connected to shared game WebSocket');
         pongGame.updateStatus("Connected - Click Start to begin");
         if (pongGame.startRenderLoop) pongGame.startRenderLoop();
+
+        try {
+            const baby = new baby3D(pongGame);
+            await baby.createScene();
+        } catch (e) {
+            console.error('❌ Failed to start 3D renderer:', e);
+        }
     } catch (error) {
         console.error('❌ Failed to connect to game WebSocket:', error);
     }

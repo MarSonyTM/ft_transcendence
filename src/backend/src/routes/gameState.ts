@@ -1,14 +1,10 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { GameState } from '../game/gameState';
-import { database } from '../database/index';
+import { database, Player } from '../database/index';
 
 // Types
 export interface CreateGameStateInput {
     gameId: number;
-    player1Id: number;
-    player2Id: number;
-    player3Id: number;
-    player4Id: number;
 }
 
 export interface UpdateGameStateInput {
@@ -16,17 +12,7 @@ export interface UpdateGameStateInput {
     ballPosY?: number;
     ballVelX?: number;
     ballVelY?: number;
-    player1Pos?: number;
-    player2Pos?: number;
-    player3Pos?: number;
-    player4Pos?: number;
-    scorePlayer1: number;
-    scorePlayer2: number;
-    scorePlayer3: number;
-    scorePlayer4: number;
 }
-
-const gameStateInstance = new GameState();
 
 // Plugin function that registers all game state routes
 async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -129,16 +115,13 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 
                 const defaultGameState = {
                     gameId: gameIdNum,
-                    player1Id: 1, // Default player IDs
-                    player2Id: 2,
-                    ballPosX: 0,
-                    ballPosY: 0,
+                    players: [] as Player[],
+                    ballPosX: 200,
+                    ballPosY: game.mode === '4P' ? 200 : 100,
                     ballVelX: 0,
                     ballVelY: 0,
-                    player1Pos: 0,
-                    player2Pos: 0,
-                    scorePlayer1: 0,
-                    scorePlayer2: 0
+                    mode: game.mode || '2P',
+                    lastActivity: new Date().toISOString()
                 };
                 
                 // Try to create the game state
@@ -178,10 +161,10 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
             const gameStateData = request.body as CreateGameStateInput;
             
             // Basic validation
-            if (!gameStateData.gameId || !gameStateData.player1Id || !gameStateData.player2Id) {
+            if (!gameStateData.gameId) {
                 reply.code(400).send({
                     success: false,
-                    message: 'gameId, player1Id, and player2Id are required'
+                    message: 'gameId is required'
                 });
                 return;
             }
@@ -196,17 +179,17 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 return;
             }
             
-            // Check if players exist
-            const player1 = database.users.getUserById(gameStateData.player1Id);
-            const player2 = database.users.getUserById(gameStateData.player2Id);
+            // // Check if players exist
+            // const player1 = database.users.getUserById(gameStateData.player1Id);
+            // const player2 = database.users.getUserById(gameStateData.player2Id);
             
-            if (!player1 || !player2) {
-                reply.code(404).send({
-                    success: false,
-                    message: 'One or both players not found'
-                });
-                return;
-            }
+            // if (!player1 || !player2) {
+            //     reply.code(404).send({
+            //         success: false,
+            //         message: 'One or both players not found'
+            //     });
+            //     return;
+            // }
             
             // Check if game state already exists for this game
             const existingGameState = database.gameState.getGameStateByGameId(gameStateData.gameId);
@@ -218,7 +201,7 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 return;
             }
             
-            const newGameState = database.gameState.createGameState(gameStateData);
+            const newGameState = database.gameState.createGameState({ gameId: gameStateData.gameId});//, players: [], ballPosX: 200, ballPosY: game.mode === '4P' ? 200 : 100, ballVelX: 0, ballVelY: 0, mode: game.mode || '2P' });
             
             reply.code(201).send({
                 success: true,
@@ -250,7 +233,7 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 return;
             }
             
-            const updatedGameState = database.gameState.updateGameState(gameStateId, updateData);
+            const updatedGameState = database.gameState.updateGameStateByGameId(gameStateId, updateData);
             
             if (!updatedGameState) {
                 reply.code(404).send({
@@ -350,15 +333,6 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
         }
     });
 
-    // Get ball pos
-    fastify.get('/ball-position', async (request, reply) => {
-        return {
-            success: true,
-            ballX: gameStateInstance.getBallPosX(),
-            ballY: gameStateInstance.getBallPosY()
-        };
-    });
-
     // Get ball pos for specific game
     fastify.get('/game/:gameId/ball-position', async (request, reply) => {
         try {
@@ -400,10 +374,21 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
 
     // Get score for specific game
     fastify.get('/:id/score', async (request, reply) => {
+        const { id } = request.params as { id: number };
+        const gameStateInstance = database.gameState.getGameStateByGameId(id);
+        if (!gameStateInstance) {
+            reply.code(404).send({
+                success: false,
+                message: 'Game state not found'
+            });
+            return;
+        }
         return {
             success: true,
-            scorePlayer1: gameStateInstance.getScorePlayer1(),
-            scorePlayer2: gameStateInstance.getScorePlayer2()
+            scorePlayer1: gameStateInstance.players[0].score,
+            scorePlayer2: gameStateInstance.players[1].score,
+            scorePlayer3: gameStateInstance.players[2]?.score || 0,
+            scorePlayer4: gameStateInstance.players[3]?.score || 0
         };
     });
 
@@ -433,19 +418,18 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
             }
             
             // Create GameState instance and populate it with data
-            const gameState = new GameState();
-            gameState.ballPosX = gameStateData.ballPosX;
-            gameState.ballPosY = gameStateData.ballPosY;
-            gameState.ballVelX = gameStateData.ballVelX;
-            gameState.ballVelY = gameStateData.ballVelY;
-            gameState.player1Pos = gameStateData.player1Pos;
-            gameState.player2Pos = gameStateData.player2Pos;
-            gameState.scorePlayer1 = gameStateData.scorePlayer1;
-            gameState.scorePlayer2 = gameStateData.scorePlayer2;
-            
             return {
                 success: true,
-                data: gameState.getGameState()
+                data: {
+                    ballPosX: gameStateData.ballPosX,
+                    ballPosY: gameStateData.ballPosY,
+                    ballVelX: gameStateData.ballVelX ?? 0,
+                    ballVelY: gameStateData.ballVelY ?? 0,
+                    players: gameStateData.players,
+                    gameId: gameStateData.gameId,
+                    mode: gameStateData.mode,
+                    lastContact: gameStateData.lastContact || 0
+                }
             };
         } catch (error) {
             fastify.log.error(error);
