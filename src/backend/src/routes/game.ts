@@ -617,76 +617,76 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             // Start game engine
-            try {
-                // Get the game mode from the database - NOW SUPPORTING 4PLAYER!
-                const gameMode = game.mode || '2P'; // Default to 2P if no mode specified
+            // try {
+            //     // Get the game mode from the database - NOW SUPPORTING 4PLAYER!
+            //     const gameMode = game.mode || '2P'; // Default to 2P if no mode specified
                 
-                console.log(`🎮 Starting ${gameMode} game engine for game ${gameId}`);
+            //     console.log(`🎮 Starting ${gameMode} game engine for game ${gameId}`);
                 
-                // Build a runtime game state that the engine expects
-                const playersInDb = database.players.getPlayers(gameId) as any[];
-                const left = playersInDb.find((p: any) => p.playerPosition === 'left');
-                const right = playersInDb.find((p: any) => p.playerPosition === 'right');
-                const p1Id = left?.playerId ?? 1;
-                const p2Id = right?.playerId ?? 2;
+            //     // Build a runtime game state that the engine expects
+            //     const playersInDb = database.players.getPlayers(gameId) as any[];
+            //     const left = playersInDb.find((p: any) => p.playerPosition === 'left');
+            //     const right = playersInDb.find((p: any) => p.playerPosition === 'right');
+            //     const p1Id = left?.playerId ?? 1;
+            //     const p2Id = right?.playerId ?? 2;
 
-                const runtimeGameState = {
-                    gameId,
-                    players: [
-                        {
-                            id: p1Id,
-                            gameId,
-                            pos: 0,
-                            material: null,
-                            color: { r: 1, g: 1, b: 1 },
-                            score: 0,
-                            connectionStatus: 'connected',
-                            lastActivity: new Date().toISOString()
-                        },
-                        {
-                            id: p2Id,
-                            gameId,
-                            pos: 0,
-                            material: null,
-                            color: { r: 1, g: 1, b: 1 },
-                            score: 0,
-                            connectionStatus: 'connected',
-                            lastActivity: new Date().toISOString()
-                        }
-                    ],
-                    ballPosX: gameStateRow?.ballPosX ?? 0,
-                    ballPosY: gameStateRow?.ballPosY ?? 0,
-                    ballVelX: gameStateRow?.ballVelX ?? 0,
-                    ballVelY: gameStateRow?.ballVelY ?? 0,
-                    mode: gameMode,
-                    lastActivity: new Date().toISOString()
-                } as any;
+            //     const runtimeGameState = {
+            //         gameId,
+            //         players: [
+            //             {
+            //                 id: p1Id,
+            //                 gameId,
+            //                 pos: 0,
+            //                 material: null,
+            //                 color: { r: 1, g: 1, b: 1 },
+            //                 score: 0,
+            //                 connectionStatus: 'connected',
+            //                 lastActivity: new Date().toISOString()
+            //             },
+            //             {
+            //                 id: p2Id,
+            //                 gameId,
+            //                 pos: 0,
+            //                 material: null,
+            //                 color: { r: 1, g: 1, b: 1 },
+            //                 score: 0,
+            //                 connectionStatus: 'connected',
+            //                 lastActivity: new Date().toISOString()
+            //             }
+            //         ],
+            //         ballPosX: gameStateRow?.ballPosX ?? 0,
+            //         ballPosY: gameStateRow?.ballPosY ?? 0,
+            //         ballVelX: gameStateRow?.ballVelX ?? 0,
+            //         ballVelY: gameStateRow?.ballVelY ?? 0,
+            //         mode: gameMode,
+            //         lastActivity: new Date().toISOString()
+            //     } as any;
 
-                const gameEngine = createGameEngine(runtimeGameState as any, gameMode);
-                activeGames.set(gameId, gameEngine);
-                gameEngine.startGame();
+            //     const gameEngine = createGameEngine(runtimeGameState as any, gameMode);
+            //     activeGames.set(gameId, gameEngine);
+            //     gameEngine.startGame();
                 
-                // Update game status in database
-                database.games.updateGame(gameId, { 
-                    status: 'active',
-                    startedAt: new Date().toISOString()
-                });
+            //     // Update game status in database
+            //     database.games.updateGame(gameId, { 
+            //         status: 'active',
+            //         startedAt: new Date().toISOString()
+            //     });
                 
-                reply.send({
-                    success: true,
-                    message: `${gameMode} game started successfully`,
-                    gameId: gameId,
-                    mode: gameMode
-                });
+            //     reply.send({
+            //         success: true,
+            //         message: `${gameMode} game started successfully`,
+            //         gameId: gameId,
+            //         mode: gameMode
+            //     });
                 
-            } catch (engineError) {
-                console.error('Failed to start game engine:', engineError);
-                reply.code(500).send({
-                    success: false,
-                    message: `Failed to start game engine: ${engineError instanceof Error ? engineError.message : 'Unknown error'}`
-                });
-                return;
-            }
+            // } catch (engineError) {
+            //     console.error('Failed to start game engine:', engineError);
+            //     reply.code(500).send({
+            //         success: false,
+            //         message: `Failed to start game engine: ${engineError instanceof Error ? engineError.message : 'Unknown error'}`
+            //     });
+            //     return;
+            // }
             
         } catch (error) {
             fastify.log.error(error);

@@ -57,17 +57,6 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     `;
     return;
   }
-  
-//   ${currentRoom.players.length === 1 && isHost ? `
-//   <div style="background: rgb(79 70 229); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
-//     <div style="color: white; font-weight: 500; margin-bottom: 0.5em;">
-//       💌 Invitation Sent!
-//     </div>
-//     <div style="color: rgb(224 231 255); font-size: 0.9em;">
-//       Waiting for your friend to accept the invitation...
-//     </div>
-//   </div>
-// ` : ''}
 
   console.log('✅ [LOBBY] Room ready:', currentRoom.roomId);
 
@@ -96,7 +85,7 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     body: JSON.stringify({
       hostId: userId,
       hostUsername: username,
-      maxPlayers
+      maxPlayers: maxPlayers
     })
   });
 
@@ -114,15 +103,14 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     throw new Error('Server returned non-JSON response');
   }
 
-  const data = await response.json();
-  console.log('[CREATE] Response:', data);
-  
-  if (data.success && data.data && data.data.room) {
-    setCurrentRoom(data.data.room);
-    console.log('✅ [CREATE] Room created:', data.data.room.roomId);
-  } else {
-    throw new Error(data.message || 'Failed to create room');
-  }
+    const data = await response.json();
+    
+    if (data.success && data.data && data.data.room) {
+      console.log('[CREATE] Room created:', data.data.room);
+      setCurrentRoom(data.data.room);
+    } else {
+      throw new Error(data.message || 'Failed to create room');
+    }
 }
 
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
@@ -193,6 +181,9 @@ async function startGame(): Promise<void> {
 
   console.log('Starting game for room:', currentRoom.roomId);
 
+  // Show countdown overlay
+  await showGameStartCountdown();
+
   try {
     const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
@@ -226,9 +217,11 @@ async function startGame(): Promise<void> {
       
       stopRoomPolling();
       
-      // Navigate to game
-      history.pushState({ page: 'game', roomId: currentRoom.roomId }, '', '#game');
-      setCurrentPage('game');
+      // Navigate to game based on mode
+      const gameMode = getCurrentGameMode();
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
+      history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `${gamePage}`);
+      setCurrentPage(gamePage);
       renderApp();
     } else {
       alert(data.message || 'Failed to start game');
@@ -237,6 +230,80 @@ async function startGame(): Promise<void> {
     console.error('❌ Error starting game:', error);
     alert('Failed to start game');
   }
+}
+
+// Add this new function for the countdown
+async function showGameStartCountdown(): Promise<void> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'countdown-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: fadeIn 0.3s ease-out;
+    `;
+
+    const countdownText = document.createElement('div');
+    countdownText.style.cssText = `
+      font-size: 10em;
+      font-weight: bold;
+      color: rgb(52 211 153);
+      text-shadow: 0 0 30px rgba(52, 211, 153, 0.5);
+      animation: pulse 1s ease-in-out;
+    `;
+
+    const messageText = document.createElement('div');
+    messageText.style.cssText = `
+      font-size: 2em;
+      color: rgb(209 213 219);
+      margin-top: 1em;
+      opacity: 0.8;
+    `;
+    messageText.textContent = 'Get Ready!';
+
+    overlay.appendChild(countdownText);
+    overlay.appendChild(messageText);
+    document.body.appendChild(overlay);
+
+    let count = 3;
+    countdownText.textContent = count.toString();
+
+    const countdownInterval = setInterval(() => {
+      count--;
+      
+      if (count > 0) {
+        countdownText.textContent = count.toString();
+        // Reset animation
+        countdownText.style.animation = 'none';
+        setTimeout(() => {
+          countdownText.style.animation = 'pulse 1s ease-in-out';
+        }, 10);
+      } else {
+        countdownText.textContent = 'GO!';
+        countdownText.style.color = 'rgb(251 191 36)';
+        messageText.textContent = 'Game Starting...';
+        
+        clearInterval(countdownInterval);
+        
+        setTimeout(() => {
+          overlay.style.animation = 'fadeOut 0.3s ease-in';
+          setTimeout(() => {
+            overlay.remove();
+            resolve();
+          }, 300);
+        }, 800);
+      }
+    }, 1000);
+  });
 }
 
 function initLobbyWebSocket(roomId: string, playerId: string): void {
@@ -284,8 +351,10 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       }
       
       console.log('Navigating to game page...');
-      history.pushState({ page: 'game', roomId }, '', '#game');
-      setCurrentPage('game');
+      const gameMode = getCurrentGameMode();
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
+      history.pushState({ page: gamePage, roomId: currentRoom?.roomId }, '', `${gamePage}`);
+      setCurrentPage(gamePage);
       renderApp();
     },
     
@@ -350,6 +419,20 @@ function renderLobby(root: HTMLElement): void {
 	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
 	  return;
 	}
+
+  const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
+  let selectedDifficulty = difficultySelect?.value;
+
+  // If no selection exists, try to get difficulty from the last AI player
+  if (!selectedDifficulty) {
+      const aiPlayers = currentRoom.players.filter(p => p.isAI);
+      if (aiPlayers.length > 0) {
+          selectedDifficulty = aiPlayers[aiPlayers.length - 1].difficulty || 'normal';
+      }
+  }
+
+  // Default to normal if no difficulty is found
+  selectedDifficulty = selectedDifficulty || 'normal';
   
 	const existingInput = document.getElementById('joinRoomInput') as HTMLInputElement;
 	const preservedValue = existingInput ? existingInput.value : '';
@@ -359,9 +442,12 @@ function renderLobby(root: HTMLElement): void {
 	const players = currentRoom.players;
 	const maxPlayers = currentRoom.maxPlayers;
 	const canAddMore = players.length < maxPlayers;
-	const canStart = players.length >= 2 && players.every(p => p.isReady);
+  const minPlayersRequired = maxPlayers === 4 ? 4 : 2;
+  const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
 	const currentPlayer = players.find(p => p.id === currentUserId);
+  let hasGuest = false;
+  let hasLocal = players.some(p => p.id === 'local');
   
 	root.innerHTML = `
 	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
@@ -393,7 +479,9 @@ function renderLobby(root: HTMLElement): void {
 		  </div>
   
 		  <div style="margin-bottom: 1.5em;">
-			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">Players (${players.length}/${maxPlayers})</h3>
+			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">
+        Players (${players.length}/${maxPlayers}) - ${maxPlayers === 4 ? '4-Player Mode' : '1v1 Mode'}
+      </h3>
 			${players.map(player => `
 			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
 				<div>
@@ -423,27 +511,46 @@ function renderLobby(root: HTMLElement): void {
 			  ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
 			</button>
 		  ` : ''}
-		  
+
 		  ${canAddMore && isHost ? `
-			<button id="addAIBtn" 
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-						   background: rgb(99 102 241); color: white;">
-			  Add AI Opponent
-			</button>
+            <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1em;">
+                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em;">Add Player</div>
+                
+                ${!hasLocal ? '<button id="addLocalBtn" style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em; background: rgb(34 197 94); color: white;"> 🎮 Add Local Player (O/L keys)</button>' : ''}
+                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em; margin-top: 1em;">AI Opponent Settings</div>
+                <select id="aiDifficulty" 
+                    style="width: 100%; padding: 0.75em; border: 1px solid rgb(75 85 99); border-radius: 8px; font-size: 1em; margin-bottom: 0.75em; background: rgb(31 41 55); color: white;">
+                    <option value="easy" ${selectedDifficulty === 'easy' ? 'selected' : ''}>Easy - Good for beginners</option>
+                    <option value="normal" ${selectedDifficulty === 'normal' ? 'selected' : ''}>Normal - Balanced challenge</option>
+                    <option value="hard" ${selectedDifficulty === 'hard' ? 'selected' : ''}>Hard - Extremely challenging</option>
+                </select>
+                <div style="color: rgb(156 163 175); font-size: 0.8em; font-style: italic; margin-bottom: 0.75em; text-align: center;">
+                    ${selectedDifficulty === 'easy' ? 
+                        '🟢 Slower reactions, less accurate - Perfect for learning the game' : 
+                    selectedDifficulty === 'normal' ? 
+                        '🟡 Moderate speed and accuracy - Good for regular practice' : 
+                        '🔴 Lightning-fast reactions, perfect accuracy - Ultimate challenge'}
+                </div>
+                <button id="addAIBtn" 
+                    style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
+                        background: rgb(99 102 241); color: white;">
+                    🤖 Add AI Opponent
+                </button>
+            </div>
 		  ` : ''}
 		  
 		  ${isHost ? `
-			<button id="startGameBtn"
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
-						   background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
-						   cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
-			  ${canStart ? 'Start Game' : '⏳ Waiting for players...'}
-			</button>
-		  ` : `
-			<div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
-			  ${canStart ? '⏳ Waiting for host...' : '⏳ Waiting for players...'}
-			</div>
-		  `}
+      <button id="startGameBtn"
+              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
+                    background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
+                    cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
+        ${canStart ? '🎮 Start Game' : `⏳ Need ${minPlayersRequired - players.length} more player(s)...`}
+      </button>
+    ` : `
+      <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
+        ${canStart ? 'Waiting for host to start...' : `Waiting for ${minPlayersRequired - players.length} more player(s)...`}
+      </div>
+    `}
 		  
 		  <button id="leaveBtn" 
 				  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
@@ -493,9 +600,20 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
     toggleReadyBtn.addEventListener('click', () => toggleReady());
   }
 
+  // const addLocalPlayerBtn = document.getElementById('addLocalPlayerBtn');
+  // if (addLocalPlayerBtn && canAddMore && isHost) {
+  //   addLocalPlayerBtn.addEventListener('click', () => addLocalPlayer());
+  // }
+
   const addAIBtn = document.getElementById('addAIBtn');
   if (addAIBtn && canAddMore && isHost) {
     addAIBtn.addEventListener('click', () => addAIOpponent());
+  }
+
+  const addLocalBtn = document.getElementById('addLocalBtn');
+  if (addLocalBtn && canAddMore && isHost) {
+    addLocalBtn.addEventListener('click', () => addLocalPlayer());
+    
   }
 
   const removeButtons = document.querySelectorAll('.remove-player-btn');
@@ -548,6 +666,56 @@ async function toggleReady(): Promise<void> {
   }
 }
 
+// async function addLocalPlayer(): Promise<void> {
+//     const currentRoom = getCurrentRoom();
+//     console.log('[LOCAL] addLocalPlayer called, currentRoom:', currentRoom);
+    
+//     if (!currentRoom) {
+//         console.error('[LOCAL] No current room!');
+//         alert('No active room found');
+//         return;
+//     }
+    
+//     try {
+//         const localPlayerId = `local-player-${Date.now()}`;
+//         const localPlayerUsername = 'Local Player 2';
+        
+//         const token = authService.getToken();
+//         const joinResponse = await fetch(`/api/room/${currentRoom.roomId}/join`, {
+//             method: 'POST',
+//             headers: { 
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Bearer ${token}`
+//             },
+//             body: JSON.stringify({
+//                 playerId: localPlayerId,
+//                 username: localPlayerUsername,
+//                 isLocal: true, // Mark as local player
+//                 isReady: true // Local players are automatically ready
+//             })
+//         });
+        
+//         const joinData = await joinResponse.json();
+//         console.log('[LOCAL] Join response:', joinData);
+        
+//         if (joinData.success && joinData.room) {
+//             setCurrentRoom(joinData.room);
+//             console.log('✅ [LOCAL] Local player added successfully');
+            
+//             const root = document.getElementById('app-root');
+//             if (root) {
+//                 renderLobby(root);
+//             }
+//         } else {
+//             console.error('[LOCAL] Failed to add local player:', joinData);
+//             alert(joinData.message || 'Failed to add local player');
+//         }
+//     } catch (error) {
+//         console.error('[LOCAL] Error adding local player:', error);
+//         alert('Failed to add local player');
+//     }
+// }
+
 async function addAIOpponent(): Promise<void> {
   const currentRoom = getCurrentRoom();
   console.log('[AI] addAIOpponent called, currentRoom:', currentRoom);
@@ -575,7 +743,9 @@ async function addAIOpponent(): Promise<void> {
       body: JSON.stringify({
         playerId: aiId,
         username: `AI Bot ${aiNumber}`,
-        isAI: true
+        isAI: true,
+        isReady: true,
+        isLocal: true
       })
     });
 
@@ -589,6 +759,60 @@ async function addAIOpponent(): Promise<void> {
   } catch (error) {
     console.error('❌ [AI] Error adding AI:', error);
     alert('Failed to add AI opponent');
+  }
+}
+
+async function addLocalPlayer(): Promise<void> {
+  const currentRoom = getCurrentRoom();
+  
+  if (!currentRoom) {
+    console.error('❌ [LOCAL] currentRoom is null!');
+    alert('Error: Room not initialized');
+    return;
+  }
+
+  const localId = `local`;
+  const roomId = currentRoom.roomId;
+  
+  console.log(`[LOCAL] Adding Local Player to room ${roomId}`);
+
+  let username:string | null = "Local";
+  username = window.prompt("Enter an alias for local player", "Local");
+  
+  if (!username) {
+    return; // User cancelled
+  }
+  
+  try {
+    const token = authService.getToken();
+    const joinResponse = await fetch(`/api/room/${roomId}/join`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        playerId: localId,
+        username: username,
+        isAI: false,
+        isReady: true,
+        isLocal: true
+      })
+    });
+
+    const joinData = await joinResponse.json();
+    
+    if (joinData.success) {
+      console.log(`✅ [LOCAL] ${username} joined as local player`);
+      
+      // Set hasGuest flag on pongGame
+      // The game page will check for local player when it initializes
+      
+      await fetchRoomState();
+    }
+  } catch (error) {
+    console.error('❌ [LOCAL] Error adding Local:', error);
+    alert('Failed to add Local opponent');
   }
 }
 

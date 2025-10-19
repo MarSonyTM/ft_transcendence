@@ -491,20 +491,11 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
                 if (userInGame) {
                     playerGames.push({
                         gameId: game.id,
-                        gameStatus: game.status,
                         playerPosition: (userInGame as any).playerPosition,
                         currentScore: (userInGame as any).score,
-                        createdAt: game.createdAt,
-                        endedAt: game.endedAt
                     });
                     
                     totalScore += (userInGame as any).score || 0;
-                    
-                    if (game.status === 'finished' && game.winnerId === playerId) {
-                        gamesWon++;
-                    } else if (game.status === 'finished' && game.winnerId !== playerId) {
-                        gamesLost++;
-                    }
                 }
             }
             

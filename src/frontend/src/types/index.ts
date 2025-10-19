@@ -15,7 +15,8 @@ export interface WebSocketMessage extends SharedWebSocketMessage {
   players?: Player[];
 }
 
-export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 'lobby' | 'authCallback' | 'register' | 'friends' | 'join';
+export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 
+  'lobby' | 'authCallback' | 'register' | 'join' | 'friends' | '2PGame' | '4PGame' | 'tempLogin';
 
 declare global {
   interface Window {

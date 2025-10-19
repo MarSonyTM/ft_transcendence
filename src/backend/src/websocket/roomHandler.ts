@@ -93,22 +93,35 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
       break;
 
     case 'move':
-      // Handle player movement
-      if (typeof message.position === 'number' && room.gameId) {
-        const playerNum = getPlayerNumber(room, playerId);
-        const gameEngine = activeGames.get(room.gameId);
-        if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
-          gameEngine.updatePlayerPosition(playerNum, message.position);
+    // Handle player movement
+    if (typeof message.position === 'number' && room.gameId) {
+      let targetPlayerId = playerId;
+      let targetPlayerNum = getPlayerNumber(room, playerId);
+      
+      // Check if this is a guest move from a local player
+      if (message.isGuest) {
+        // Find the "local" player in the room
+        const localPlayer = room.players.find((p: any) => p.id === 'local');
+        if (localPlayer) {
+          targetPlayerId = 'local';
+          targetPlayerNum = getPlayerNumber(room, 'local');
+          console.log(`📤 Guest move from ${playerId} controlling local player (position ${targetPlayerNum})`);
         }
-
-        // Broadcast movement to all players in room (for UI sync)
-        broadcastToRoom(roomId, {
-          type: 'playerMove',
-          playerId,
-          position: message.position
-        }, playerId); // Exclude sender
       }
-      break;
+      
+      const gameEngine = activeGames.get(room.gameId);
+      if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
+        gameEngine.updatePlayerPosition(targetPlayerNum, message.position);
+      }
+
+      // Broadcast movement to all players in room (for UI sync)
+      broadcastToRoom(roomId, {
+        type: 'playerMove',
+        playerId: targetPlayerId,
+        position: message.position
+      }, playerId); // Exclude sender from broadcast
+    }
+    break;
 
     case 'ready':
       // Player ready status changed
@@ -126,13 +139,33 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
         playerId,
         username: message.username,
         message: message.text,
-        timestamp: Date.now()
       });
       break;
 
     case 'requestState':
       // Send current game state to requesting player
       sendRoomState(roomId, playerId);
+      break;
+
+    case 'keyState':
+      // Handle key state updates
+      if (room.gameId) {
+        let targetPlayerNum = getPlayerNumber(room, playerId);
+        
+        // If this is a guest key press, control player 2 (the local guest)
+        if (message.isGuest) {
+          const localPlayer = room.players.find((p: any) => p.id === 'local');
+          if (localPlayer) {
+            targetPlayerNum = getPlayerNumber(room, 'local');
+          }
+        } else {
+        }
+        
+        const gameEngine = activeGames.get(room.gameId);
+        if (gameEngine && typeof gameEngine.setPlayerKeyState === 'function') {
+          gameEngine.setPlayerKeyState(targetPlayerNum, message.key, message.pressed);
+        }
+      }
       break;
 
     default:
@@ -212,7 +245,6 @@ export function broadcastGameStartToRoom(roomId: string, gameId: number): void {
   broadcastToRoom(roomId, {
     type: 'gameStart',
     gameId,
-    timestamp: Date.now()
   });
 }
 
@@ -221,7 +253,6 @@ export function broadcastGameStateToRoom(roomId: string, gameState: any): void {
   broadcastToRoom(roomId, {
     type: 'gameState',
     state: gameState,
-    timestamp: Date.now()
   });
 }
 
@@ -230,7 +261,6 @@ export function broadcastScoreToRoom(roomId: string, scores: any): void {
   broadcastToRoom(roomId, {
     type: 'score',
     ...scores,
-    timestamp: Date.now()
   });
 }
 
@@ -239,7 +269,6 @@ export function broadcastGameEndToRoom(roomId: string, winnerId: string): void {
   broadcastToRoom(roomId, {
     type: 'gameEnd',
     winnerId,
-    timestamp: Date.now()
   });
 }
 
@@ -256,7 +285,6 @@ function removePlayerFromRoom(roomId: string, playerId: string): void {
       broadcastToRoom(roomId, {
         type: 'playerDisconnected',
         playerId,
-        timestamp: Date.now()
       });
     }
   }

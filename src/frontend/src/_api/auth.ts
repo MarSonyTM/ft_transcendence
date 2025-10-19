@@ -143,3 +143,44 @@ export async function registerUser(
 		};
 	}
 }
+
+export async function createGuestUser(username?: string): Promise<{ 
+  success: boolean; 
+  username?: string; 
+  token?: string; 
+  isGuest?: boolean;
+  error?: string;
+}> {
+  const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+  
+  try {
+    const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username || undefined })
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        success: data.success || false,
+        username: data.data?.username,
+        token: data.token,
+        isGuest: data.data?.isGuest || true,
+        error: data.message
+      };
+    }
+    
+    if (res.status === 404) {
+      return { success: false, error: 'API not available (404)' };
+    }
+    
+    return { success: false, error: `Server error (${res.status})` };
+  } catch (error) {
+    console.error('Guest user creation error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Network error' 
+    };
+  }
+}

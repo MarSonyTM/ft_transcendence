@@ -1,12 +1,11 @@
 import { Player, GameState, WebSocketMessage } from '../types';
 import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
+import { RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from '../utils/auth';
 
 export class PongGame {
-    gameId?: number;
-    // Display mapping from server player indices -> local view indices
-    // Default: identity [0,1,2,3]. For 1v1, right-side client can use [1,0,2,3]
+    gameId?: number = 0;
     // viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     websocket: WebSocket | null = null;
@@ -15,25 +14,37 @@ export class PongGame {
     frameCount: number = 0;
     lastPingTime: number = 0;
     players: Player[] = [];
+    private lastMoveTime: number = 0;
+    private readonly MOVE_THROTTLE = 16;
+    private lastSentPosition: number = 0;
+
     gameState: GameState = {
         gameId: this.gameId,
         players: [],
 		ballPosX: 200,
-        ballPosY: 100,
-        ballVelX: 0,
-        ballVelY: 0,
-        mode: "2P",
+        ballPosY: getCurrentGameMode() === '4P' ? 200 : 100,
+        mode: getCurrentGameMode(),
         lastContact: 0
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
     playerId: number = 1;
-    paddlePosition: number = 80;
+    paddlePosition: number = this.gameState.mode === '4P' ? 160 : 70;
     onGameEnd?: (winnerId: number) => Promise<void>;
+    roomWS: RoomWebSocketManager | null = null;
+    currentGameState: any = null;
     private renderLoopRunning: boolean = false;
     private animationFrameId: number | null = null;
     private shouldReconnect: boolean = true;
     private stateListeners: Array<(state: GameState, game: PongGame) => void> = [];
+    hasLocal: boolean = false;
+    isGuest: boolean = false;
+
+    private interpolatedState = {
+        ballPosX: 200,
+        ballPosY: getCurrentGameMode() === '4P' ? 200 : 100,
+    };
+    private lerpFactor = 1;
     
     constructor() {
         this.setupKeyboardControls();
@@ -63,7 +74,7 @@ export class PongGame {
 
         if (!this.gameState.players) this.gameState.players = [] as any;
         for (let i = this.gameState.players.length; i < desiredCount; i++) {
-            let defaultPos = this.gameState.mode === '4P' ? 160 : 80;
+            let defaultPos = this.gameState.mode === '4P' ? 160 : 70;
             this.gameState.players.push({
                 id: i + 1,
                 gameId: this.gameId,
@@ -77,32 +88,10 @@ export class PongGame {
         this.players = this.gameState.players;
     }
 
-    setupKeyboardControls(): void {
-        document.addEventListener('keydown', (e) => {
-            this.keys[e.code] = true;
-        });
-        document.addEventListener('keyup', (e) => {
-            this.keys[e.code] = false;
-        });
-        document.addEventListener('keydown', (e) => {
-            const gameKeys = ['KeyW', 'KeyS'];
-            if (gameKeys.includes(e.code)) e.preventDefault();
-        });
-    }
-
-    startHeartbeat(): void {
-        this.heartbeatInterval = setInterval(() => {
-            if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-                this.lastPingTime = Date.now();
-                this.websocket.send(JSON.stringify({ type: 'ping' }));
-            }
-        }, 30000);
-    }
-
     addPlayer(initialPos?: number): Player {
         const idx = this.gameState.players?.length ?? 0;
-        const paddlePos = initialPos !== undefined ? initialPos : (this.gameState.mode === '4P' ? 160 : 80);
-    if (!this.gameState.players) this.gameState.players = [] as any;
+        const paddlePos = initialPos !== undefined ? initialPos : (this.gameState.mode === '4P' ? 160 : 70);
+        if (!this.gameState.players) this.gameState.players = [] as any;
 
         const newPlayer: Player = {
             id: idx + 1,
@@ -112,7 +101,7 @@ export class PongGame {
             connectionStatus: '',
             lastActivity: ''
         } as any;
-    this.gameState.players.push(newPlayer);
+        this.gameState.players.push(newPlayer);
 
         this.players = this.gameState.players;
         this.notifyStateListeners();
@@ -148,7 +137,7 @@ export class PongGame {
         if (!this.canvas) return;
         
         const is4Player = getCurrentGameMode() === '4P';
-        is4Player ? this.paddlePosition = 160 : this.paddlePosition = 80;
+        this.paddlePosition = is4Player ? 160 : 70;
         
         this.updateStatus("Ready to start...");
         
@@ -286,35 +275,34 @@ export class PongGame {
                 
             case 'gameState':
                 if (message.state) {
-                    const nextState = {
-                        ballPosX: message.state.ballPosX ?? this.gameState.ballPosX,
-                        ballPosY: message.state.ballPosY ?? this.gameState.ballPosY,
-                        players: message.state.players ?? this.gameState.players,
-                        mode: message.mode ?? message.state.mode ?? this.gameState.mode,
-                        lastContact: message.state.lastContact ?? this.gameState.lastContact,
-                        gameId: message.state.gameId ?? this.gameState.gameId
-                    };
+                    const s = message.state as any;
 
-                    // // Apply display mapping for 1v1 when the local view swaps left/right
-                    // const swapLeftRight =
-                    //     (nextState.mode === '2P') &&
-                    //     this.viewIndexMap.length >= 2 &&
-                    //     this.viewIndexMap[0] === 1 && this.viewIndexMap[1] === 0;
+                    this.gameState.ballPosX = s.ballPosX === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosX;
+                    this.gameState.ballPosY = s.ballPosY === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosY;
+                    this.gameState.lastContact = s.lastContact === undefined ? 0 : s.lastContact;
 
-                    // if (swapLeftRight) {
-                    //     const width = (this.canvas && this.canvas.width) ? this.canvas.width : 400;
-                    //     const mirrored = { ...nextState } as any;
-                    //     mirrored.ballPosX = width - (nextState.ballPosX ?? 0);
-                    //     mirrored.players = (nextState.players ?? []).map((p: Player) => ({
-                    //         ...p,
-                    //         pos: width - (p.pos ?? 0)
-                    //     }));
-                    //     this.gameState = mirrored;
-                    // } else
-                    this.gameState = nextState;
-                    
-                    this.paddlePosition = this.gameState.players[this.playerId - 1]?.pos ?? 80;
-                    
+                    if (Array.isArray(s.players)) {
+                        if (!this.gameState.players) this.gameState.players = [] as any;
+                        const len = this.gameState.mode === '4P' ? 4 : 2;
+                        for (let i = 0; i < len; i++) {
+                            const incoming = s.players[i];
+                            if (!this.gameState.players[i]) {
+                                this.gameState.players[i] = {
+                                    id: i + 1,
+                                    gameId: this.gameId,
+                                    pos: (this.gameState.mode === '4P' ? 160 : 70),
+                                    score: 0,
+                                    connectionStatus: '',
+                                    lastActivity: ''
+                                } as any;
+                            }
+                            if (incoming) {
+                                if (incoming.pos !== undefined) this.gameState.players[i].pos = incoming.pos;
+                                if (incoming.score !== undefined) this.gameState.players[i].score = incoming.score;
+                            }
+                        }
+                    }
+
                     this.updateScoreDisplay();
                     this.notifyStateListeners();
                 }
@@ -384,12 +372,9 @@ export class PongGame {
         const player4Score = document.getElementById("player4score");
 
         const uiNodes = [player1Score, player2Score, player3Score, player4Score];
-        // const order = this.viewIndexMap;
         const max = is4Player ? 4 : 2;
         for (let i = 0; i < max; i++) {
             const node = uiNodes[i];
-            // const scoreIdx = order[i];
-            // const scoreVal = this.gameState.players[scoreIdx]?.score ?? 0;
             const scoreVal = this.gameState.players[i]?.score ?? 0;
             if (node) node.textContent = scoreVal.toString();
         }
@@ -427,14 +412,11 @@ export class PongGame {
 
     startRenderLoop(): void {
         if (this.renderLoopRunning) return;
-        
         this.renderLoopRunning = true;
-        
         const renderFrame = () => {
             if (!this.renderLoopRunning) return;
             
             this.updateFPS();
-            this.handleInput();
             this.animationFrameId = requestAnimationFrame(renderFrame);
         };
         
@@ -449,65 +431,56 @@ export class PongGame {
         }
     }
 
-    handleInput(): void {
-        if (!this.isActive) return;
-        // In room-based games, input is handled by room WS logic in gamePage.ts
-        // to correctly attribute controls per connected player. Avoid double-sending here.
-        if (getCurrentRoom()) return;
-        
-        let newPosition = this.paddlePosition;
-        const is4Player = this.gameState.mode === '4P' || getCurrentGameMode() === '4P';
-        const paddleSpeed = is4Player ? 8 : 4;
-        
-        
-        if (is4Player) {
-            const minPos = 0;
-            const maxPos = 320;
-            
-            if (this.keys['KeyW'] && newPosition > minPos) newPosition = Math.max(minPos, newPosition - paddleSpeed);
-            if (this.keys['KeyS'] && newPosition < maxPos) newPosition = Math.min(maxPos, newPosition + paddleSpeed);
-        } else {
-            const minPos = 0;
-            const maxPos = 160;
-            
-            if (this.keys['KeyW'] && newPosition > minPos) newPosition = Math.max(minPos, newPosition - paddleSpeed);
-            if (this.keys['KeyS'] && newPosition < maxPos) newPosition = Math.min(maxPos, newPosition + paddleSpeed);
-        }
-            
-        if (newPosition !== this.paddlePosition) {
-            this.paddlePosition = newPosition;
-            this.notifyStateListeners();
-            this.sendPlayerMove(newPosition);
-        }
-    }
-
     sendPlayerMove(position: number): void {
-        // Do not send moves over the game socket when playing a room-based game;
-        // room WebSocket handles authoritative input routing.
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            if (!this.playerId) this.playerId = 1; // Default to player 1 if unset
+            if (this.playerId === undefined) this.playerId = 0;// TODO: why default to 1? -> this.playerId = 1; // Default to player 1 if unset
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: this.playerId,
                 position: position,
-                timestamp: Date.now()
             }));
         }
     }
 
-    updateFPS(): void {
-        const now = performance.now();
-        this.frameCount++;
-        const elapsed = now - this.fpsStartTime;
+    setupKeyboardControls(): void {
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
+        });
         
-        if (elapsed >= 1000) {
-            const fps = Math.round((this.frameCount * 1000) / elapsed);
-            const fpsCounter = document.getElementById('fpsCounter');
-            if (fpsCounter) fpsCounter.textContent = fps.toString();
-            this.fpsStartTime = now;
-            this.frameCount = 0;
-        }
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            const gameKeys = ['KeyW', 'KeyS'];
+            if (gameKeys.includes(e.code)) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    startHeartbeat(): void {
+        this.heartbeatInterval = setInterval(() => {
+            if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                this.lastPingTime = Date.now();
+                this.websocket.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    }
+
+    updateFPS(): void {
+        // const now = performance.now();
+        // this.frameCount++;
+        // const elapsed = now - this.fpsStartTime;
+        
+        // if (elapsed >= 1000) {
+        //     const fps = Math.round((this.frameCount * 1000) / elapsed);
+        //     const fpsCounter = document.getElementById('fpsCounter');
+        //     if (fpsCounter) fpsCounter.textContent = fps.toString();
+        //     this.fpsStartTime = now;
+        //     this.frameCount = 0;
+        // }
     }
 
     updatePlayerInfo(): void {

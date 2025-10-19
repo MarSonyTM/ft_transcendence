@@ -54,7 +54,7 @@ class PongCLI:
         try:
             with httpx.Client() as client:
                 response = client.post("http://0.0.0.0:3000/api/game/new", 
-                    json={"mode": "1v1", "difficulty": "normal"})
+                    json={"mode": "2player", "difficulty": "normal"})
                 data = response.json()
                 if data["success"]:
                     self.game_id = data["data"]["id"]

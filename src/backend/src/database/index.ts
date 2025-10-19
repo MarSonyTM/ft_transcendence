@@ -29,12 +29,7 @@ export interface User {
 
 export interface Game {
   id: number;
-  status: string;
   mode: string;
-  createdAt: string;
-  startedAt?: string;
-  endedAt?: string;
-  winnerId?: number;
   difficulty: string;
 }
 
@@ -60,7 +55,7 @@ export interface GameState {
   ballVelY: number;
   
   mode: string;
-  lastContact?: number;
+  lastContact: number;
   lastActivity: string;
 }
 
@@ -256,17 +251,13 @@ class GameDatabaseManager {
 
   createGame(gameData: { mode?: string; difficulty?: string }): Game {
     const stmt = this.db.prepare(`
-      INSERT INTO games (mode, difficulty, status, startedAt, endedAt, winnerId) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO games (mode, difficulty) 
+      VALUES (?, ?)
     `);
     
     const result = stmt.run(
       gameData.mode || '2P',
-      gameData.difficulty || 'normal',
-      'waiting',
-      null,
-      null,
-      null
+      gameData.difficulty || 'normal'
     );
     
     const insertedGame = this.getGameById(result.lastInsertRowid as number);

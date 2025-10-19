@@ -24,7 +24,7 @@ export interface GameState {
   ballVelX?: number;
   ballVelY?: number;
   mode: '2P' | '4P' | string;
-  lastContact?: number;
+  lastContact: number;
 }
 
 // WebSocket message structure

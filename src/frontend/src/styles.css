@@ -22,10 +22,13 @@ body {
   outline: none;
   touch-action: none;
   image-rendering: auto;
+  width: 100%;
+  height: 100%;
 }
 
 .threeD-wrapper {
-  max-width: 820px;
+  width: min(95vw, 900px);
+  height: min(70vh, 520px);
   margin: 0 auto 1rem auto;
   position: relative;
   box-shadow: 0 0 12px rgba(0,0,0,0.6);
@@ -312,17 +315,19 @@ h3 {
 }
 
 /* Game canvas */
-#gameScreen {
-  border: 2px solid rgb(255 255 255); /* border-2 border-white */
-  background-color: rgb(17 24 39); /* bg-gray-900 */
-  margin-bottom: 1.5rem; /* mb-6 */
+/* #gameScreen {
+  border: 2px solid rgb(255 255 255);
+  background-color: rgb(17 24 39);
+  margin-bottom: 1.5rem;
   display: block;
   margin-left: auto;
   margin-right: auto;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
-}
+  will-change: transform;
+  transform: translateZ(0);
+} */
 
 /* Controls info */
 .controls-info {
@@ -345,10 +350,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button:not(:disabled):hover {
+/* button:not(:disabled):hover {
   transform: scale(1.05);
-  transition: transform 150ms;
-}
+  transition: transform 150ms; 
+}   */
 
 .connected {
   color: rgb(74 222 128); /* text-green-400 */
@@ -656,4 +661,40 @@ button:not(:disabled):hover {
 .btn-archive {
   font-size: .75rem;
   padding: .3rem .6rem;
+}
+
+/* Countdown */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    /* transform: scale(1); */
+    opacity: 1;
+  }
+  50% {
+    /* transform: scale(1.2); */
+    opacity: 0.8;
+  }
+}
+
+#countdown-overlay {
+  user-select: none;
+  pointer-events: all;
 }

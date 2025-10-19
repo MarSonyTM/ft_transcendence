@@ -50,7 +50,18 @@ npm run dev
 
 ### Important Notes for Mac Users
 - Use Method 2 (Single Container) as it avoids networking issues between containers on Mac
-- The Vite config in `src/frontend/vite.config.ts` should use `localhost:3000` as the backend target
+- The Vite config in `src/frontend/vite.config.ts` should use `localhost:3000` as the backend target:
+  ```typescript
+  // in src/frontend/vite.config.ts
+  server: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',  // NOT backend_dev:3000
+        changeOrigin: true,
+      }
+    }
+  }
+  ```
 - Both services run in the same container, so they can communicate via localhost
 - Database files will be created in `src/backend/database/`
 

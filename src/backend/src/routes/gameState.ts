@@ -428,7 +428,7 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                     players: gameStateData.players,
                     gameId: gameStateData.gameId,
                     mode: gameStateData.mode,
-                    lastContact: gameStateData.lastContact || null
+                    lastContact: gameStateData.lastContact || 0
                 }
             };
         } catch (error) {

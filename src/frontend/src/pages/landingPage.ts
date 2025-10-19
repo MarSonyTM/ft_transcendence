@@ -13,8 +13,9 @@ export function renderLandingPage(): void {
             <h1 class="main-title">PING PONG</h1>
             <button id="loginBtn" class="btn btn-login">Login</button>
             <button id="registerBtn" class="btn btn-register">Register</button>
+            <button id="guestBtn" class="btn btn-register">Play as Guest</button>
         </div>
-    `;
+        `;
     }
     else {
         root.innerHTML = `
@@ -40,6 +41,15 @@ export function renderLandingPage(): void {
         registerBtn.addEventListener('click', () => {
             history.pushState({ page: 'register' }, '', '/register');
             setCurrentPage('register');
+            renderApp();
+        });
+    }
+
+    const guestBtn = document.getElementById('guestBtn');
+    if (guestBtn) {
+        guestBtn.addEventListener('click', () => {
+            history.pushState({ page: 'tempLogin' }, '', '/tempLogin');
+            setCurrentPage('tempLogin');
             renderApp();
         });
     }
