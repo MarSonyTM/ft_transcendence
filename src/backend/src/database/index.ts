@@ -1138,6 +1138,17 @@ export class DatabaseManager extends BaseDatabaseManager {
         0                 // gamesLost
       );
 
+      const res = stmt.run(
+        'Michael',           // firstName
+        'Naysmith',           // lastName
+        'contact@schmitzi.nz',  // email
+        'schmitzi',       // username
+        '$2a$10$11CaXhwOlAB4VgvhIWBog./z1Pg3yY5KrtW3LYnkD9JuQ6Pt3.41u',               // password (empty for seed user)
+        1,                // emailVerified (true)
+        0,                // gamesWon
+        0                 // gamesLost
+      );
+
       console.log(`Seed user created with ID: ${result.lastInsertRowid}`);
     } catch (error) {
       console.error('Failed to create seed user:', error);

@@ -52,7 +52,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
       }
 
       const pendingRequests = database.friends.getPendingRequests(userId);
-      
+      console.log("Checking for new friends");
       return {
         success: true,
         data: pendingRequests

@@ -40,5 +40,3 @@ src/frontend/node_modules/
 *.db-wal
 *.db
 src/database/
-
-/package-lock.json
