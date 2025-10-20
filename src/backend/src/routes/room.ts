@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { gameRoomManager } from '../game/gameRoom';
 import { broadcastGameStartToRoom, broadcastToRoom } from '../websocket/roomHandler';
 import { database } from '../database/index';
-import { TwoPlayerGameEngine, FourPlayerGameEngine } from '../game/gameEngine';
+import { BaseGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
 import { GameState } from '../database/index';
 
@@ -16,7 +16,6 @@ interface JoinRoomBody {
   playerId: string;
   username: string;
   isAI?: boolean;
-  isLocal?: boolean;
   isReady?: boolean;
   isLocal: boolean;
   difficulty?: string;
@@ -280,43 +279,64 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4player' : '2player';
+      const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
+      // Use incremental DB-backed game IDs for cleanliness
       const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
       const gameId = createdGame.id;
       
       console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
+      const positions = gameMode === '4P' 
+        ? ['left', 'top', 'right', 'bottom'] 
+        : ['left', 'right'];
+      
+      const players = room.players.map((roomPlayer, index) => {
+        let playerId: number;
+        const parsedId = parseInt(roomPlayer.id);
+        
+        if (!isNaN(parsedId) && parsedId > 0) {
+          playerId = parsedId;
+          
+          try {
+            const position = positions[index] || 'left';
+            database.players.addPlayerToGame(gameId, playerId, position);
+          } catch (err) {
+            console.warn(`⚠️ Could not add player ${playerId} to database (user might not exist), using in-memory only`);
+          }
+        } else {
+          playerId = index + 1;
+          console.log(`ℹ️ Using index-based ID ${playerId} for ${roomPlayer.username} (AI/guest)`);
+        }
+        
+        return {
+          id: playerId,
+          name: roomPlayer.username,
+          gameId: gameId,
+          pos: gameMode === '4P' ? 160 : 80,
+          material: null,
+          color: { r: 1, g: 1, b: 1 },
+          score: 0,
+          connectionStatus: 'connected',
+          lastActivity: new Date().toISOString()
+        };
+      });
+
       // Create a proper GameState object
       const initialGameState: GameState = {
         id: 0, // Optional: engine updates guard errors internally
         gameId: gameId,
-        player1Id: 0,
-        player2Id: 0,
-        player3Id: 0,
-        player4Id: 0,
+        players: players,
         ballPosX: 200,
-        ballPosY: 100,
+        ballPosY: gameMode === '4P' ? 200 : 100,
         ballVelX: 0,
         ballVelY: 0,
-        player1Pos: 80,
-        player2Pos: 80,
-        player3Pos: 180,
-        player4Pos: 180,
-        scorePlayer1: 0,
-        scorePlayer2: 0,
-        scorePlayer3: 0,
-        scorePlayer4: 0,
-        gameMode: gameMode,
-        lastActivity: ''
+        mode: gameMode,
+        lastContact: 0,
+        lastActivity: new Date().toISOString(),
       };
 
       // Create game engine with proper GameState
-      let gameEngine;
-      if (gameMode === '4player') {
-        gameEngine = new FourPlayerGameEngine(initialGameState);
-      } else {
-        gameEngine = new TwoPlayerGameEngine(initialGameState);
-      }
+      const gameEngine: BaseGameEngine = new BaseGameEngine(initialGameState);
 
       // Attach AI players before first frame
       room.players.forEach((player, index) => {
@@ -407,7 +427,7 @@ async function roomRoutes(fastify: FastifyInstance) {
 
       return reply.send({ success: true, message: 'Game ended and room reset', room });
     } catch (error) {
-      fastify.log.error('Failed to end game:', error);
+      fastify.log.error(error);
       return reply.status(500).send({ success: false, message: 'Failed to end game' });
     }
   });

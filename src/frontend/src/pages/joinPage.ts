@@ -1,4 +1,3 @@
-import { renderLobbyPage } from './lobbyPage';
 import { authService } from '../utils/auth';
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';

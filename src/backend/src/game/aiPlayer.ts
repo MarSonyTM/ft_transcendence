@@ -13,10 +13,12 @@ export class AIPongPlayer {
     private lastView: AIGameView | null = null;
     private lastUpdateTime: number = 0;
     private currentKeys: { up: boolean; down: boolean } = { up: false, down: false };
-    private readonly paddleHeight: number = 40;  // Same as in gameEngine.ts
-    private readonly maxPaddleY: number = 160;  // 200 - paddleHeight
-    private readonly centerY: number = this.maxPaddleY / 2;
-    
+    private readonly max: number;
+    private readonly maxPaddle: number;
+    private readonly center: number;
+    private readonly sides: string[];
+    private readonly side: string;
+
     // Difficulty settings
     private settings: {
         updateInterval: number;     // How often AI updates its view (ms)
@@ -26,13 +28,28 @@ export class AIPongPlayer {
     };
     
     constructor(
-        private playerId: number, 
-        private side: 'left' | 'right',
-        difficulty: AIDifficulty = 'normal'
+        private playerId: number,
+        difficulty: AIDifficulty = 'normal',
+        private values: {
+            mode: string,
+            maxX: number,
+            maxY: number,
+            ballRadius: number,
+            paddleHeight: number,
+            paddleWidth: number,
+            defaultPaddlePos: number,
+            paddleSpeed: number
+        }
     ) {
+        this.sides = values.mode === '2P' ? ['left', 'right'] : ['left', 'top', 'right', 'bottom'];
+        this.side = this.sides[(playerId - 1) % this.sides.length];
+        this.max = this.side === 'left' || this.side === 'right' ? this.values.maxX : this.values.maxY;
+        this.maxPaddle = this.max - values.paddleHeight;
+        this.center = this.maxPaddle / 2;
+         
         // Initialize difficulty settings
         this.settings = this.getDifficultySettings(difficulty);
-        console.log(`🤖 AI Player ${playerId} created (${side} side, ${difficulty} difficulty)`);
+        console.log(`🤖 AI Player ${playerId} created (${difficulty} difficulty)`);
     }
 
     private getDifficultySettings(difficulty: AIDifficulty) {
@@ -73,7 +90,7 @@ export class AIPongPlayer {
         
         // Only update view based on difficulty setting
         if (now - this.lastUpdateTime >= this.settings.updateInterval) {
-            const paddlePos = gameState.paddlePos ?? 80; // Default to center if undefined
+            const paddlePos = gameState.paddlePos ?? this.center; // Default to center if undefined
             
             this.lastView = {
                 ballPosX: gameState.ballPosX,
@@ -104,22 +121,37 @@ export class AIPongPlayer {
         // Get current ball position
         const ballX = this.lastView.ballPosX;
         const ballY = this.lastView.ballPosY;
-        const paddleY = this.lastView.paddlePos;
+        const paddle = this.lastView.paddlePos;
+
+        let target: number;
+        let clampedTarget: number;
+        let paddlePos: number;
+        let predicted: number;
+        let ball: number;
+        let ballVel: number;
 
         // Predict if ball is coming towards this paddle
         const isComingTowards = (this.side === 'left' && this.lastView.ballVelX < 0) ||
-                               (this.side === 'right' && this.lastView.ballVelX > 0);
+                               (this.side === 'right' && this.lastView.ballVelX > 0) ||
+                               (this.side === 'top' && this.lastView.ballVelY < 0) ||
+                               (this.side === 'bottom' && this.lastView.ballVelY > 0);
+
+        ball = this.side === 'left' || this.side === 'right' ? ballX : ballY;
+        ballVel = this.side === 'left' || this.side === 'right' ? this.lastView.ballVelX : this.lastView.ballVelY;
 
         // Different behavior based on difficulty
         if (this.settings.predictionError >= 60) { // Easy mode
             // Easy mode: Very slow, inaccurate tracking
-            const targetY = ballY + (Math.random() - 0.5) * 80; // Random offset
-            const clampedTarget = Math.max(0, Math.min(this.maxPaddleY, targetY));
-            
+            target = this.side === 'left' || this.side === 'right' ?
+                ballY + (Math.random() - 0.5) * 80 :
+                ballX + (Math.random() - 0.5) * 80;
+            clampedTarget = this.side === 'left' || this.side === 'right' ? 
+                Math.max(0, Math.min(this.maxPaddle, target)) :
+                Math.max(0, Math.min(this.maxPaddle, target));
             // Large deadzone - only move if far from target
-            if (Math.abs(paddleY - clampedTarget) > 40) {
-                this.currentKeys.up = clampedTarget < paddleY;
-                this.currentKeys.down = clampedTarget > paddleY;
+            if (Math.abs(paddle - clampedTarget) > 40) {
+                this.currentKeys.up = clampedTarget < paddle;
+                this.currentKeys.down = clampedTarget > paddle;
             } else {
                 this.currentKeys.up = false;
                 this.currentKeys.down = false;
@@ -129,15 +161,17 @@ export class AIPongPlayer {
 
         if (this.settings.predictionError >= 15) { // Normal mode
             // Simpler prediction without bounce calculation
-            const targetY = ballY + (this.lastView.ballVelY * timeSinceUpdate);
+            target = this.side === 'left' || this.side === 'right' ?
+                ballY + (this.lastView.ballVelY * timeSinceUpdate) :
+                ballX + (this.lastView.ballVelX * timeSinceUpdate);
             
             // Add some randomness to make it miss sometimes
             const randomOffset = (Math.random() - 0.5) * 40;
-            const adjustedTargetY = Math.max(0, Math.min(this.maxPaddleY, targetY + randomOffset));
+            const adjustedTarget = Math.max(0, Math.min(this.maxPaddle, target + randomOffset));
             
-            if (Math.abs(paddleY - adjustedTargetY) > 20) {
-                this.currentKeys.up = adjustedTargetY < paddleY;
-                this.currentKeys.down = adjustedTargetY > paddleY;
+            if (Math.abs(paddle - adjustedTarget) > 20) {
+                this.currentKeys.up = adjustedTarget < paddle;
+                this.currentKeys.down = adjustedTarget > paddle;
             } else {
                 this.currentKeys.up = false;
                 this.currentKeys.down = false;
@@ -148,41 +182,43 @@ export class AIPongPlayer {
         // Hard mode - perfect prediction with wall bounces
         if (isComingTowards) {
             // Calculate where ball will be when it reaches paddle
-            const paddleX = this.side === 'left' ? 10 : 390;
-            const timeToReach = Math.abs(paddleX - ballX) / Math.abs(this.lastView.ballVelX);
-            
-            // Predict Y position with wall bounces
-            let predictedY = ballY + (this.lastView.ballVelY * timeToReach);
-            
-            // Handle wall bounces
-            while (predictedY < 0 || predictedY > 200) {
-                if (predictedY < 0) {
-                    predictedY = Math.abs(predictedY);
-                } else if (predictedY > 200) {
-                    predictedY = 200 - (predictedY - 200);
+                paddlePos = this.side === 'left' || this.side === 'top' ?
+                    this.values.paddleWidth : this.max - this.values.paddleWidth;
+                const timeToReach = Math.abs(paddle - ball) / Math.abs(ballVel);
+                
+                // Predict Y position with wall bounces
+                predicted = ball + (ballVel * timeToReach);
+                
+                // Handle wall bounces
+                while (predicted < 0 || predicted > this.max) {
+                    if (predicted < 0) {
+                        predicted = Math.abs(predicted);
+                    } else if (predicted > this.max) {
+                        predicted = this.max - (predicted - this.max);
+                    }
                 }
-            }
-            
-            // Target the center of the paddle to the predicted position
-            const targetY = Math.max(0, Math.min(this.maxPaddleY, predictedY - this.paddleHeight / 2));
-            
-            // Larger deadzone to prevent jittery movement (8px threshold)
-            const deadzone = 8;
-            if (Math.abs(paddleY - targetY) > deadzone) {
-                this.currentKeys.up = targetY < paddleY;
-                this.currentKeys.down = targetY > paddleY;
-            } else {
-                this.currentKeys.up = false;
-                this.currentKeys.down = false;
-            }
+                
+                // Target the center of the paddle to the predicted position
+                target = Math.max(0, Math.min(this.maxPaddle, predicted - this.values.paddleHeight / 2));
+                
+                // Larger deadzone to prevent jittery movement (8px threshold)
+                const deadzone = 8;
+                if (Math.abs(paddle - target) > deadzone) {
+                    this.currentKeys.up = target < paddle;
+                    this.currentKeys.down = target > paddle;
+                } else {
+                    this.currentKeys.up = false;
+                    this.currentKeys.down = false;
+                }
+            // }
         } else {
             // Ball moving away - return to center smoothly
-            const targetY = this.centerY;
+            const target = this.center;
             const deadzone = 8;
             
-            if (Math.abs(paddleY - targetY) > deadzone) {
-                this.currentKeys.up = targetY < paddleY;
-                this.currentKeys.down = targetY > paddleY;
+            if (Math.abs(paddle - target) > deadzone) {
+                this.currentKeys.up = target < paddle;
+                this.currentKeys.down = target > paddle;
             } else {
                 this.currentKeys.up = false;
                 this.currentKeys.down = false;

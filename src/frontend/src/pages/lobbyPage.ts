@@ -2,7 +2,13 @@ import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
-import { Player, GameRoom, getCurrentRoom, setCurrentRoom, clearRoomState } from '../utils/roomState';
+import { 
+  Player, 
+  GameRoom, 
+  getCurrentRoom,
+  setCurrentRoom,
+  clearRoomState
+} from '../utils/roomState';
 
 let currentUserId: string | null = null;
 let pollInterval: number | null = null;
@@ -67,22 +73,35 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   console.log('[CREATE] Creating room for:', username);
   
   const gameMode = getCurrentGameMode();
-  const maxPlayers = gameMode === '2player' ? 2 : 4;
+  const maxPlayers = gameMode === '2P' ? 2 : 4;
+
+  const token = authService.getToken();
+  const response = await fetch('/api/room/create', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      hostId: userId,
+      hostUsername: username,
+      maxPlayers: maxPlayers
+    })
+  });
+
+  if (!response.ok) {
+    console.error('[CREATE] HTTP Error:', response.status, response.statusText);
+    const text = await response.text();
+    console.error('[CREATE] Response body:', text);
+    throw new Error(`Failed to create room: ${response.status} ${response.statusText}`);
+  }
   
-  try {
-    const token = authService.getToken();
-    const response = await fetch('/api/room/create', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        hostId: userId,
-        hostUsername: username,
-        maxPlayers: maxPlayers
-      })
-    });
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error('[CREATE] Non-JSON response:', text);
+    throw new Error('Server returned non-JSON response');
+  }
 
     const data = await response.json();
     
@@ -92,10 +111,6 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
     } else {
       throw new Error(data.message || 'Failed to create room');
     }
-  } catch (error) {
-    console.error('[CREATE] Error:', error);
-    throw error;
-  }
 }
 
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
@@ -204,7 +219,7 @@ async function startGame(): Promise<void> {
       
       // Navigate to game based on mode
       const gameMode = getCurrentGameMode();
-      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
       history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();
@@ -337,7 +352,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       console.log('Navigating to game page...');
       const gameMode = getCurrentGameMode();
-      const gamePage = gameMode === '4player' ? '4playergame' : '2playergame';
+      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
       history.pushState({ page: gamePage, roomId: currentRoom?.roomId }, '', `${gamePage}`);
       setCurrentPage(gamePage);
       renderApp();

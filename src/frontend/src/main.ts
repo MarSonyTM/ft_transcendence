@@ -68,11 +68,11 @@ function handleRouting(): void {
       case 'friends':
         setCurrentPage('friends');
         break;
-      case '2playergame':
-        setCurrentPage('2playergame');
+      case '2PGame':
+        setCurrentPage('2PGame');
         break;
-      case '4playergame':
-        setCurrentPage('4playergame');
+      case '4PGame':
+        setCurrentPage('4PGame');
         break;
       case 'tempLogin':
         setCurrentPage('tempLogin');
@@ -120,11 +120,11 @@ function handleRouting(): void {
     case '/auth/callback':
       setCurrentPage('authCallback');
       break;
-    case '/2playergame':
-      setCurrentPage('2playergame');
+    case '/2PGame':
+      setCurrentPage('2PGame');
       break;
-    case '/4playergame':
-      setCurrentPage('4playergame');
+    case '/4PGame':
+      setCurrentPage('4PGame');
       break;
     case 'tempLogin':
         setCurrentPage('tempLogin');
@@ -135,16 +135,12 @@ function handleRouting(): void {
   renderApp();
 }
 
-
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
-  
-  if (page !== 'lobby' && page !== '2playergame' && page !== '4playergame') {
+
+  if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame') {
     cleanupLobby();
   }
-
-
-
 
   switch (page) {
     case 'landing':
@@ -184,10 +180,10 @@ export async function renderApp(): Promise<void> {
     case 'profile':
       renderProfilePage();
       break;
-    case '2playergame':
+    case '2PGame':
       render2PlayerGame();
       break;
-    case '4playergame':
+    case '4PGame':
       render4PlayerGame();
       break;
     case 'friends':
@@ -225,3 +221,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   handleRouting();
 });
+
+// Add types for SSR support
+declare global {
+  interface Window {
+    __INITIAL_STATE__?: {
+      gameState: any;
+      gameId: number | null;
+      currentUser: string;
+      currentPage: string;
+      timestamp: number;
+      apiEndpoint: string;
+      wsEndpoint: string;
+      environment: string;
+    };
+    __GAME_STATE__?: any;
+    __GAME_ID__?: number | null;
+    __USERNAME__?: string;
+    __CURRENT_PAGE__?: string;
+    game?: any;
+  }
+}

@@ -2,11 +2,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
-const FRONTEND_URL = process.env.FRONTEND_URL;
+const JWT_SECRET: string = process.env.JWT_SECRET as string;
+const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID as string;
+const GOOGLE_CLIENT_SECRET: string = process.env.GOOGLE_CLIENT_SECRET as string;
+const GOOGLE_REDIRECT_URI: string = process.env.GOOGLE_REDIRECT_URI as string;
+const FRONTEND_URL: string = process.env.FRONTEND_URL as string;
 
 if (!JWT_SECRET || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI || !FRONTEND_URL) {
 	throw new Error('Missing environment variables, please add the .env file inside the backend folder ');

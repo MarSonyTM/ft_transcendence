@@ -7,6 +7,11 @@ const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'dat
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
 
 // Interface definitions
+export interface RGBColor {
+  r: number;
+  g: number;
+  b: number;
+}
 export interface User {
   id: number;
   firstName: string;
@@ -25,21 +30,17 @@ export interface User {
 
 export interface Game {
   id: number;
-  status: string;
   mode: string;
-  createdAt: string;
-  startedAt?: string;
-  endedAt?: string;
-  winnerId?: number;
   difficulty: string;
 }
 
 export interface Player {
   id: number;
+  name: string;//TODO: use?
   gameId: number;
-  playerId: number;
-  playerPosition: string;
-  currentScore: number;
+  pos: number;
+  color: RGBColor;
+  score: number;
   connectionStatus: string;
   lastActivity: string;
 }
@@ -47,23 +48,15 @@ export interface Player {
 export interface GameState {
   id: number;
   gameId: number;
-  player1Id: number;
-  player2Id: number;
-  player3Id: number;
-  player4Id: number;
+  players: Player[];
+  
   ballPosX: number;
   ballPosY: number;
   ballVelX: number;
   ballVelY: number;
-  player1Pos: number;
-  player2Pos: number;
-  player3Pos: number;
-  player4Pos: number;
-  scorePlayer1: number;
-  scorePlayer2: number;
-  scorePlayer3: number;
-  scorePlayer4: number;
-  gameMode: string;
+  
+  mode: string;
+  lastContact: number;
   lastActivity: string;
 }
 
@@ -295,7 +288,7 @@ class GameDatabaseManager {
     `);
     
     const result = stmt.run(
-      gameData.mode || '2player',
+      gameData.mode || '2P',
       gameData.difficulty || 'normal'
     );
     
@@ -395,13 +388,13 @@ class PlayerDatabaseManager {
     return result.changes > 0;
   }
 
-  updatePlayer(playerId: number, gameId: number, updateData: Partial<{ currentScore: number; connectionStatus: string; playerPosition: string }>): Player | undefined {
+  updatePlayer(playerId: number, gameId: number, updateData: Partial<{ score: number; connectionStatus: string; pos: number }>): Player | undefined {
     const fields: string[] = [];
     const values: any[] = [];
     
-    if (updateData.currentScore !== undefined) {
-      fields.push('currentScore = ?');
-      values.push(updateData.currentScore);
+    if (updateData.score !== undefined) {
+      fields.push('score = ?');
+      values.push(updateData.score);
     }
     
     if (updateData.connectionStatus) {
@@ -409,9 +402,9 @@ class PlayerDatabaseManager {
       values.push(updateData.connectionStatus);
     }
     
-    if (updateData.playerPosition) {
-      fields.push('playerPosition = ?');
-      values.push(updateData.playerPosition);
+    if (updateData.pos) {
+      fields.push('pos = ?');
+      values.push(updateData.pos);
     }
     
     if (fields.length === 0) {
@@ -460,110 +453,137 @@ class GameStateDatabaseManager {
   }
 
   getGameStateByGameId(gameId: number): GameState | undefined {
+    try {
     const stmt = this.db.prepare('SELECT * FROM gameState WHERE gameId = ? ORDER BY lastActivity DESC LIMIT 1');
     return stmt.get(gameId) as GameState | undefined;
+    } catch (e) {
+      try {
+        const stmt2 = this.db.prepare('SELECT * FROM gameState WHERE gameId = ? LIMIT 1');
+        return stmt2.get(gameId) as GameState | undefined;
+      } catch (e2) {
+        return undefined;
+      }
+    }
   }
 
-  createGameState(gameStateData: { gameId: number; player1Id: number; player2Id: number }): GameState {
-    const stmt = this.db.prepare(`
-      INSERT INTO gameState (
-        gameId, player1Id, player2Id, player3Id, player4Id,
-        ballPosX, ballPosY, ballVelX, ballVelY, 
-        player1Pos, player2Pos, scorePlayer1, scorePlayer2
-      ) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    const result = stmt.run(
-      gameStateData.gameId,
-      gameStateData.player1Id,
-      gameStateData.player2Id,
-      gameStateData.player1Id,  // Use player1Id as default for player3Id
-      gameStateData.player2Id,  // Use player2Id as default for player4Id
-      0, // Default ball X position
-      0, // Default ball Y position
-      0, // Default ball X velocity
-      0, // Default ball Y velocity
-      0, // Default player1 position
-      0, // Default player2 position
-      0, // Default player1 score
-      0  // Default player2 score
-    );
-    
+  createGameState(gameStateData: { gameId: number }): GameState {
+    const columns = this.db.prepare("PRAGMA table_info('gameState')").all() as Array<{ cid: number; name: string; type: string; notnull: number; dflt_value: any; pk: number }>;
+    const existing = this.getGameStateByGameId(gameStateData.gameId);
+    if (existing) return existing;
+
+    const defaultForColumn = (name: string, type?: string): any => {
+      const lower = name.toLowerCase();
+      if (lower === 'mode') return '2P';
+      if (lower === 'difficulty') return 'normal';
+      if (lower === 'status') return 'waiting';
+      if (lower === 'startedat') return new Date().toISOString();
+      if (lower === 'endedat') return null;
+      if (lower === 'winnerid') return null;
+      if (lower.endsWith('id')) {
+        if (lower === 'gameid') return gameStateData.gameId;
+        return 0;
+      }
+      if (lower.includes('pos') || lower.includes('vel') || lower.includes('score') || lower.includes('ball')) return 0;
+      if (lower.includes('lastactivity')) return new Date().toISOString();
+      const t = (type || '').toUpperCase();
+      if (t.includes('TEXT')) return '';
+      if (t.includes('INT') || t.includes('REAL') || t.includes('NUM')) return 0;
+      return 0;
+    };
+
+    const insertCols: string[] = [];
+    const values: any[] = [];
+
+    for (const col of columns) {
+      if (col.pk === 1 || col.name.toLowerCase() === 'id') {
+        continue;
+      }
+      insertCols.push(col.name);
+      if (col.name.toLowerCase() === 'gameid') {
+        values.push(gameStateData.gameId);
+      } else if (col.dflt_value !== null && col.dflt_value !== undefined) {
+        values.push(defaultForColumn(col.name, col.type));
+      } else {
+        values.push(defaultForColumn(col.name, col.type));
+      }
+    }
+
+    if (insertCols.length === 0) {
+      try {
+        const stmt2 = this.db.prepare('INSERT INTO gameState (gameId) VALUES (?)');
+        const res2 = stmt2.run(gameStateData.gameId);
+        const gs2 = this.getGameStateById(res2.lastInsertRowid as number);
+        if (gs2) return gs2;
+      } catch {}
+      throw new Error('Unable to construct insert for gameState');
+    }
+
+    const placeholders = insertCols.map(() => '?').join(', ');
+    const sql = `INSERT INTO gameState (${insertCols.join(', ')}) VALUES (${placeholders})`;
+
+    try {
+      const stmt = this.db.prepare(sql);
+      const result = stmt.run(...values);
     const newGameState = this.getGameStateById(result.lastInsertRowid as number);
-    
-    if (!newGameState) {
+      if (newGameState) return newGameState;
+    } catch (e: any) {
+      const existing2 = this.getGameStateByGameId(gameStateData.gameId);
+      if (existing2) return existing2;
+      throw e;
+    }
+    const fallback = this.getGameStateByGameId(gameStateData.gameId);
+    if (!fallback) {
       throw new Error('Failed to retrieve created game state');
     }
-    
-    return newGameState;
+    return fallback;
   }
 
-  updateGameState(id: number, gameStateData: Partial<{ ballPosX: number; ballPosY: number;
-     ballVelX: number; ballVelY: number; player1Pos: number; player2Pos: number; 
-     scorePlayer1: number; scorePlayer2: number }>): GameState | undefined {
+  updateGameStateByGameId(gameId: number, gameStateData: Partial<{ ballPosX: number; ballPosY: number; ballVelX: number; ballVelY: number; players: Player[]; mode: string }>): GameState | undefined {
     const fields: string[] = [];
     const values: any[] = [];
-    
+
     if (gameStateData.ballPosX !== undefined) {
       fields.push('ballPosX = ?');
       values.push(gameStateData.ballPosX);
     }
-    
     if (gameStateData.ballPosY !== undefined) {
       fields.push('ballPosY = ?');
       values.push(gameStateData.ballPosY);
     }
-    
-    if (gameStateData.ballVelX !== undefined) {
+    if (gameStateData.ballVelX !== undefined) {//TODO: add babylon physics?
       fields.push('ballVelX = ?');
       values.push(gameStateData.ballVelX);
     }
-    
     if (gameStateData.ballVelY !== undefined) {
       fields.push('ballVelY = ?');
       values.push(gameStateData.ballVelY);
     }
-    
-    if (gameStateData.player1Pos !== undefined) {
-      fields.push('player1Pos = ?');
-      values.push(gameStateData.player1Pos);
+
+    if (gameStateData.players !== undefined) {
+      fields.push('players = ?');
+      values.push(JSON.stringify(gameStateData.players));
     }
-    
-    if (gameStateData.player2Pos !== undefined) {
-      fields.push('player2Pos = ?');
-      values.push(gameStateData.player2Pos);
+
+    if (gameStateData.mode !== undefined) {
+      fields.push('mode = ?');
+      values.push(gameStateData.mode);
     }
-    
-    if (gameStateData.scorePlayer1 !== undefined) {
-      fields.push('scorePlayer1 = ?');
-      values.push(gameStateData.scorePlayer1);
-    }
-    
-    if (gameStateData.scorePlayer2 !== undefined) {
-      fields.push('scorePlayer2 = ?');
-      values.push(gameStateData.scorePlayer2);
-    }
-    
+
     if (fields.length === 0) {
-      return this.getGameStateById(id);
+      return this.getGameStateByGameId(gameId);
     }
-    
-    values.push(id);
-    
+
+    values.push(gameId);
     const stmt = this.db.prepare(`
-      UPDATE gameState 
+      UPDATE gameState
       SET ${fields.join(', ')}, lastActivity = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE gameId = ?
     `);
-    
     const result = stmt.run(...values);
-    
     if (result.changes === 0) {
       return undefined;
     }
-    
-    return this.getGameStateById(id);
+    return this.getGameStateByGameId(gameId);
   }
 
   deleteGameState(id: number): boolean {
@@ -906,7 +926,6 @@ class InvitationDatabaseManager {
   }
 }
 
-
 // Central Database Manager
 export class DatabaseManager extends BaseDatabaseManager {
   public users: UserDatabaseManager;
@@ -971,7 +990,7 @@ export class DatabaseManager extends BaseDatabaseManager {
       CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         status TEXT NOT NULL DEFAULT 'waiting',
-        mode TEXT NOT NULL DEFAULT '2player',
+        mode TEXT NOT NULL DEFAULT '2P',
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         startedAt DATETIME NULL,
         endedAt DATETIME NULL,
@@ -990,8 +1009,8 @@ export class DatabaseManager extends BaseDatabaseManager {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         gameId INTEGER NOT NULL,
         playerId INTEGER NOT NULL,
-        playerPosition TEXT NOT NULL,
-        currentScore INTEGER NOT NULL DEFAULT 0,
+        pos INTEGER NOT NULL DEFAULT 0,
+        score INTEGER NOT NULL DEFAULT 0,
         connectionStatus TEXT NOT NULL DEFAULT 'connected',
         lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
@@ -1008,29 +1027,13 @@ export class DatabaseManager extends BaseDatabaseManager {
       CREATE TABLE IF NOT EXISTS gameState (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         gameId INTEGER NOT NULL,
-        player1Id INTEGER NOT NULL,
-        player2Id INTEGER NOT NULL,
-        player3Id INTEGER NOT NULL,
-        player4Id INTEGER NOT NULL,
         ballPosX INTEGER NOT NULL DEFAULT 0,
         ballPosY INTEGER NOT NULL DEFAULT 0,
         ballVelX INTEGER NOT NULL DEFAULT 0,
         ballVelY INTEGER NOT NULL DEFAULT 0,
-        player1Pos INTEGER NOT NULL DEFAULT 0,
-        player2Pos INTEGER NOT NULL DEFAULT 0,
-        player3Pos INTEGER NOT NULL DEFAULT 0,
-        player4Pos INTEGER NOT NULL DEFAULT 0,
-        scorePlayer1 INTEGER NOT NULL DEFAULT 0,
-        scorePlayer2 INTEGER NOT NULL DEFAULT 0,
-        scorePlayer3 INTEGER NOT NULL DEFAULT 0,
-        scorePlayer4 INTEGER NOT NULL DEFAULT 0,
-        gameMode TEXT NOT NULL DEFAULT '2player',
+        mode TEXT NOT NULL DEFAULT '2P',
         lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
-        FOREIGN KEY (player1Id) REFERENCES users(id),
-        FOREIGN KEY (player2Id) REFERENCES users(id),
-        FOREIGN KEY (player3Id) REFERENCES users(id),
-        FOREIGN KEY (player4Id) REFERENCES users(id)
+        FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
       )
     `;
     

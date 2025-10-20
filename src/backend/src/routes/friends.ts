@@ -10,18 +10,10 @@ interface FriendParams {
 }
 
 // Extend FastifyRequest to include user
-interface AuthenticatedRequest extends FastifyRequest {
-  user?: {
-    id: number;
-    email: string;
-    username: string;
-  };
-}
-
 async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
   
   // Get all friends
-  fastify.get('/list', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  fastify.get('/list', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -48,7 +40,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Get pending friend requests
-  fastify.get('/requests/pending', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  fastify.get('/requests/pending', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -75,7 +67,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Get sent friend requests
-  fastify.get('/requests/sent', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  fastify.get('/requests/sent', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -102,7 +94,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Send friend request
-  fastify.post('/request', async (request: AuthenticatedRequest & { Body: FriendRequestBody }, reply: FastifyReply) => {
+  fastify.post('/request', async (request: FastifyRequest<{ Body: FriendRequestBody; Params: FriendParams; Querystring: { q?: string } }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -148,7 +140,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Accept friend request
-  fastify.post('/accept/:id', async (request: AuthenticatedRequest & { Params: FriendParams }, reply: FastifyReply) => {
+  fastify.post('/accept/:id', async (request: FastifyRequest<{ Body: FriendRequestBody; Params: FriendParams; Querystring: { q?: string } }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -192,7 +184,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Reject friend request
-  fastify.post('/reject/:id', async (request: AuthenticatedRequest & { Params: FriendParams }, reply: FastifyReply) => {
+  fastify.post('/reject/:id', async (request: FastifyRequest<{ Body: FriendRequestBody; Params: FriendParams; Querystring: { q?: string } }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -235,7 +227,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Remove friend
-  fastify.delete('/:id', async (request: AuthenticatedRequest & { Params: FriendParams }, reply: FastifyReply) => {
+  fastify.delete('/:id', async (request: FastifyRequest<{ Body: FriendRequestBody; Params: FriendParams; Querystring: { q?: string } }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       
@@ -278,7 +270,7 @@ async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
   });
 
   // Search users to add as friends
-  fastify.get('/search', async (request: AuthenticatedRequest & { Querystring: { q: string } }, reply: FastifyReply) => {
+  fastify.get('/search', async (request: FastifyRequest<{ Body: FriendRequestBody; Params: FriendParams; Querystring: { q: string } }>, reply: FastifyReply) => {
     try {
       const userId = request.user?.id;
       

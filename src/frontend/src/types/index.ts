@@ -1,41 +1,23 @@
-export interface GameState {
-    ballPosX: number;
-    ballPosY: number;
-    player1Pos: number;
-    player2Pos: number;
-    player3Pos: number;
-    player4Pos: number;
-    scorePlayer1: number;
-    scorePlayer2: number;
-    scorePlayer3: number;
-    scorePlayer4: number;
-    gameMode: string;
-    mode?: string;
-    playerPositions?: number[];
-    scores?: number[];
-    lastContact?: number;
+import { Color3 } from "@babylonjs/core";
+import { Player as SharedPlayer, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
+
+// Frontend-specific extensions to shared types
+export interface Player extends SharedPlayer {
+  color?: Color3;
 }
 
-export interface WebSocketMessage {
-    type: string;
-    gameId?: number;
-    playerId?: number;
-    state?: GameState;
-    scorePlayer1?: number;
-    scorePlayer2?: number;
-    scorePlayer3?: number;
-    scorePlayer4?: number;
-    message?: string;
-    winner?: number;
-    winnerName?: string;
-    mode?: string;
-    scores?: number[];
-    playerPositions?: number[];
-    finalScores?: number[];
+export interface GameState extends SharedGameState {
+  players: Player[];
+}
+
+export interface WebSocketMessage extends SharedWebSocketMessage {
+  state?: GameState;
+  players?: Player[];
 }
 
 export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 
-  'lobby' | 'authCallback' | 'register' | 'join' | 'friends' | '2playergame' | '4playergame' | 'tempLogin';
+  'lobby' | 'authCallback' | 'register' | 'join' | 'friends' | '2PGame' | '4PGame' | 
+  'tempLogin' | 'editProfile' | 'changeUsername' | 'changeEmail';
 
 declare global {
   interface Window {
