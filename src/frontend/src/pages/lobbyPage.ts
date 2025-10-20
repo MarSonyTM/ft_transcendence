@@ -333,7 +333,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       let currentRoom = getCurrentRoom();
 
-      await showGameStartCountdown();
+      // await showGameStartCountdown();
       
       if (currentRoom) {
         currentRoom = { ...currentRoom, gameId, status: 'playing' as const };
