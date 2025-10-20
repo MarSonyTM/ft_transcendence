@@ -317,6 +317,15 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
     
     onConnect: () => {
       console.log('✅ Lobby WebSocket connected');
+
+      if (lobbyWebSocket) {
+        lobbyWebSocket.requestState();
+        
+        // Also poll once more to ensure sync
+        setTimeout(() => {
+          fetchRoomState();
+        }, 500);
+      }
     },
     
     onGameStart: async (gameId) => {

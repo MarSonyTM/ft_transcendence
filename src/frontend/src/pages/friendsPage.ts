@@ -287,15 +287,17 @@ async function inviteToGame(friendId: number) {
       },
       body: JSON.stringify({ 
         friendId,
-        gameMode: '2P' // or get from user selection
+        gameMode: '2P'
       })
     });
 
     const data = await response.json();
     
-    if (data.success) {   
-      // Navigate to the lobby/room
-      window.location.href = `/join/${data.data.roomId}`;
+    if (data.success) {
+      sessionStorage.setItem('pendingRoomJoin', data.data.roomId);
+      history.pushState({ page: 'lobby', roomId: data.data.roomId }, '', `/join/${data.data.roomId}`);
+      setCurrentPage('lobby');
+      renderApp();
     } else {
       alert(data.message || 'Failed to send invitation');
     }

@@ -95,9 +95,14 @@ export class AuthService {
   // Fetch user profile from backend
   async fetchUserProfile(): Promise<UserProfile | null> {
     const token = this.getToken();
-    if (!token) return null;
+    if (!token)
+      return null;
 
     try {
+      // const isGuest = localStorage.getItem("isGuest") || null;
+      // if (isGuest == 'true) {
+
+      // }
       const response = await fetch(`${API_URL}/api/users/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,

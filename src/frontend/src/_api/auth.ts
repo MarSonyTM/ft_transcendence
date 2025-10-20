@@ -135,6 +135,7 @@ export async function createGuestUser(username?: string): Promise<{
   username?: string; 
   token?: string; 
   isGuest?: boolean;
+  emailVerified?: boolean;
   error?: string;
 }> {
   const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
@@ -153,6 +154,7 @@ export async function createGuestUser(username?: string): Promise<{
         username: data.data?.username,
         token: data.token,
         isGuest: data.data?.isGuest || true,
+		emailVerified : true,
         error: data.message
       };
     }

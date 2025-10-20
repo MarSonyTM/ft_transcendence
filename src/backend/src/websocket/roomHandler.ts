@@ -57,6 +57,19 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
       }
     });
 
+    sendRoomState(roomId, playerId);
+
+    broadcastToRoom(roomId, {
+      type: 'playerJoined',
+      playerId: playerId,
+      room: {
+        roomId: room.roomId,
+        players: room.players,
+        status: room.status,
+        maxPlayers: room.maxPlayers
+      }
+    }, playerId);
+
     socket.on('close', () => {
       console.log(`🔌 Player ${playerId} disconnected from room ${roomId}`);
       removePlayerFromRoom(roomId, playerId);

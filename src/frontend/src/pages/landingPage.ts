@@ -17,17 +17,19 @@ export async function renderLandingPage(): Promise<void> {
         `;
     }
     else {
-        const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-        const newFriends = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
-        if (newFriends)
+        await authService.fetchUserProfile();
+        // const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || ''; // TODO: mgeiger- Friend Notification
+        // const newFriends = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
+        //     headers: {
+        //         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        //     }
+        // });
+        // ${!newFriends ? '<button id="profileBtn" class="btn btn-profile">New Friend</button>' : '<button id="profileBtn" class="btn btn-profile">Profile</button>'}
+        
         root.innerHTML = `
         <div class="landing-container">
         <h1 class="main-title">PING PONG</h1>
-        ${!newFriends ? '<button id="profileBtn" class="btn btn-profile">New Friend</button>' : '<button id="profileBtn" class="btn btn-profile">Profile</button>'}
+        <button id="profileBtn" class="btn btn-profile">Profile</button>
         <button id="playBtn" class="btn btn-play">Play</button>
         </div>
         `;
