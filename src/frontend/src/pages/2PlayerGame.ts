@@ -107,12 +107,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
     
     pongGame.gameId = effectiveRoom.gameId;
-    // const localUser = authService.getCurrentUser();
-    // if (localUser && effectiveRoom.players) {
-    //     const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
-    //     if (idx === 1) 
-    //         pongGame.viewIndexMap = [1, 0, 2, 3];
-    // }
     
     setGameScreen(pongGame);
 
@@ -176,12 +170,12 @@ async function initRoomBasedGame(room: any): Promise<void> {
     
     const user = authService.getCurrentUser();
     
-    if (!user) {
+    if (!user && localStorage.getItem('isGuest') != 'true') {
         console.error('No authenticated user for room game');
         return;
     }
 
-    const playerId = user.id?.toString() || `guest-${Date.now()}`;
+    const playerId = user?.id?.toString() || `guest-${Date.now()}`;
     const gameMode = getCurrentGameMode();
 
     console.log('Initializing room-based game:', {
@@ -190,20 +184,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         gameId: room.gameId,
         gameMode
     });
-
-    // if (pongGame && room.gameId) {
-    //     pongGame.gameId = room.gameId;
-    //     console.log(`✅ Using shared game ID from room: ${room.gameId}`);
-        
-    //     const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
-        
-    //     // Set view rotation based on game mode and player index
-    //     if (idx === 1) {
-    //         pongGame.viewIndexMap = [1, 0, 2, 3];
-    //     } else {
-    //         pongGame.viewIndexMap = [0, 1, 2, 3];
-    //     }
-    // }
 
     // Initialize WebSocket connection to room
     pongGame.roomWS = initRoomWebSocket({

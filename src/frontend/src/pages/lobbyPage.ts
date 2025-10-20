@@ -332,6 +332,8 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       console.log('Game started by host! GameID:', gameId);
       
       let currentRoom = getCurrentRoom();
+
+      await showGameStartCountdown();
       
       if (currentRoom) {
         currentRoom = { ...currentRoom, gameId, status: 'playing' as const };
