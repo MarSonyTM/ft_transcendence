@@ -33,7 +33,6 @@ jobs:
           npm run build --if-present
 
       - name: Install and test backend
-      - name: Install and test backend
         run: |
           cd src/backend
           npm ci
