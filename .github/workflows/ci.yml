@@ -12,11 +12,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20.19.5'
+          cache: 'npm'
+          cache-dependency-path: |
+            src/frontend/package-lock.json
+            src/backend/package-lock.json
     
       - name: Install and test frontend
         run: |
@@ -27,12 +33,19 @@ jobs:
           npm run build --if-present
 
       - name: Install and test backend
+      - name: Install and test backend
         run: |
           cd src/backend
+          npm ci
           npm ci
           npm run lint --if-present
           npm test --if-present || true
           npm run build --if-present
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker images
-        run: docker compose -f docker-compose.dev.yml build
+        run: |
+          cd src
+          docker compose -f docker-compose.dev.yml build
