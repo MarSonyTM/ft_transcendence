@@ -112,15 +112,13 @@ function showLoginPrompt(root: HTMLElement, roomId: string): void {
 
   if (guestBtn) {
     guestBtn.addEventListener('click', async () => {
-      // Create guest account
       const guestUsername = `Guest${Math.floor(Math.random() * 10000)}`;
-      // Set temporary guest session
       sessionStorage.setItem('guestUser', JSON.stringify({
         username: guestUsername,
-        id: `guest-${Date.now()}`
+        id: `guest-${Date.now()}`,
+        emailVerified: 1
       }));
       
-      // Retry joining
       await renderJoinPage(roomId);
     });
   }

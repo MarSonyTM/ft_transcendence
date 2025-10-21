@@ -94,8 +94,23 @@ export class AuthService {
   
   // Fetch user profile from backend
   async fetchUserProfile(): Promise<UserProfile | null> {
+
+    if (localStorage.getItem('isGuest')) {
+      const guestStr = localStorage.getItem('currentUser');
+      let guest = null;
+
+      if (guestStr) {
+        try {
+            guest = JSON.parse(guestStr);
+        } catch (e) {
+            console.error('Failed to parse guest user:', e);
+        }
+      }
+      return guest;
+    }
     const token = this.getToken();
-    if (!token) return null;
+    if (!token)
+      return null;
 
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -155,6 +170,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('isGuest');
     this.currentUser = null;
   }
 

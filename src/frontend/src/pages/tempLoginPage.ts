@@ -1,5 +1,6 @@
 import { setCurrentUser } from '../utils/globalState';
 import { createGuestUser } from '../_api/auth';
+import { updateUserProfile } from '../_api/user';
 
 export function renderTempLoginPage(): void {
   const root = document.getElementById('app-root');
@@ -60,8 +61,21 @@ export function renderTempLoginPage(): void {
         
         // Mark as guest user
         localStorage.setItem('isGuest', 'true');
-        
+
         // Update current user
+        const userData = {
+          username: username,
+          email: 'guest@transcendence.com',
+          firstName: 'Guest',
+          lastName: 'User',
+          avatar: null,
+          emailVerified: 'true',
+          gamesPlayed: 0,
+          gamesWon: 0,
+          gamesLost: 0
+        };
+      
+        localStorage.setItem('currentUser', JSON.stringify(userData));
         setCurrentUser(result.username || 'Guest');
         
         // Show success message

@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { gameRoomManager } from '../game/gameRoom';
-import { broadcastGameStartToRoom, broadcastToRoom } from '../websocket/roomHandler';
+import { broadcastGameStartToRoom, broadcastToRoom, broadcastCountdownToRoom } from '../websocket/roomHandler';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
@@ -279,112 +279,99 @@ async function roomRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
-      // Use incremental DB-backed game IDs for cleanliness
-      const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
-      const gameId = createdGame.id;
+      broadcastCountdownToRoom(roomId);
       
-      console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
-
-      const positions = gameMode === '4P' 
-        ? ['left', 'top', 'right', 'bottom'] 
-        : ['left', 'right'];
-      
-      const players = room.players.map((roomPlayer, index) => {
-        let playerId: number;
-        const parsedId = parseInt(roomPlayer.id);
-        
-        if (!isNaN(parsedId) && parsedId > 0) {
-          playerId = parsedId;
-          
-          try {
-            const position = positions[index] || 'left';
-            database.players.addPlayerToGame(gameId, playerId, position);
-          } catch (err) {
-            console.warn(`⚠️ Could not add player ${playerId} to database (user might not exist), using in-memory only`);
-          }
-        } else {
-          playerId = index + 1;
-          console.log(`ℹ️ Using index-based ID ${playerId} for ${roomPlayer.username} (AI/guest)`);
-        }
-        
-        return {
-          id: playerId,
-          name: roomPlayer.username,
-          gameId: gameId,
-          pos: gameMode === '4P' ? 160 : 80,
-          material: null,
-          color: { r: 1, g: 1, b: 1 },
-          score: 0,
-          connectionStatus: 'connected',
-          lastActivity: new Date().toISOString()
-        };
-      });
-
-      // Create a proper GameState object
-      const initialGameState: GameState = {
-        id: 0, // Optional: engine updates guard errors internally
-        gameId: gameId,
-        players: players,
-        ballPosX: 200,
-        ballPosY: gameMode === '4P' ? 200 : 100,
-        ballVelX: 0,
-        ballVelY: 0,
-        mode: gameMode,
-        lastContact: 0,
-        lastActivity: new Date().toISOString(),
-      };
-
-      // Create game engine with proper GameState
-      const gameEngine: BaseGameEngine = new BaseGameEngine(initialGameState);
-
-      // Attach AI players before first frame
-      room.players.forEach((player, index) => {
-      const playerId = index + 1; // Player IDs are 1-indexed
-      if (player.isAI) {
-        const difficulty = (player.difficulty as any) || 'normal';
-        gameEngine.setPlayerAI(playerId, true, difficulty);
-      }
-    });
-
-      // Ensure all runtime state is initialized AFTER AI is attached
-      if (typeof (gameEngine as any).resetGame === 'function') {
-        try {
-          console.log('🔄 Performing pre-start reset to stabilize initial state...');
-          (gameEngine as any).resetGame();
-        } catch (e) {
-          console.warn('⚠️ Pre-start reset failed (continuing):', e);
-        }
-      }
-
-      // Store and start the game engine (guard against duplicate engine/loops)
-      const existingEngine = activeGames.get(gameId);
-      if (!existingEngine) {
-        activeGames.set(gameId, gameEngine);
-      }
-      const engineToStart = existingEngine || gameEngine;
-      if (typeof (engineToStart as any).startGame === 'function') {
-        (engineToStart as any).startGame();
-      }
-      
-      const started = gameRoomManager.startGame(roomId, gameId);
-      if (!started) {
-        throw new Error('Failed to start game in room');
-      }
-
-      broadcastGameStartToRoom(roomId, gameId);
-      return reply.send({
+      reply.send({
         success: true,
-      message: 'Game started',
-      gameId: gameId,
-      room: gameRoomManager.getRoom(roomId)
+        message: 'Countdown started'
       });
+      
+      setTimeout(async () => {
+        try {
+          const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
+          const createdGame = database.games.createGame({ mode: gameMode, difficulty: 'normal' });
+          const gameId = createdGame.id;
+          
+          console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
+          const positions = gameMode === '4P' 
+            ? ['left', 'top', 'right', 'bottom'] 
+            : ['left', 'right'];
+          
+          const players = room.players.map((roomPlayer, index) => {
+            let playerId: number;
+            const parsedId = parseInt(roomPlayer.id);
+            
+            if (!isNaN(parsedId) && parsedId > 0) {
+              playerId = parsedId;
+              
+              try {
+                const position = positions[index] || 'left';
+                database.players.addPlayerToGame(gameId, playerId, position);
+              } catch (err) {
+                console.warn(`⚠️ Could not add player ${playerId} to database`);
+              }
+            } else {
+              playerId = index + 1;
+            }
+            
+            return {
+              id: playerId,
+              name: roomPlayer.username,
+              gameId: gameId,
+              pos: gameMode === '4P' ? 160 : 70,
+              material: null,
+              color: { r: 1, g: 1, b: 1 },
+              score: 0,
+              connectionStatus: 'connected',
+              lastActivity: new Date().toISOString()
+            };
+          });
+
+          const initialGameState: GameState = {
+            id: 0,
+            gameId: gameId,
+            players: players,
+            ballPosX: 200,
+            ballPosY: gameMode === '4P' ? 200 : 100,
+            ballVelX: 0,
+            ballVelY: 0,
+            mode: gameMode,
+            lastContact: 0,
+            lastActivity: new Date().toISOString(),
+          };
+
+          const gameEngine: BaseGameEngine = new BaseGameEngine(initialGameState);
+
+          // Attach AI players
+          room.players.forEach((player, index) => {
+            const playerId = index + 1;
+            if (player.isAI) {
+              const difficulty = (player.difficulty as any) || 'normal';
+              gameEngine.setPlayerAI(playerId, true, difficulty);
+            }
+          });
+
+          activeGames.set(gameId, gameEngine);
+          gameEngine.startGame();
+
+          room.gameId = gameId;
+          room.status = 'playing';
+
+          // Broadcast game start to all players
+          broadcastGameStartToRoom(roomId, gameId);
+          
+          console.log('✅ Game started successfully after countdown');
+        } catch (error) {
+          console.error('Error starting game after countdown:', error);
+        }
+      }, 4000); // 4 second delay for countdown
+      
     } catch (error) {
-      console.error('Error starting room game:', error);
+      fastify.log.error(error);
       return reply.status(500).send({
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: 'Failed to start countdown'
       });
     }
   });

@@ -1,5 +1,4 @@
 name: CI
-
 on:
   workflow_dispatch:
   pull_request:
@@ -8,41 +7,40 @@ on:
     branches: [ MAIN, DEV, PRE, PROD ]
 
 jobs:
-  build-and-test:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, backend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.5'
+          cache: 'npm'
+          cache-dependency-path: src/${{ matrix.service }}/package-lock.json
+    
+      - name: Install and test
+        run: |
+          cd src/${{ matrix.service }}
+          npm ci
+          npm run lint --if-present
+          npm test --if-present || true
+
+  docker-build:
+    needs: lint-and-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect project files
-        id: detect
-        run: |
-          echo "has_pkg=$( [ -f package.json ] && echo true || echo false )" >> $GITHUB_OUTPUT
-          echo "has_dockerfile=$( [ -f Dockerfile ] && echo true || echo false )" >> $GITHUB_OUTPUT
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Setup Node
-        if: steps.detect.outputs.has_pkg == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install deps
-        if: steps.detect.outputs.has_pkg == 'true'
+      - name: Build Docker images
         run: |
-          npm ci --ignore-scripts || npm install --no-audit --no-fund
-
-      - name: Lint
-        if: steps.detect.outputs.has_pkg == 'true'
-        run: |
-          npm run lint --if-present
-
-      - name: Test
-        if: steps.detect.outputs.has_pkg == 'true'
-        run: |
-          npm test --if-present --silent || true
-
-      - name: Docker build
-        if: steps.detect.outputs.has_dockerfile == 'true'
-        run: |
-          docker build -t ft_transcendence:test .
+          cd src
+          docker compose -f docker-compose.dev.yml build

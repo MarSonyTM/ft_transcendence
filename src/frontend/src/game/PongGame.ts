@@ -3,20 +3,20 @@ import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
 import { RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from '../utils/auth';
+import { baby3D } from './game3D';
 
 export class PongGame {
     gameId?: number = 0;
     // viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
+    ctx: CanvasRenderingContext2D | null = null;
+    babylonGame?: baby3D;
     websocket: WebSocket | null = null;
     isActive: boolean = false;
     fpsStartTime: number = performance.now();
     frameCount: number = 0;
     lastPingTime: number = 0;
     players: Player[] = [];
-    private lastMoveTime: number = 0;
-    private readonly MOVE_THROTTLE = 16;
-    private lastSentPosition: number = 0;
 
     gameState: GameState = {
         gameId: this.gameId,
@@ -35,7 +35,6 @@ export class PongGame {
     currentGameState: any = null;
     private renderLoopRunning: boolean = false;
     private animationFrameId: number | null = null;
-    private shouldReconnect: boolean = true;
     private stateListeners: Array<(state: GameState, game: PongGame) => void> = [];
     hasLocal: boolean = false;
     isGuest: boolean = false;
@@ -131,13 +130,13 @@ export class PongGame {
         }
     }
 
-    async init(): Promise<void> {
-        this.canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
-
-        if (!this.canvas) return;
+    async init() {
+        console.log('🎮 [PONGGAME] Initializing PongGame...');
         
-        const is4Player = getCurrentGameMode() === '4P';
-        this.paddlePosition = is4Player ? 160 : 70;
+        this.canvas = document.getElementById('gameScreen') as HTMLCanvasElement;
+        this.ctx = this.canvas?.getContext('2d');
+        
+        this.paddlePosition = (this.gameState.mode === '4P') ? 160 : 70;
         
         this.updateStatus("Ready to start...");
         
@@ -157,13 +156,13 @@ export class PongGame {
                 this.gameId = room.gameId;
                 console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
             }
-            //  Create a new game if there's NO room AND no gameId set
+            // Create a new game if there's NO room AND no gameId set
             else if (!room) {
                 console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
                 await this.createGame();
                 console.log(`✅ [PONGGAME] Created new standalone game ID: ${this.gameId}`);
             }
-            // Priority 4: Room exists but no gameId yet - wait for host to start
+            // Room exists but no gameId yet - wait for host to start
             else {
                 console.warn(`⏳ [PONGGAME] Room exists but no gameId - game not started yet`);
                 this.updateStatus("Waiting for host to start game...");
@@ -174,6 +173,10 @@ export class PongGame {
             if (this.gameId) {
                 await this.connectWebSocket();
                 this.updateStatus("Connected - Click Start to begin");
+                
+                // Initialize 3D AFTER WebSocket is connected
+                await this.init3DGame();
+                
                 this.startRenderLoop(); // Start the game loop for input/state updates
             } else {
                 throw new Error("Failed to establish game ID");
@@ -181,6 +184,41 @@ export class PongGame {
         } catch (error) {
             console.error("❌ [PONGGAME] Initialization error:", error);
             this.updateStatus(`Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    private async init3DGame() {
+        console.log('🎨 [PONGGAME] Initializing 3D renderer...');
+        
+        try {
+            // Make sure DOM is ready
+            await new Promise<void>(resolve => {
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => resolve());
+                } else {
+                    resolve();
+                }
+            });
+            
+            // Add a small delay to ensure everything is settled
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Check if BabylonJS game exists
+            if (!this.babylonGame) {
+                console.warn('⚠️ [PONGGAME] BabylonGame not initialized, skipping 3D');
+                return;
+            }
+            
+            // Create the scene
+            console.log('🎨 [PONGGAME] Creating BabylonJS scene...');
+            await this.babylonGame.createScene();
+            console.log('✅ [PONGGAME] 3D scene created successfully');
+            
+        } catch (error) {
+            console.error('❌ [PONGGAME] Failed to initialize 3D game:', error);
+            console.warn('⚠️ [PONGGAME] Falling back to 2D-only mode');
+            // Don't throw - just continue without 3D
+            // The 2D canvas will still work
         }
     }
 
@@ -549,7 +587,6 @@ export class PongGame {
 
     async endGame(): Promise<void> {
         this.isActive = false;
-        this.shouldReconnect = false;
         
         this.stopRenderLoop();
         

@@ -10,6 +10,7 @@ interface RoomWebSocketConfig {
   onPlayerDisconnected?: (playerId: string) => void;
   onScore?: (scores: any) => void;
   onGameStart?: (gameId: number) => void;
+  onCountdown?: () => void;
   onGameEnd?: (data: { winnerId: string; winnerSeat?: string; winnerName?: string; players?: any[] }) => void;
   onChat?: (message: any) => void;
   onError?: (error: Error) => void;
@@ -117,6 +118,12 @@ export class RoomWebSocketManager {
 
       case 'pong':
         // Heartbeat response
+        break;
+
+      case 'countdown':
+        if (this.config.onCountdown) {
+          this.config.onCountdown();
+        }
         break;
 
       case 'roomState':
