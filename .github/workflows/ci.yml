@@ -20,27 +20,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.19.5'
-          cache: 'npm'
-          cache-dependency-path: src/${{ matrix.service }}/package-lock.json
     
-      - name: Install and test
+      - name: Install and test frontend
         run: |
-          cd src/${{ matrix.service }}
+          cd src/frontend
           npm ci
           npm run lint --if-present
           npm test --if-present || true
+          npm run build --if-present
 
-  docker-build:
-    needs: lint-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install and test backend
+        run: |
+          cd src/backend
+          npm ci
+          npm run lint --if-present
+          npm test --if-present || true
+          npm run build --if-present
 
       - name: Build Docker images
-        run: |
-          cd src
-          docker compose -f docker-compose.dev.yml build
+        run: docker compose -f docker-compose.dev.yml build
