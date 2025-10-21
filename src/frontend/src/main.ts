@@ -30,6 +30,12 @@ function handleRouting(): void {
 
   if (!publicPages.includes(path)) {
     const currentUser = localStorage.getItem('needEmailVerification');
+    const email = localStorage.getItem('pendingEmailVerification');
+    if (!email) {
+      history.pushState({ page: 'login' }, '', `/login`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
     if (currentUser === 'true') {
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
