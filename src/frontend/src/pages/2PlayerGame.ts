@@ -67,8 +67,8 @@ export async function render2PlayerGame(): Promise<void> {
             <canvas id="renderCanvas"></canvas>
         </div>
         <div class="controls-info">
-            <p style="color: #60a5fa; font-weight: bold;">W / S</p>
-            ${!pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Player 2 - Up/Down</p>' : ''}
+            <p style="color: #60a5fa; font-weight: bold;">${players[0].username} W / S</p>
+            ${pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Local PLayer - O/L</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
         <hr>
