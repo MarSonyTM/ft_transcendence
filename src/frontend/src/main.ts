@@ -1,6 +1,6 @@
 import './styles.css';
 import { AppPage } from './types';
-import { getCurrentPage, setCurrentPage, getCurrentUser, setCurrentUser } from './utils/globalState';
+import { getCurrentPage, setCurrentPage, setCurrentUser } from './utils/globalState';
 import { renderLandingPage } from './pages/landingPage';
 import { renderLoginPage } from './pages/loginPage';
 import { renderGameSelectPage } from './pages/gameSelectPage';
@@ -13,6 +13,10 @@ import { renderJoinPage } from './pages/joinPage';
 import { renderLobbyPage, cleanupLobby } from './pages/lobbyPage';
 import { renderFriendsPage } from './pages/friendsPage';
 import { renderTempLoginPage } from './pages/tempLoginPage';
+import { renderEditProfilePage } from './pages/editProfilePage';
+import { renderChangeUsernamePage } from './pages/changeUsernamePage';
+import { renderChangeEmailPage } from './pages/changeEmailPage';
+import { renderVerifyEmailPage } from './pages/verifyEmail';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -39,47 +43,6 @@ function handleRouting(): void {
     currentRoomId = joinMatch[1];
     console.log('Joining room:', currentRoomId);
     setCurrentPage('join');
-    renderApp();
-    return;
-  }
-
-  // Handle hash-based routing
-  if (hash) {
-    const hashPage = hash.replace('#', '');
-    switch (hashPage) {
-      case 'login':
-        setCurrentPage('login');
-        break;
-      case 'gameSelect':
-        setCurrentPage('gameSelect');
-        break;
-      case 'profile':
-        setCurrentPage('profile');
-        break;
-      case 'lobby':
-        setCurrentPage('lobby');
-        break;
-      case 'register':
-        setCurrentPage('register');
-        break;
-      case 'authCallback':
-        setCurrentPage('authCallback');
-        break;
-      case 'friends':
-        setCurrentPage('friends');
-        break;
-      case '2PGame':
-        setCurrentPage('2PGame');
-        break;
-      case '4PGame':
-        setCurrentPage('4PGame');
-        break;
-      case 'tempLogin':
-        setCurrentPage('tempLogin');
-        break;
-      default:
-        setCurrentPage('landing');
-    }
     renderApp();
     return;
   }
@@ -129,6 +92,9 @@ function handleRouting(): void {
     case 'tempLogin':
         setCurrentPage('tempLogin');
         break;
+    case '/verify-email':
+      setCurrentPage('verifyEmail');
+      break;
     default:
       setCurrentPage('landing');
   }
@@ -162,13 +128,11 @@ export async function renderApp(): Promise<void> {
       if (currentRoomId) {
         await renderJoinPage(currentRoomId);
       } else {
-        // Fallback if no room ID
         setCurrentPage('landing');
         renderLandingPage();
       }
       break;
     case 'lobby':
-      // Check if we have a pending room join from session storage
       const pendingRoomJoin = sessionStorage.getItem('pendingRoomJoin');
       if (pendingRoomJoin) {
         sessionStorage.removeItem('pendingRoomJoin');
@@ -179,6 +143,15 @@ export async function renderApp(): Promise<void> {
       break;
     case 'profile':
       renderProfilePage();
+      break;
+    case 'editProfile':
+      renderEditProfilePage();
+      break;
+    case 'changeUsername':
+      renderChangeUsernamePage();
+      break;
+    case 'changeEmail':
+      renderChangeEmailPage();
       break;
     case '2PGame':
       render2PlayerGame();
@@ -191,6 +164,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'tempLogin':
       renderTempLoginPage();
+      break;
+    case 'verifyEmail':
+      renderVerifyEmailPage();
       break;
     default:
       renderLandingPage();

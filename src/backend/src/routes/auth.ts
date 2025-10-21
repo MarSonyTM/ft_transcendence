@@ -30,6 +30,7 @@ export interface GoogleAuthInput {
 
 export interface GuestUserInput {
   username?: string;
+  emailVerified?: boolean;
 }
 
 function validateEmail(email: string): boolean {
@@ -559,6 +560,8 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 		email: undefined,
 		avatar: undefined
 		});
+
+		
 
 		// Generate JWT token with shorter expiration
 		const token = jwt.sign(

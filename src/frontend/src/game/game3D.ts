@@ -61,28 +61,85 @@ export class baby3D {
     }
 
     async createScene(): Promise<Scene> {
+        console.log('🎨 [3D] Starting scene creation...');
+        
+        // Check WebGL support first
+        if (!this.checkWebGLSupport()) {
+            throw new Error('WebGL is not supported in this browser');
+        }
+        
+        // Wait a bit for DOM to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Find or create canvas
         let canvas = document.getElementById('renderCanvas') as HTMLCanvasElement | null;
+        
         if (!canvas) {
+            console.log('⚠️ [3D] Canvas not found, creating new one');
             canvas = document.createElement('canvas');
             canvas.id = 'renderCanvas';
-            document.body.appendChild(canvas);
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            canvas.style.display = 'block';
+            canvas.style.touchAction = 'none'; // Prevent touch scrolling
+            
+            // Find the right container to append to
+            const gameContainer = document.getElementById('gameContainer') 
+                || document.querySelector('.game-container')
+                || document.body;
+            
+            gameContainer.appendChild(canvas);
+            console.log('✅ [3D] Canvas created and appended to:', gameContainer.id || 'body');
         }
-        this.engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+        
+        // Create BabylonJS engine with error handling
+        try {
+            console.log('🎨 [3D] Creating BabylonJS engine...');
+            this.engine = new Engine(canvas, true, { 
+                preserveDrawingBuffer: true, 
+                stencil: true,
+                antialias: true,
+                powerPreference: "high-performance"
+            });
+            console.log('✅ [3D] Engine created successfully');
+        } catch (error) {
+            console.error('❌ [3D] Failed to create BabylonJS engine:', error);
+            throw new Error(`WebGL initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        
+        // Create scene
         this.scene = new Scene(this.engine);
         this.engine.resize();
+        console.log('✅ [3D] Scene created');
 
-        this.camera = new ArcRotateCamera('cam', Math.PI / 2 + Math.PI, 1.05, 480, new Vector3(0, 0, 0), this.scene);
+        // Setup camera
+        this.camera = new ArcRotateCamera(
+            'cam', 
+            Math.PI / 2 + Math.PI, 
+            1.05, 
+            480, 
+            new Vector3(0, 0, 0), 
+            this.scene
+        );
         this.camera.lowerBetaLimit = 0.6;
         this.camera.upperBetaLimit = 1.2;
         this.camera.wheelDeltaPercentage = 0.01;
         this.camera.attachControl(canvas, true);
+        console.log('✅ [3D] Camera configured');
+        
+        // Set background color
         this.scene.clearColor = new Color4(0.04, 0.06, 0.10, 1);
 
+        // Setup lighting
         this.light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
         this.light.intensity = 0.85;
+        console.log('✅ [3D] Lighting configured');
 
+        // Build the game table and paddles
         this.rebuild();
+        console.log('✅ [3D] Game objects created');
 
+        // Create ball
         const ballMat = new StandardMaterial('ballMat', this.scene);
         ballMat.diffuseColor = new Color3(1, 0.95, 0.4);
         this.ball = MeshBuilder.CreateSphere('ball', { diameter: this.values.ballRadius }, this.scene);
@@ -95,26 +152,58 @@ export class baby3D {
         this.lastBallX = this.values.tableX / 2;
         this.lastBallY = this.values.tableY / 2;
         this.hasBallState = false;
+        console.log('✅ [3D] Ball created');
 
         this.initialized = true;
 
+        // Start render loop with error handling
         this.engine.runRenderLoop(() => {
             try {
-                this.syncFromGameState();
-                this.scene.render();
+                if (this.scene && !this.scene.isDisposed) {
+                    this.syncFromGameState();
+                    this.scene.render();
+                }
             } catch (e) {
                 console.error('[3D] Render loop error:', e);
+                // Stop render loop on persistent errors
+                this.engine.stopRenderLoop();
             }
         });
+        console.log('✅ [3D] Render loop started');
 
-        window.addEventListener('resize', () => this.engine.resize());
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (this.engine) {
+                this.engine.resize();
+            }
+        });
+        
+        // Handle canvas container resize
         if (canvas.parentElement && 'ResizeObserver' in window) {
             const ro = new ResizeObserver(() => {
-                this.engine.resize();
+                if (this.engine) {
+                    this.engine.resize();
+                }
             });
             ro.observe(canvas.parentElement);
         }
+        
+        console.log('✅ [3D] Scene initialization complete!');
         return this.scene;
+    }
+
+    private checkWebGLSupport(): boolean {
+        console.log('🔍 [3D] Checking WebGL support...');
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const supported = !!(window.WebGLRenderingContext && gl);
+            console.log(supported ? '✅ [3D] WebGL is supported' : '❌ [3D] WebGL is NOT supported');
+            return supported;
+        } catch(e) {
+            console.error('❌ [3D] WebGL check failed:', e);
+            return false;
+        }
     }
 
     private rebuild() {

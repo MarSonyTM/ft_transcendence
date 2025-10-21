@@ -12,7 +12,7 @@ COPY postcss.config.js ./
 COPY vite.config.ts ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source files
 COPY src/ ./src/

@@ -33,37 +33,59 @@ export async function renderProfilePage(): Promise<void> {
 
     // Fetch user profile
     const user = await authService.fetchUserProfile();
-    
-    if (!user) {
+    const guestStr = localStorage.getItem('currentUser');
+    let guest = null;
+
+    // Try to parse guest user from localStorage
+    if (guestStr) {
+        try {
+            guest = JSON.parse(guestStr);
+        } catch (e) {
+            console.error('Failed to parse guest user:', e);
+            localStorage.removeItem('currentUser');
+        }
+    }
+
+    if (!guest && !user) {
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
-                <h2 style="color: #f87171; margin-bottom: 1em;">Error Loading Profile</h2>
-                <p style="color: #666; margin-bottom: 2em;">Failed to load user profile</p>
-                <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
+            <h2 style="color: #f87171; margin-bottom: 1em;">Error Loading Profile</h2>
+            <p style="color: #666; margin-bottom: 2em;">Failed to load user profile</p>
+            <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
             </div>
         `;
-        
+    
         const backBtn = document.getElementById('backToLandingBtn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
-                history.pushState({ page: 'landing' }, '', '/');
-                setCurrentPage('landing');
-                renderApp();
+            history.pushState({ page: 'landing' }, '', '/');
+            setCurrentPage('landing');
+            renderApp();
             });
         }
         return;
     }
 
-    const userData = {
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        avatar: user.avatar,
-        gamesPlayed: (user.gamesWon || 0) + (user.gamesLost || 0),
-        gamesWon: user.gamesWon || 0,
-        gamesLost: user.gamesLost || 0
+    const userData = guest ? {
+        username: guest.username || 'Guest',
+        email: guest.email || undefined,
+        firstName: guest.firstName || 'Guest',
+        lastName: guest.lastName || 'User',
+        avatar: guest.avatar || undefined,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        gamesLost: 0
+    } : {
+        username: user!.username,
+        email: user!.email,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
+        avatar: user!.avatar,
+        gamesPlayed: (user!.gamesWon || 0) + (user!.gamesLost || 0),
+        gamesWon: user!.gamesWon || 0,
+        gamesLost: user!.gamesLost || 0
     };
+    
 
     const winRate = userData.gamesPlayed > 0 
         ? ((userData.gamesWon / userData.gamesPlayed) * 100).toFixed(1) : 0;
@@ -114,9 +136,7 @@ export async function renderProfilePage(): Promise<void> {
                 <button id="friendListBtn" class="btn btn-friends" style="font-size: 1.1em; background: #38bdf8; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
                     Friend List
                 </button>
-                <button id="editProfileBtn" class="btn" style="font-size: 1.1em; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
-                    Edit Profile
-                </button>
+                ${!localStorage.getItem('isGuest') ? '<button id="editProfileBtn" class="btn" style="font-size: 1.1em; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;"> Edit Profile </button>' : ''}
                 <button id="logoutBtn" class="btn" style="font-size: 1.1em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
                     Logout
                 </button>
