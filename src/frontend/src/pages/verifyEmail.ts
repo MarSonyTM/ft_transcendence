@@ -9,6 +9,14 @@ export function renderVerifyEmailPage(): void {
     // Get email from URL parameters or localStorage
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get('email') || localStorage.getItem('pendingEmailVerification') || '';
+    if (!email || email.length === 0 || email === 'null' || email === 'undefined') {
+        localStorage.removeItem('pendingEmailVerification');
+        localStorage.removeItem('needEmailVerification');
+        localStorage.removeItem('authToken');
+        history.pushState({ page: 'login' }, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        return;
+    }
 
     root.innerHTML = `
         <div class="verify-email-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
