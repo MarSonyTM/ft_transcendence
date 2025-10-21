@@ -1109,7 +1109,7 @@ export class DatabaseManager extends BaseDatabaseManager {
   private createSeedUser() {
     try {
       // Check if seed user already exists
-      const existingUser = this.db.prepare('SELECT id FROM users WHERE username = ?').get('seeduser');
+      const existingUser = this.db.prepare('SELECT id FROM users WHERE username = ?').get('testuser');
       
       if (existingUser) {
         console.log('Seed user already exists');
