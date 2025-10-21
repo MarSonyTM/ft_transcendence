@@ -170,6 +170,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem('authToken');
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('isGuest');
     this.currentUser = null;
   }
 

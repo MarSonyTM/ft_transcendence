@@ -2,6 +2,14 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 
+ // const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || ''; // TODO: mgeiger- Friend Notification
+        // const newFriends = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
+        //     headers: {
+        //         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        //     }
+        // });
+        // ${!newFriends ? '<button id="profileBtn" class="btn btn-profile">New Friend</button>' : '<button id="profileBtn" class="btn btn-profile">Profile</button>'}
+
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -18,13 +26,6 @@ export async function renderLandingPage(): Promise<void> {
     }
     else {
         await authService.fetchUserProfile();
-        // const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || ''; // TODO: mgeiger- Friend Notification
-        // const newFriends = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
-        //     headers: {
-        //         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        //     }
-        // });
-        // ${!newFriends ? '<button id="profileBtn" class="btn btn-profile">New Friend</button>' : '<button id="profileBtn" class="btn btn-profile">Profile</button>'}
         
         root.innerHTML = `
         <div class="landing-container">

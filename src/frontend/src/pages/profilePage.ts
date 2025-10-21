@@ -136,9 +136,7 @@ export async function renderProfilePage(): Promise<void> {
                 <button id="friendListBtn" class="btn btn-friends" style="font-size: 1.1em; background: #38bdf8; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
                     Friend List
                 </button>
-                <button id="editProfileBtn" class="btn" style="font-size: 1.1em; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
-                    Edit Profile
-                </button>
+                ${!localStorage.getItem('isGuest') ? '<button id="editProfileBtn" class="btn" style="font-size: 1.1em; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;"> Edit Profile </button>' : ''}
                 <button id="logoutBtn" class="btn" style="font-size: 1.1em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
                     Logout
                 </button>
