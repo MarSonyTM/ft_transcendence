@@ -181,9 +181,6 @@ async function startGame(): Promise<void> {
 
   console.log('Starting game for room:', currentRoom.roomId);
 
-  // Show countdown overlay
-  await showGameStartCountdown();
-
   try {
     const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
@@ -200,29 +197,7 @@ async function startGame(): Promise<void> {
     const data = await response.json();
     
     if (data.success) {
-      console.log('✅ Game started successfully!');
-      console.log('Response data:', data);
-      
-      if (data.room && data.room.gameId) {
-        setCurrentRoom(data.room);
-        console.log('✅ Updated room with gameId:', data.room.gameId);
-      } else if (data.gameId) {
-        const updatedRoom = { ...currentRoom, gameId: data.gameId };
-        setCurrentRoom(updatedRoom);
-        console.log('✅ Updated room with gameId (fallback):', data.gameId);
-      }
-      
-      const finalRoom = getCurrentRoom();
-      console.log('Navigating to game page with room:', finalRoom);
-      
-      stopRoomPolling();
-      
-      // Navigate to game based on mode
-      const gameMode = getCurrentGameMode();
-      const gamePage = gameMode === '4P' ? '4PGame' : '2PGame';
-      history.pushState({ page: gamePage, roomId: currentRoom.roomId }, '', `${gamePage}`);
-      setCurrentPage(gamePage);
-      renderApp();
+      console.log('✅ Countdown initiated - waiting for game start...');
     } else {
       alert(data.message || 'Failed to start game');
     }
@@ -232,7 +207,6 @@ async function startGame(): Promise<void> {
   }
 }
 
-// Add this new function for the countdown
 async function showGameStartCountdown(): Promise<void> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
@@ -327,20 +301,22 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
         }, 500);
       }
     },
+
+    onCountdown: async () => {
+      await showGameStartCountdown();
+    },
     
     onGameStart: async (gameId) => {
       console.log('Game started by host! GameID:', gameId);
       
       let currentRoom = getCurrentRoom();
-
-      // await showGameStartCountdown();
       
       if (currentRoom) {
         currentRoom = { ...currentRoom, gameId, status: 'playing' as const };
         setCurrentRoom(currentRoom);
         console.log('✅ Updated room with gameId from WebSocket:', gameId);
       } else {
-        // If we don't have the room, fetch it
+
         console.log('⚠️ No currentRoom, fetching from server...');
         try {
           const response = await fetch(`/api/room/${roomId}`);

@@ -261,6 +261,13 @@ export function broadcastGameStartToRoom(roomId: string, gameId: number): void {
   });
 }
 
+export function broadcastCountdownToRoom(roomId: string): void {
+  broadcastToRoom(roomId, {
+    type: 'countdown',
+    message: 'Game starting soon'
+  });
+}
+
 // Broadcast game state updates to all players in a room
 export function broadcastGameStateToRoom(roomId: string, gameState: any): void {
   broadcastToRoom(roomId, {
