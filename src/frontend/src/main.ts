@@ -21,7 +21,7 @@ import { renderVerifyEmailPage } from './pages/verifyEmail';
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-const publicPages = ['/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
+const publicPages = ['/', '/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
 
 // Centralized routing handler
 function handleRouting(): void {
