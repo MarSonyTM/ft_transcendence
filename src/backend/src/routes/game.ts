@@ -27,7 +27,7 @@ function getUserIdFromRequest(request: any): number | null {
     }
 }
 
-// Store active game engines (MUST be exported for room.ts)
+// Store active game engines
 export const activeGames = new Map<number, BaseGameEngine>();
 
 // Plugin function that registers all game routes
@@ -144,48 +144,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         }
     });
 
-    // Get player position
-    // fastify.get('/:id/players/:playerId/position', async (request, reply) => {
-    //     try {
-    //         const { id, playerId } = request.params as { id: string; playerId: string };
-    //         const gameId = parseInt(id);
-    //         const playerIdNum = parseInt(playerId);
-            
-    //         if (isNaN(gameId) || isNaN(playerIdNum)) {
-    //             reply.code(400).send({
-    //                 success: false,
-    //                 message: 'Invalid game ID or player ID'
-    //             });
-    //             return;
-    //         }
-            
-    //         const gameEngine = activeGames.get(gameId);
-    //         if (!gameEngine) {
-    //             reply.code(404).send({
-    //                 success: false,
-    //                 message: 'Game engine not found'
-    //             });
-    //             return;
-    //         }
-            
-    //         const gameState = gameEngine.getGameState();
-    //         const position = playerIdNum === 1 ? gameState.player1Pos : gameState.player2Pos;
-            
-    //         return {
-    //             success: true,
-    //             data: {
-    //                 playerId: playerIdNum,
-    //                 position: position
-    //             }
-    //         };
-    //     } catch (error) {
-    //         fastify.log.error(error);
-    //         reply.code(500).send({
-    //             success: false,
-    //             message: 'Failed to get player position'
-    //         });
-    //     }
-    // });
     fastify.get('/:id/player-positions', async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
@@ -403,7 +361,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Add player to game
             const gamePlayer = database.players.addPlayerToGame(gameId, playerId, position);
             
-            // ✅ FIXED: Create game state ONLY when we have exactly 2 players AND no game state exists yet
             if (currentPlayers.length === 1) {
                 // Check if game state already exists for this game
                 const existingGameState = database.gameState.getGameStateByGameId(gameId);
@@ -615,78 +572,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     return;
                 }
             }
-            
-            // Start game engine
-            // try {
-            //     // Get the game mode from the database - NOW SUPPORTING 4PLAYER!
-            //     const gameMode = game.mode || '2P'; // Default to 2P if no mode specified
-                
-            //     console.log(`🎮 Starting ${gameMode} game engine for game ${gameId}`);
-                
-            //     // Build a runtime game state that the engine expects
-            //     const playersInDb = database.players.getPlayers(gameId) as any[];
-            //     const left = playersInDb.find((p: any) => p.playerPosition === 'left');
-            //     const right = playersInDb.find((p: any) => p.playerPosition === 'right');
-            //     const p1Id = left?.playerId ?? 1;
-            //     const p2Id = right?.playerId ?? 2;
-
-            //     const runtimeGameState = {
-            //         gameId,
-            //         players: [
-            //             {
-            //                 id: p1Id,
-            //                 gameId,
-            //                 pos: 0,
-            //                 material: null,
-            //                 color: { r: 1, g: 1, b: 1 },
-            //                 score: 0,
-            //                 connectionStatus: 'connected',
-            //                 lastActivity: new Date().toISOString()
-            //             },
-            //             {
-            //                 id: p2Id,
-            //                 gameId,
-            //                 pos: 0,
-            //                 material: null,
-            //                 color: { r: 1, g: 1, b: 1 },
-            //                 score: 0,
-            //                 connectionStatus: 'connected',
-            //                 lastActivity: new Date().toISOString()
-            //             }
-            //         ],
-            //         ballPosX: gameStateRow?.ballPosX ?? 0,
-            //         ballPosY: gameStateRow?.ballPosY ?? 0,
-            //         ballVelX: gameStateRow?.ballVelX ?? 0,
-            //         ballVelY: gameStateRow?.ballVelY ?? 0,
-            //         mode: gameMode,
-            //         lastActivity: new Date().toISOString()
-            //     } as any;
-
-            //     const gameEngine = createGameEngine(runtimeGameState as any, gameMode);
-            //     activeGames.set(gameId, gameEngine);
-            //     gameEngine.startGame();
-                
-            //     // Update game status in database
-            //     database.games.updateGame(gameId, { 
-            //         status: 'active',
-            //         startedAt: new Date().toISOString()
-            //     });
-                
-            //     reply.send({
-            //         success: true,
-            //         message: `${gameMode} game started successfully`,
-            //         gameId: gameId,
-            //         mode: gameMode
-            //     });
-                
-            // } catch (engineError) {
-            //     console.error('Failed to start game engine:', engineError);
-            //     reply.code(500).send({
-            //         success: false,
-            //         message: `Failed to start game engine: ${engineError instanceof Error ? engineError.message : 'Unknown error'}`
-            //     });
-            //     return;
-            // }
             
         } catch (error) {
             fastify.log.error(error);
@@ -946,6 +831,39 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             reply.code(500).send({
                 success: false,
                 message: 'Failed to update player position'
+            });
+        }
+    });
+
+    fastify.get('/returnall', async (request, reply) => {
+        try {
+            let allGames = Set<Game>;
+            let index:number = 0;
+            let gameState = database.gameState.getGameStateByGameId(index);
+            if (!gameState) {
+                reply.code(404).send({
+                    success: false,
+                    message: 'Game state not found'
+                });
+                return;
+            }
+            for(index; gameState; index++) {
+                if (!gameState) {
+                    allGames.apply(gameState);
+                    gameState = database.gameState.getGameStateByGameId(index);
+                }
+            }
+            reply.code(200).send({
+                success: true,
+                message: "All games served",
+                games: allGames
+            });
+            return;
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: "Failed to return all games"
             });
         }
     });

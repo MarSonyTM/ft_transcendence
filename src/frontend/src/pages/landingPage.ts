@@ -20,6 +20,7 @@ export async function renderLandingPage(): Promise<void> {
             <h1 class="main-title">PING PONG</h1>
             <button id="loginBtn" class="btn btn-login">Login</button>
             <button id="registerBtn" class="btn btn-register">Register</button>
+            <button id="leaderboardBtn" class="btn btn-profile">Leaderboard</button>
             <button id="guestBtn" class="btn btn-register">Play as Guest</button>
         </div>
         `;
@@ -31,6 +32,7 @@ export async function renderLandingPage(): Promise<void> {
         <div class="landing-container">
         <h1 class="main-title">PING PONG</h1>
         <button id="profileBtn" class="btn btn-profile">Profile</button>
+        <button id="leaderboardBtn" class="btn btn-profile">Leaderboard</button>
         <button id="playBtn" class="btn btn-play">Play</button>
         </div>
         `;
@@ -77,6 +79,15 @@ export async function renderLandingPage(): Promise<void> {
         profileBtn.addEventListener('click', () => {
             history.pushState({ page: 'profile' }, '', '/profile');
             setCurrentPage('profile');
+            renderApp();
+        });
+    }
+
+    const leaderboardBtn = document.getElementById('leaderboardBtn');
+    if (leaderboardBtn) {
+        leaderboardBtn.addEventListener('click', () => {
+            history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
+            setCurrentPage('leaderboard');
             renderApp();
         });
     }

@@ -13,25 +13,28 @@ export interface RGBColor {
   b: number;
 }
 export interface User {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  username: string;
-  password: string;
-  avatar: string;
-  googleId: string;
-  emailVerified: boolean;
-  gamesWon: number;
-  gamesLost: number;
-  createdAt: string;
-  UpdatedAt: string;
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    username: string;
+    password: string;
+    avatar: string;
+    googleId: string;
+    emailVerified: boolean;
+    gamesWon: number;
+    gamesLost: number;
+    createdAt: string;
+    UpdatedAt: string;
 }
 
 export interface Game {
-  id: number;
-  mode: string;
-  difficulty: string;
+    id: number;
+    mode: string;
+    players: JSON;
+    points: JSON;
+    difficulty: string;
+    createdAt: string
 }
 
 export interface Player {
@@ -991,6 +994,8 @@ export class DatabaseManager extends BaseDatabaseManager {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         status TEXT NOT NULL DEFAULT 'waiting',
         mode TEXT NOT NULL DEFAULT '2P',
+        points JSON DEFAULT '[]',
+        players JSON DEFAULT '[]',
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         startedAt DATETIME NULL,
         endedAt DATETIME NULL,
