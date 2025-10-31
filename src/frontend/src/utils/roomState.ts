@@ -1,20 +1,20 @@
 export interface Player {
-  id: string;
-  username: string;
-  isReady: boolean;
-  avatar?: string;
-  isAI?: boolean;
-  difficulty?: string;
-  socketId?: string;
+    id: string;
+    username: string;
+    isReady: boolean;
+    avatar?: string;
+    isAI?: boolean;
+    difficulty?: string;
+    socketId?: string;
 }
 
 export interface GameRoom {
-  roomId: string;
-  hostId: string;
-  players: Player[];
-  maxPlayers: number;
-  status: 'waiting' | 'playing' | 'finished';
-  gameId?: number;
+    roomId: string;
+    hostId: string;
+    players: Player[];
+    maxPlayers: number;
+    status: 'waiting' | 'playing' | 'finished';
+    gameId?: number;
 }
 
 // Shared state
@@ -22,18 +22,17 @@ let currentRoom: GameRoom | null = null;
 
 // Getters and setters
 export function getCurrentRoom(): GameRoom | null {
-  return currentRoom;
+    return currentRoom;
 }
 
 export function setCurrentRoom(room: GameRoom | null): void {
-  currentRoom = room;
-  // console.log('🔄 Room state updated:', room?.roomId || 'null');
+    currentRoom = room;
 }
 
 export function getLobbyPlayers(): Player[] {
-  return currentRoom ? currentRoom.players : [];
+    return currentRoom ? currentRoom.players : [];
 }
 
 export function clearRoomState(): void {
-  currentRoom = null;
+    currentRoom = null;
 }

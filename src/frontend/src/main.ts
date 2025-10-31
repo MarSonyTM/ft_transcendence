@@ -17,6 +17,7 @@ import { renderEditProfilePage } from './pages/editProfilePage';
 import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
+import { renderLeaderboardPage } from './pages/leaderboardPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -26,17 +27,18 @@ const publicPages = ['/', '/landing', '/login', '/register', '/auth/callback', '
 // Centralized routing handler
 function handleRouting(): void {
   const path = window.location.pathname;
-  const hash = window.location.hash;
 
   if (!publicPages.includes(path)) {
-    const currentUser = localStorage.getItem('needEmailVerification');
-    const email = localStorage.getItem('pendingEmailVerification');
-    if (!email) {
-      history.pushState({ page: 'login' }, '', `/login`);
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      history.pushState({ page: 'login' }, '', '/login');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }
-    if (currentUser === 'true') {
+    
+    const needsVerification = localStorage.getItem('needEmailVerification');
+    if (needsVerification === 'true') {
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
@@ -101,6 +103,9 @@ function handleRouting(): void {
     case '/verify-email':
       setCurrentPage('verifyEmail');
       break;
+    case '/leaderboard':
+      setCurrentPage('leaderboard');
+      break; 
     default:
       setCurrentPage('landing');
   }
@@ -174,6 +179,9 @@ export async function renderApp(): Promise<void> {
     case 'verifyEmail':
       renderVerifyEmailPage();
       break;
+    case 'leaderboard':
+      renderLeaderboardPage();
+      break; 
     default:
       renderLandingPage();
   }

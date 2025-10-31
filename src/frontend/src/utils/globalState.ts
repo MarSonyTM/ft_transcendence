@@ -5,25 +5,25 @@ export let currentUser: string = window.__USERNAME__ || '';
 export let currentGameMode: string = '2P';
 
 export function setCurrentPage(page: AppPage) {
-  currentPage = page;
+    currentPage = page;
 }
 
 export function setCurrentUser(user: string) {
-  currentUser = user;
+    currentUser = user;
 }
 
 export function setCurrentGameMode(mode: string) {
-  currentGameMode = mode;
+    currentGameMode = mode;
 }
 
 export function getCurrentPage(): AppPage {
-  return currentPage;
+    return currentPage;
 }
 
 export function getCurrentUser(): string {
-  return currentUser;
+    return currentUser;
 }
 
 export function getCurrentGameMode(): string {
-  return currentGameMode;
+    return currentGameMode;
 }

@@ -371,6 +371,18 @@ export class PongGame {
                 break;
 
             case 'gameEnd':
+                // Update scores from finalScores if available
+                if (Array.isArray(message.finalScores)) {
+                    message.finalScores.forEach((scoreData: any) => {
+                        const playerIndex = scoreData.playerId - 1;
+                        if (this.gameState.players[playerIndex]) {
+                            this.gameState.players[playerIndex].score = scoreData.score || 0;
+                        }
+                    });
+                    // Update the score display with final scores
+                    this.updateScoreDisplay();
+                }
+                
                 if (message.mode === '4P') {
                     this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`);

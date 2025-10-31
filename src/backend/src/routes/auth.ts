@@ -9,33 +9,33 @@ import { sendVerificationEmail } from '../config/email';
 
 // Types
 export interface CreateUserInput {
-  firstName: string;
-  lastName: string;
-  email?: string;
-  username?: string;
-  emailVerified?: boolean;
-  password?: string;
-  avatar?: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    username?: string;
+    emailVerified?: boolean;
+    password?: string;
+    avatar?: string;
 }
 
 export interface LoginInput {
-  username?: string;
-  password?: string;
-  email?: string;
+    username?: string;
+    password?: string;
+    email?: string;
 }
 
 export interface GoogleAuthInput {
-  token: string;
+    token: string;
 }
 
 export interface GuestUserInput {
-  username?: string;
-  emailVerified?: boolean;
+    username?: string;
+    emailVerified?: boolean;
 }
 
 function validateEmail(email: string): boolean {
-  const validationEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return validationEmailRegex.test(email);
+    const validationEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return validationEmailRegex.test(email);
 }
 
 async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -558,7 +558,8 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 		username: guestUsername,
 		password: randomPassword,
 		email: undefined,
-		avatar: undefined
+		avatar: undefined,
+        emailVerified: true
 		});
 
 		
@@ -604,7 +605,8 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 			username: retryUsername,
 			password: randomPassword,
 			email: undefined,
-			avatar: undefined
+			avatar: undefined,
+            emailVerified: true
 			});
 
 			const token = jwt.sign(
