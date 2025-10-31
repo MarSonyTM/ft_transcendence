@@ -1,4 +1,3 @@
-// src/backend/src/config/email.ts
 import nodemailer from 'nodemailer';
 import { EMAIL_USER, EMAIL_PASSWORD } from './index';
 

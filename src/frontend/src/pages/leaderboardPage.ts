@@ -11,33 +11,38 @@ interface LeaderboardUser {
 interface GameResult {
     id: number;
     mode: string;
-    winner: string;
+    winner: Player;
     createdAt: string;
-    players?: string[];
+    players?: Player[];
+    points?: number[];
 }
 
-interface Game {
-    id: number;
-    mode: string;
-    players: JSON;
-    points: JSON;
-    winnerId: number;
-    difficulty: string;
-    createdAt: string;
+interface Player {
+  id: string;
+  username: string;
+  isReady: boolean;
+  isAI?: boolean;
+  isLocal: boolean;
+  difficulty?: string;
+  socketId?: string;
 }
 
 function getApiEndpoint(): string {
 	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
 }
 
-async function fetchAllGames(): Promise<Game[]> {
-//async function fetchAllGames(): Promise<GameResult[]> {
+async function fetchAllGames(): Promise<GameResult[]> {
     try {
-        const response = await fetch(`${getApiEndpoint()}/api/game/returnall`);
-        if (!response.ok)
-            throw new Error('Failed to fetch all games');
-        const games = await response.json();
-        return games;
+        const response = await fetch(`${getApiEndpoint()}/api/game`);
+        if (!response.ok) {
+            console.error('Failed to fetch games:', response.status);
+            throw new Error('Failed to fetch games');
+        }
+        const result = await response.json();
+        console.log('Games API response:', result);
+        
+        // Extract the data array from the API response
+        return result.data || [];
     } catch (error) {
         console.error('Error fetching games:', error);
         return [];
@@ -49,12 +54,13 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
         // Fetch all users with their stats
         const response = await fetch(`${getApiEndpoint()}/api/users/stats`);
         if (!response.ok) {
+            console.error('Failed to fetch leaderboard:', response.status);
             // Fallback: calculate from current user only
             const currentUser = localStorage.getItem('currentUser');
             if (!currentUser) return [];
             const user = JSON.parse(currentUser);
-            const total = user.gamesWon + user.gamesLost;
-            const winRate = total > 0 ? (user.gamesWon / total) * 100 : 0;
+            const total = (user.gamesWon || 0) + (user.gamesLost || 0);
+            const winRate = total > 0 ? ((user.gamesWon || 0) / total) * 100 : 0;
             return [{
                 username: user.username,
                 gamesWon: user.gamesWon || 0,
@@ -62,16 +68,22 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
                 winRate
             }];
         }
-        const users = await response.json();
+        
+        const result = await response.json();
+        console.log('Leaderboard API response:', result);
+        
+        // Extract the data array from the API response
+        const users = result.data || [];
+        
         // Calculate win rates and sort
         return users
             .map((u: any) => {
-                const total = u.gamesWon + u.gamesLost;
+                const total = (u.gamesWon || 0) + (u.gamesLost || 0);
                 return {
                     username: u.username,
                     gamesWon: u.gamesWon || 0,
                     gamesLost: u.gamesLost || 0,
-                    winRate: total > 0 ? (u.gamesWon / total) * 100 : 0
+                    winRate: total > 0 ? ((u.gamesWon || 0) / total) * 100 : 0
                 };
             })
             .sort((a: LeaderboardUser, b: LeaderboardUser) => {
@@ -136,30 +148,6 @@ export async function renderLeaderboardPage(): Promise<void> {
                 </div>
 
                 <div class="games-section" style="margin-top: 2em;">
-                    <h3>Top Players</h3>
-                    <div style="max-height: 200px; overflow-y: auto; margin-top: 0.5em; padding-right: 0.5em;">
-                        ${leaderboard.length > 0 ? `
-                            <div style="display: flex; flex-direction: column; gap: 0.5em;">
-                                ${leaderboard.map((user, index) => `
-                                    <div style="background: rgba(255, 255, 255, 0.05); padding: 0.8em; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-                                        <div style="display: flex; align-items: center; gap: 0.8em;">
-                                            <span style="font-weight: bold; color: rgb(156 163 175); min-width: 1.5em;">#${index + 1}</span>
-                                            <span style="color: rgb(229 231 235);">${user.username}</span>
-                                        </div>
-                                        <div style="text-align: right; font-size: 0.85em;">
-                                            <div style="color: rgb(34 197 94);">${user.gamesWon}W</div>
-                                            <div style="color: rgb(239 68 68);">${user.gamesLost}L</div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : `
-                            <p style="color: rgb(156 163 175); text-align: center; padding: 1em;">No players yet</p>
-                        `}
-                    </div>
-                </div>
-
-                <div class="games-section" style="margin-top: 2em;">
                     <h3>Past Games (${sortedGames.length})</h3>
                     <div id="gamesScrollContainer" style="max-height: 300px; overflow-y: auto; margin-top: 0.5em; padding-right: 0.5em;">
                         ${sortedGames.length > 0 ? `
@@ -168,24 +156,128 @@ export async function renderLeaderboardPage(): Promise<void> {
                                     const date = new Date(game.createdAt);
                                     const dateStr = date.toLocaleDateString();
                                     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                    return `
-                                        <div style="background: rgba(255, 255, 255, 0.05); padding: 1em; border-radius: 6px; border-left: 3px solid rgb(59 130 246);">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5em;">
-                                                <span style="font-weight: bold; color: rgb(229 231 235);">Game #${sortedGames.length - index}</span>
-                                                <span style="font-size: 0.85em; color: rgb(156 163 175);">${dateStr} ${timeStr}</span>
-                                            </div>
-                                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                <div>
-                                                    <span style="color: rgb(156 163 175); font-size: 0.9em;">Winner:</span>
-                                                    <span style="color: rgb(34 197 94); font-weight: bold; margin-left: 0.5em;">${game.winnerId || 'Unknown'}</span>
+                                    
+                                    // Determine winner and loser from the game data
+                                    if (game.mode == '2P') {
+                                        let winnerName = 'Unknown';
+                                        let loserName = 'Unknown';
+                                        
+                                        if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
+                                            // Find winner by winnerId or by highest score
+                                            let winner, loser;
+                                            
+                                            if (game.winner) {
+                                                winner = game.players.find((p: any) => p.id === game.winner);
+                                                loser = game.players.find((p: any) => p.id !== game.winner);
+                                            } else {
+                                                // Sort by score to find winner
+                                                const sortedPlayers = [...game.players].sort((a: any, b: any) => 
+                                                    (b.score || 0) - (a.score || 0)
+                                                );
+                                                winner = sortedPlayers[0];
+                                                loser = sortedPlayers[1];
+                                            }
+                                            // Get winner name and AI status
+                                            if (winner) {
+                                                winnerName = winner.username || `Player ${winner.id}`;
+                                            }
+                                            
+                                            // Get loser name and AI status
+                                            if (loser) {
+                                                loserName = loser.username || `Player ${loser.id}`;
+                                            }
+                                        }
+
+                                        return `
+                                            <div style="background: rgba(255, 255, 255, 0.05); padding: 1em; border-radius: 6px; border-left: 3px solid rgb(59 130 246);">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5em;">
+                                                    <span style="font-weight: bold; color: rgb(229 231 235);">Game #${sortedGames.length - index}</span>
+                                                    <span style="font-size: 0.85em; color: rgb(156 163 175);">${dateStr} ${timeStr}</span>
                                                 </div>
-                                                <span style="background: rgba(59, 130, 246, 0.2); color: rgb(147 197 253); padding: 0.3em 0.8em; border-radius: 4px; font-size: 0.85em;">
-                                                    ${game.mode || 'Pong'}
-                                                </span>
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <div style="flex: 1;">
+                                                        <div style="margin-bottom: 0.3em;">
+                                                            <span style="color: rgb(156 163 175); font-size: 0.9em;">Players:</span>
+                                                            <span style="color: rgb(34 197 94); font-weight: bold; margin-left: 0.5em;">
+                                                                🏆 ${winnerName}
+                                                            </span>
+                                                            <span style="color: rgb(239 68 68); font-weight: bold; margin-left: 0.5em;">
+                                                                ❌ ${loserName}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <span style="background: rgba(59, 130, 246, 0.2); color: rgb(147 197 253); padding: 0.3em 0.8em; border-radius: 4px; font-size: 0.85em;">
+                                                        ${game.mode || 'Pong'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    `;
-                                }).join('')}
+                                        `;
+                                    } else {
+                                        
+                                        let winnerName = 'Unknown';
+                                        let loserNames: string[] = ['Unknown', 'Unknown', 'Unknown', 'Unknown'];
+                                        
+                                        if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
+                                            // Find winner by winnerId or by highest score
+                                            let winner;
+                                            let losers = new Array<Player>();
+                                            
+                                            if (game.winner) {
+                                                winner = game.players.find((p: any) => p.id === game.winner);
+                                                let i = 0;
+                                                for (i; game.players[i]; i++) {
+                                                    if (game.players[i].username !== game.winner.username)
+                                                        losers.push(game.players[i]);
+                                                }
+                                            } else {
+                                                // Sort by score to find winner
+                                                const sortedPlayers = [...game.players].sort((a: any, b: any) => 
+                                                    (b.score || 0) - (a.score || 0)
+                                                );
+                                                winner = sortedPlayers[0];
+                                                losers[0] = sortedPlayers[1];
+                                                losers[1] = sortedPlayers[2];
+                                                losers[2] = sortedPlayers[3];
+                                            }
+                                            // Get winner name and AI status
+                                            if (winner) {
+                                                winnerName = winner.username || `Player ${winner.id}`;
+                                            }
+                                            
+                                            // Get loser name and AI status
+                                            if (losers) {
+                                                let i = 0;
+                                                for (i; losers[i]; i++)
+                                                    loserNames[i] = losers[i].username || `Player ${losers[i].id}`;
+                                            }
+                                        }
+
+                                        return `
+                                            <div style="background: rgba(255, 255, 255, 0.05); padding: 1em; border-radius: 6px; border-left: 3px solid rgb(59 130 246);">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5em;">
+                                                    <span style="font-weight: bold; color: rgb(229 231 235);">Game #${sortedGames.length - index}</span>
+                                                    <span style="font-size: 0.85em; color: rgb(156 163 175);">${dateStr} ${timeStr}</span>
+                                                </div>
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <div style="flex: 1;">
+                                                        <div style="margin-bottom: 0.3em;">
+                                                            <span style="color: rgb(156 163 175); font-size: 0.9em;">Winner:</span>
+                                                            <span style="color: rgb(34 197 94); font-weight: bold; margin-left: 0.5em;">
+                                                                🏆 ${winnerName}
+                                                            </span>
+                                                             <span style="color: rgb(239 68 68); font-weight: bold; margin-left: 0.5em;">
+                                                                ❌ ${loserNames[0]} | ${loserNames[1]} | ${loserNames[2]}                                                           
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <span style="background: rgba(59, 130, 246, 0.2); color: rgb(147 197 253); padding: 0.3em 0.8em; border-radius: 4px; font-size: 0.85em;">
+                                                        ${game.mode || 'Pong'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
+                                }).join('')}                           
                             </div>
                         ` : `
                             <p style="color: rgb(156 163 175); text-align: center; padding: 2em;">No games played yet</p>

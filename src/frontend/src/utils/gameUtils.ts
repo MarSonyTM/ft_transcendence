@@ -84,13 +84,31 @@ export function endGame(pongGame: PongGame) {
                     didWin = (winnerId === 1);
                 }
                 try {
-                    await fetch(`${apiEndpoint}/api/users/stats`, {
+                    const authHeader = authService.getAuthHeader?.();
+                    if (!authHeader) {
+                        console.warn('⚠️ No auth token available, skipping stats update');
+                        return;
+                    }
+                
+                    const statsResponse = await fetch(`${apiEndpoint}/api/users/stats`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            ...authHeader  // FIXED: Properly include auth token
+                        },
                         body: JSON.stringify({ won: didWin })
                     });
+                
+                    if (!statsResponse.ok) {
+                        const errorText = await statsResponse.text();
+                        console.error('❌ Failed to update stats:', statsResponse.status, errorText);
+                    } else {
+                        console.log('✅ Stats updated successfully');
+                        // Refresh user profile to get updated stats
+                        await authService.fetchUserProfile?.();
+                    }
                 } catch (e) {
-                    console.warn('Unable to update user stats:', e);
+                    console.error('❌ Error updating user stats:', e);
                 }
             }
         } catch (error) {
@@ -100,7 +118,14 @@ export function endGame(pongGame: PongGame) {
 }
 
 export function showGameEndScreen(winnerId: string, winnerName: string, pongGame: PongGame): void {
+    // Remove any existing overlays first
+    const existingOverlay = document.getElementById('gameEndOverlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
     const overlay = document.createElement('div');
+    overlay.id = 'gameEndOverlay';
     overlay.style.cssText = `
         position: fixed;
         top: 0;
@@ -131,12 +156,17 @@ export function showGameEndScreen(winnerId: string, winnerName: string, pongGame
 
     document.body.appendChild(overlay);
 
-    document.getElementById('backToHomeBtn')?.addEventListener('click', () => {
-        overlay.remove();
-        cleanupGame(pongGame);
-        history.pushState({ page: 'landing' }, '', '/landing');
-        window.location.reload();
-    });
+    setTimeout(() => {
+        const backBtn = document.getElementById('backToHomeBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                overlay.remove();
+                cleanupGame(pongGame);
+                history.pushState({ page: 'landing' }, '', '/');
+                window.location.reload();
+            });
+        } 
+    }, 0);
 }
 
 // Cleanup function
@@ -176,15 +206,6 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
         notification.style.animation = 'slideOut 0.3s ease-in';
         setTimeout(() => notification.remove(), 300);
     }, 4000);
-}
-
-// Update connection status
-export function updateConnectionStatus(status: string, isConnected: boolean): void {
-    // const wsStatus = document.getElementById('wsStatus');
-    // if (wsStatus) {
-    //     wsStatus.textContent = status;
-    //     wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
-    // }
 }
 
 export async function setEffectiveRoom(): Promise<GameRoom | null> {

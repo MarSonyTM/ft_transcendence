@@ -179,18 +179,6 @@ async function gameStateRoutes(fastify: FastifyInstance, options: FastifyPluginO
                 return;
             }
             
-            // // Check if players exist
-            // const player1 = database.users.getUserById(gameStateData.player1Id);
-            // const player2 = database.users.getUserById(gameStateData.player2Id);
-            
-            // if (!player1 || !player2) {
-            //     reply.code(404).send({
-            //         success: false,
-            //         message: 'One or both players not found'
-            //     });
-            //     return;
-            // }
-            
             // Check if game state already exists for this game
             const existingGameState = database.gameState.getGameStateByGameId(gameStateData.gameId);
             if (existingGameState) {

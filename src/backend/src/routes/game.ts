@@ -8,8 +8,8 @@ import jwt from 'jsonwebtoken';
 
 // Types
 export interface CreateGameInput {
-  mode?: string;
-  difficulty?: string;
+    mode?: string;
+    difficulty?: string;
 }
 
 function getUserIdFromRequest(request: any): number | null {
@@ -27,7 +27,7 @@ function getUserIdFromRequest(request: any): number | null {
     }
 }
 
-// Store active game engines
+// Store active game engines (MUST be exported for room.ts)
 export const activeGames = new Map<number, BaseGameEngine>();
 
 // Plugin function that registers all game routes
@@ -37,10 +37,43 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.get('/', async (request, reply) => {
         try {
             const games = database.games.getAllGames();
+        
+            // Map games and use players from the game object (JSON field)
+            const gamesWithPlayers = games.map(game => {
+                let players = game.players || [];
+                let points = game.points || [];
+                
+                // If players is a string, parse it
+                if (typeof players === 'string') {
+                    try {
+                        players = JSON.parse(players);
+                    } catch (e) {
+                        console.error(`Failed to parse players for game ${game.id}:`, e);
+                        players = [];
+                    }
+                }
+
+                // If points is a string, parse it
+                if (typeof points === 'string') {
+                    try {
+                        points = JSON.parse(points);
+                    } catch (e) {
+                        console.error(`Failed to parse points for game ${game.id}:`, e);
+                        points = [];
+                    }
+                }
+                
+                return {
+                    ...game,
+                    players: players,
+                    points: points
+                };
+            });
+            
             return {
                 success: true,
-                count: games.length,
-                data: games
+                count: gamesWithPlayers.length,
+                data: gamesWithPlayers
             };
         } catch (error) {
             fastify.log.error(error);
@@ -49,8 +82,8 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 message: 'Failed to fetch games'
             });
         }
-    });
-    
+    });    
+
     // Get game by ID
     fastify.get('/:id', async (request, reply) => {
         try {
@@ -309,7 +342,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         }
     });
 
-    // ✅ FIXED: Join game endpoint
     fastify.post('/:id/join', async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
@@ -344,7 +376,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            // ✅ NEW: Check if player is already in this game
             const existingPlayer = currentPlayers.find(p => p.id === playerId);
             if (existingPlayer) {
                 reply.code(409).send({
@@ -683,6 +714,8 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const gameId = parseInt(id);
             const { winnerId } = request.body as { winnerId: number };
             
+            console.log(`🎯 Winner endpoint called for game ${gameId}, winnerId: ${winnerId}`);
+            
             if (isNaN(gameId)) {
                 reply.code(400).send({
                     success: false,
@@ -691,17 +724,9 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            if (!winnerId || isNaN(winnerId)) {
-                reply.code(400).send({
-                    success: false,
-                    message: 'Invalid winner ID'
-                });
-                return;
-            }
-            
-            // Check if game exists
             const game = database.games.getGameById(gameId);
             if (!game) {
+                console.log(`❌ Game ${gameId} not found`);
                 reply.code(404).send({
                     success: false,
                     message: 'Game not found'
@@ -709,45 +734,120 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            // Check if winner is a real user (not AI/guest)
+            let gamePlayers = database.players.getPlayers(gameId);
+            console.log(`📊 Players from database: ${gamePlayers.length}`);
+            
+            if (gamePlayers.length === 0) {
+                console.log(`⚠️ No players in database, checking game engine...`);
+                const gameEngine = activeGames.get(gameId);
+                
+                if (gameEngine) {
+                    console.log(`✅ Game engine found!`);
+                    const currentState = gameEngine.getCurrentState();
+                    
+                    if (currentState && currentState.players) {
+                        console.log(`📝 Getting ${currentState.players.length} players from game engine`);
+                        
+                        gamePlayers = currentState.players.map((player: any, index: number) => {
+                            let actualUserId = index + 1; // Fallback
+                            
+                            if (player.username) {
+                                const userByUsername = database.users.getAllUsers().find(
+                                    u => u.username === player.username
+                                );
+                                if (userByUsername) {
+                                    actualUserId = userByUsername.id;
+                                    console.log(`   ✅ Found ${player.username} = user ID ${actualUserId}`);
+                                }
+                            }
+                            
+                            return {
+                                id: actualUserId,
+                                gameId: gameId,
+                                playerId: actualUserId, // Use the REAL user ID from database
+                                playerPosition: index === 0 ? 'left' : 'right',
+                                score: player.score || 0,
+                                connectionStatus: 'connected',
+                                lastActivity: new Date().toISOString(),
+                                pos: player.pos || 0,
+                                color: player.color || { r: 255, g: 255, b: 255 },
+                                name: player.name || player.username
+                            };
+                        });
+                    } else {
+                        console.log(`❌ No players in game engine state`);
+                    }
+                } else {
+                    console.log(`❌ Game engine not found. Active games: ${Array.from(activeGames.keys())}`);
+                }
+            }
+            
+            // Build players data for saving
+            // Build the players array with usernames
+            const playersData = gamePlayers.map((player: any) => {
+                const user = database.users.getUserById(player.playerId);
+                
+                let displayName = '';
+                
+                if (user) {
+                    // Registered user - use their username
+                    displayName = user.username;
+                } else if (player.name) {
+                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
+                        const difficulty = player.difficulty || 'Normal';
+                        displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                    } else {
+                        displayName = player.name;
+                    }
+                } else {
+                    displayName = `Player ${player.playerId}`;
+                }
+                
+                return {
+                    id: player.playerId.toString(),
+                    username: displayName,
+                    score: player.score || 0,
+                    position: player.playerPosition || 'unknown'
+                };
+            });
+            
+            console.log(`✅ Final players data:`, JSON.stringify(playersData, null, 2));
+            
             const winnerUser = database.users.getUserById(winnerId);
             
-            // Update game with winner (only set winnerId if it's a real user to avoid FK constraint)
             const updateData: any = { 
                 status: 'finished',
-                endedAt: new Date().toISOString()
+                endedAt: new Date().toISOString(),
+                players: playersData
             };
             
-            // Only set winnerId if winner exists in users table
             if (winnerUser) {
                 updateData.winnerId = winnerId;
+                updateData.winner = winnerUser.username;
+            } else {
+                updateData.winner = `Player ${winnerId}`; 
             }
             
             database.games.updateGame(gameId, updateData);
-            
-            // Clean up active game if exists
-            const gameEngine = activeGames.get(gameId);
-            if (gameEngine) {
-                gameEngine.endGame();
-                activeGames.delete(gameId);
-            }
             
             return {
                 success: true,
                 message: 'Winner recorded successfully',
                 gameId: gameId,
                 winnerId: winnerId,
-                winnerInDatabase: !!winnerUser
+                winnerName: updateData.winner,
+                playersRecorded: playersData.length
             };
         } catch (error) {
+            console.error(`❌ Error in winner endpoint:`, error);
             fastify.log.error(error);
             reply.code(500).send({
                 success: false,
-                message: 'Failed to record winner'
+                message: 'Failed to set winner'
             });
         }
-    });
-
+    });    
+    
     fastify.get('/:id/mode', async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
@@ -831,39 +931,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             reply.code(500).send({
                 success: false,
                 message: 'Failed to update player position'
-            });
-        }
-    });
-
-    fastify.get('/returnall', async (request, reply) => {
-        try {
-            let allGames = Set<Game>;
-            let index:number = 0;
-            let gameState = database.gameState.getGameStateByGameId(index);
-            if (!gameState) {
-                reply.code(404).send({
-                    success: false,
-                    message: 'Game state not found'
-                });
-                return;
-            }
-            for(index; gameState; index++) {
-                if (!gameState) {
-                    allGames.apply(gameState);
-                    gameState = database.gameState.getGameStateByGameId(index);
-                }
-            }
-            reply.code(200).send({
-                success: true,
-                message: "All games served",
-                games: allGames
-            });
-            return;
-        } catch (error) {
-            fastify.log.error(error);
-            reply.code(500).send({
-                success: false,
-                message: "Failed to return all games"
             });
         }
     });

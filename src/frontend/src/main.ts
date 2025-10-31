@@ -27,18 +27,19 @@ const publicPages = ['/', '/landing', '/login', '/register', '/auth/callback', '
 // Centralized routing handler
 function handleRouting(): void {
   const path = window.location.pathname;
-  const hash = window.location.hash;
 
   if (!publicPages.includes(path)) {
-    const currentUser = localStorage.getItem('needEmailVerification');
-    const email = localStorage.getItem('pendingEmailVerification');
-    if (currentUser === 'true') {
-      history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      history.pushState({ page: 'login' }, '', '/login');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }
-    if (!email) {
-      history.pushState({ page: 'login' }, '', `/login`);
+    
+    const needsVerification = localStorage.getItem('needEmailVerification');
+    if (needsVerification === 'true') {
+      history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }

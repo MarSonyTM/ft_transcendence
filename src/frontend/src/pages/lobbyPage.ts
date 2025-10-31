@@ -712,7 +712,7 @@ async function addLocalPlayer(): Promise<void> {
   username = window.prompt("Enter an alias for local player", "Local");
   
   if (!username) {
-    return; // User cancelled
+    return; 
   }
   
   try {
@@ -736,9 +736,6 @@ async function addLocalPlayer(): Promise<void> {
     
     if (joinData.success) {
       console.log(`✅ [LOCAL] ${username} joined as local player`);
-      
-      // Set hasGuest flag on pongGame
-      // The game page will check for local player when it initializes
       
       await fetchRoomState();
     }

@@ -131,47 +131,46 @@ export async function registerUser(
 }
 
 export async function createGuestUser(username?: string): Promise<{ 
-  success: boolean; 
-  username?: string; 
-  token?: string; 
-  isGuest?: boolean;
-  emailVerified?: boolean;
-  error?: string;
-}> {
-  const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+    success: boolean; 
+    username?: string; 
+    token?: string; 
+    isGuest?: boolean;
+    emailVerified?: boolean;
+    error?: string;
+    }> {
+    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
   
-  try {
-    const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username || undefined })
-    });
+    try {
+        const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username || undefined })
+        });
     
-    if (res.ok) {
-      const data = await res.json();
-      return {
-        success: data.success || false,
-        username: data.data?.username,
-        token: data.token,
-        isGuest: data.data?.isGuest || true,
-		emailVerified : true,
-        error: data.message
-      };
+        if (res.ok) {
+            const data = await res.json();
+            return {
+                success: data.success || false,
+                username: data.data?.username,
+                token: data.token,
+                isGuest: data.data?.isGuest || true,
+		        emailVerified : true,
+                error: data.message
+            };
+        }
+    
+        if (res.status === 404) {
+            return { success: false, error: 'API not available (404)' };
+        }
+    
+        return { success: false, error: `Server error (${res.status})` };
+    } catch (error) {
+        console.error('Guest user creation error:', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Network error' 
+        };
     }
-    
-    if (res.status === 404) {
-      return { success: false, error: 'API not available (404)' };
-    }
-    
-    return { success: false, error: `Server error (${res.status})` };
-  } catch (error) {
-    console.error('Guest user creation error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Network error' 
-    };
-  }
-
 }
 
 export async function verifyEmail(verificationCode: string, email: string): Promise<{ success: boolean; message?: string; error?: string }> {
@@ -180,8 +179,9 @@ export async function verifyEmail(verificationCode: string, email: string): Prom
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/verify-email`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json',
-			 },
+			headers: { 
+                'Content-Type': 'application/json',
+			},
 			body: JSON.stringify({ verificationCode, email })
 		});
 		

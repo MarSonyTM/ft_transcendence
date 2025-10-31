@@ -237,7 +237,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
             const winner = room.players.find((p: any) => p.id === data.winnerId);
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
-            
             showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });
