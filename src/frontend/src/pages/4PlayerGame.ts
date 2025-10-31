@@ -4,7 +4,7 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
+import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 import { toggleTournaments } from '../tournament';
 
 export let pongGame: PongGame | null = null;
@@ -203,7 +203,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onConnect: () => {
             console.log('✅ Connected to 4-player game room');
-            updateConnectionStatus('Connected (Room)', true);
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
@@ -213,7 +212,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onDisconnect: () => {
             console.log('Disconnected from 4-player game room');
-            updateConnectionStatus('Disconnected', false);
         },
         
         onGameState: (state) => {
