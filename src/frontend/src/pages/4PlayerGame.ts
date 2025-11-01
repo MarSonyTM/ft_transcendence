@@ -4,7 +4,7 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
+import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 import { toggleTournaments } from '../tournament';
 
 export let pongGame: PongGame | null = null;
@@ -118,28 +118,9 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
     
     pongGame.gameId = effectiveRoom.gameId;
-    // const localUser = authService.getCurrentUser();
-    // if (localUser && effectiveRoom.players) {
-    //     const idx = effectiveRoom.players.findIndex((p: any) => p.id?.toString() === localUser.id?.toString());
-    //     // Set view rotation based on player index for 4-player
-    //     // Each player sees themselves on the left (position 3)
-    //     if (idx === 0) {
-    //         // Player 0 (top) rotates 90° CW to be on left
-    //         pongGame.viewIndexMap = [3, 0, 1, 2];
-    //     } else if (idx === 1) {
-    //         // Player 1 (right) rotates 180° to be on left
-    //         pongGame.viewIndexMap = [2, 3, 0, 1];
-    //     } else if (idx === 2) {
-    //         // Player 2 (bottom) rotates 270° CW to be on left
-    //         pongGame.viewIndexMap = [1, 2, 3, 0];
-    //     } else {
-    //         // Player 3 (left) - no rotation needed
-    //         pongGame.viewIndexMap = [0, 1, 2, 3];
-    //     }
-    //     console.log(`Player ${idx} view rotation:`, pongGame.viewIndexMap);
-    // }
     
     setGameScreen(pongGame);
+    endGame(pongGame);
 
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
@@ -215,24 +196,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         gameMode
     });
 
-    // if (pongGame && room.gameId) {
-    //     pongGame.gameId = room.gameId;
-    //     console.log(`✅ Using shared game ID from room: ${room.gameId}`);
-        
-    //     const idx = room.players.findIndex((p: any) => p.id?.toString() === playerId?.toString());
-        
-    //     // Set view rotation based on game mode and player index
-    //     if (idx === 0) {
-    //         pongGame.viewIndexMap = [3, 0, 1, 2];
-    //     } else if (idx === 1) {
-    //         pongGame.viewIndexMap = [2, 3, 0, 1];
-    //     } else if (idx === 2) {
-    //         pongGame.viewIndexMap = [1, 2, 3, 0];
-    //     } else {
-    //         pongGame.viewIndexMap = [0, 1, 2, 3];
-    //     }
-    // }
-
     // Initialize WebSocket connection to room
     pongGame.roomWS = initRoomWebSocket({
         roomId: room.roomId,
@@ -240,7 +203,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onConnect: () => {
             console.log('✅ Connected to 4-player game room');
-            updateConnectionStatus('Connected (Room)', true);
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
@@ -250,7 +212,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onDisconnect: () => {
             console.log('Disconnected from 4-player game room');
-            updateConnectionStatus('Disconnected', false);
         },
         
         onGameState: (state) => {
@@ -269,13 +230,13 @@ async function initRoomBasedGame(room: any): Promise<void> {
             updateScoreDisplay(scores);
         },
         
-        onGameEnd: (winnerId) => {
-            console.log('4-player game ended in room, winner:', winnerId);
-            const winner = room.players.find((p: any) => p.id === winnerId);
-            if (winner) {
-                alert(`Game Over! ${winner.username} wins!`);
-            }
-        }
+        onGameEnd: (data: any) => {
+            console.log('4-player game ended in room, winner:', data);
+            const winner = room.players.find((p: any) => p.id === data.winnerId);
+            const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
+            const winnerId = winner ? winner.id : data.winnerId;
+            showGameEndScreen(winnerId, winnerName, pongGame!);
+        },
     });
 
     try {

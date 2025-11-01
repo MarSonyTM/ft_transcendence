@@ -39,4 +39,8 @@ export interface WebSocketMessage {
   winnerUiNumber?: number;
   mode?: string;
   players?: Player[];
+  finalScores?: Array<{
+    playerId: number;
+    score: number;
+  }>;
 }

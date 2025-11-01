@@ -5,14 +5,13 @@ import crypto from 'crypto';
 
 // Types
 export interface CreateUserInput {
-  firstName: string;
-  lastName: string;
-  email?: string;
-  username?: string;
-  password?: string;
-  avatar?: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    username?: string;
+    password?: string;
+    avatar?: string;
 }
-
 
 // Plugin function that registers all user routes
 async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -474,6 +473,35 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 message: 'Failed to change username'
             });
         }
+    });
+
+    // ==== Get all users with stats ====
+    fastify.get('/stats', async (request, reply) => {
+        try {
+             const users = database.users.getAllUsers();
+             
+             const usersWithStats = users.map(user => ({
+                 id: user.id,
+                 username: user.username,
+                 firstName: user.firstName,
+                 lastName: user.lastName,
+                 gamesWon: user.gamesWon || 0,
+                 gamesLost: user.gamesLost || 0,
+                 avatar: user.avatar
+             }));
+             
+             return {
+                 success: true,
+                 count: usersWithStats.length,
+                 data: usersWithStats
+             };
+         } catch (error) {
+             fastify.log.error(error);
+             reply.code(500).send({
+                 success: false,
+                 message: 'Failed to fetch user stats'
+             });
+         }
     });
 
     // ==== Update game statistics (protected) ====

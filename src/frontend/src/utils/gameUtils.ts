@@ -32,16 +32,31 @@ export function endGame(pongGame: PongGame) {
     pongGame.onGameEnd = async (winnerId: number) => {
         console.log(`Game ended, winner is Player ${winnerId}`);
         
-        if (pongGame.roomWS) {
-            const room = getCurrentRoom();
-            if (room) {
-                const winner = room.players[winnerId - 1];
-                if (winner) {
-                    showGameEndScreen(winner.id, winner.username, pongGame);
-                }
+        // Show winner screen for all games (both room-based and regular)
+        const room = getCurrentRoom();
+        let winnerIdStr: string;
+        let winnerNameStr: string;
+        
+        if (pongGame.roomWS && room) {
+            // Room-based game
+            const winner = room.players[winnerId - 1];
+            if (winner) {
+                winnerIdStr = winner.id;
+                winnerNameStr = winner.username;
+            } else {
+                winnerIdStr = winnerId.toString();
+                winnerNameStr = `Player ${winnerId}`;
             }
+        } else {
+            // Regular game (not room-based)
+            winnerIdStr = winnerId.toString();
+            winnerNameStr = `Player ${winnerId}`;
         }
         
+        // Show the winner screen
+        showGameEndScreen(winnerIdStr, winnerNameStr, pongGame);
+        
+        // Update winner in database
         if (!pongGame || !pongGame.gameId) {
             console.error('No game ID available to update winner');
             return;
@@ -62,7 +77,6 @@ export function endGame(pongGame: PongGame) {
             const user = authService.getCurrentUser();
             if (user && user.id) {
                 let didWin = false;
-                const room = getCurrentRoom();
                 if (room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
                     didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
@@ -70,13 +84,31 @@ export function endGame(pongGame: PongGame) {
                     didWin = (winnerId === 1);
                 }
                 try {
-                    await fetch(`${apiEndpoint}/api/users/stats`, {
+                    const authHeader = authService.getAuthHeader?.();
+                    if (!authHeader) {
+                        console.warn('⚠️ No auth token available, skipping stats update');
+                        return;
+                    }
+                
+                    const statsResponse = await fetch(`${apiEndpoint}/api/users/stats`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(authService.getAuthHeader?.() || {}) },
+                        headers: { 
+                            'Content-Type': 'application/json', 
+                            ...authHeader  // FIXED: Properly include auth token
+                        },
                         body: JSON.stringify({ won: didWin })
                     });
+                
+                    if (!statsResponse.ok) {
+                        const errorText = await statsResponse.text();
+                        console.error('❌ Failed to update stats:', statsResponse.status, errorText);
+                    } else {
+                        console.log('✅ Stats updated successfully');
+                        // Refresh user profile to get updated stats
+                        await authService.fetchUserProfile?.();
+                    }
                 } catch (e) {
-                    console.warn('Unable to update user stats:', e);
+                    console.error('❌ Error updating user stats:', e);
                 }
             }
         } catch (error) {
@@ -85,8 +117,15 @@ export function endGame(pongGame: PongGame) {
     };
 }
 
-function showGameEndScreen(winnerId: string, winnerName: string, pongGame: PongGame): void {
+export function showGameEndScreen(winnerId: string, winnerName: string, pongGame: PongGame): void {
+    // Remove any existing overlays first
+    const existingOverlay = document.getElementById('gameEndOverlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
     const overlay = document.createElement('div');
+    overlay.id = 'gameEndOverlay';
     overlay.style.cssText = `
         position: fixed;
         top: 0;
@@ -117,12 +156,17 @@ function showGameEndScreen(winnerId: string, winnerName: string, pongGame: PongG
 
     document.body.appendChild(overlay);
 
-    document.getElementById('backToHomeBtn')?.addEventListener('click', () => {
-        overlay.remove();
-        cleanupGame(pongGame);
-        history.pushState({ page: 'landing' }, '', '#landing');
-        window.location.reload();
-    });
+    setTimeout(() => {
+        const backBtn = document.getElementById('backToHomeBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                overlay.remove();
+                cleanupGame(pongGame);
+                history.pushState({ page: 'landing' }, '', '/');
+                window.location.reload();
+            });
+        } 
+    }, 0);
 }
 
 // Cleanup function
@@ -162,15 +206,6 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
         notification.style.animation = 'slideOut 0.3s ease-in';
         setTimeout(() => notification.remove(), 300);
     }, 4000);
-}
-
-// Update connection status
-export function updateConnectionStatus(status: string, isConnected: boolean): void {
-    // const wsStatus = document.getElementById('wsStatus');
-    // if (wsStatus) {
-    //     wsStatus.textContent = status;
-    //     wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
-    // }
 }
 
 export async function setEffectiveRoom(): Promise<GameRoom | null> {
