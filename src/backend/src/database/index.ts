@@ -1,25 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { CoreUser, CorePlayer as Player, CoreGameState as GameState } from '../../../shared/gameTypes';
+import { Tournament, TournamentPlayer, TournamentMatch, TFormat } from '../../../shared/tournamentTypes';
 
 // Use environment variable for Docker compatibility, fallback to local path
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
 
-// Interface definitions
-export interface RGBColor {
-  r: number;
-  g: number;
-  b: number;
-}
-export interface User {
-  id: number;
-  firstName: string;
-  lastName: string;
+export interface User extends CoreUser {
   email: string;
-  username: string;
   password: string;
-  avatar: string;
   googleId: string;
   emailVerified: boolean;
   gamesWon: number;
@@ -32,32 +23,6 @@ export interface Game {
   id: number;
   mode: string;
   difficulty: string;
-}
-
-export interface Player {
-  id: number;
-  name: string;//TODO: use?
-  gameId: number;
-  pos: number;
-  color: RGBColor;
-  score: number;
-  connectionStatus: string;
-  lastActivity: string;
-}
-
-export interface GameState {
-  id: number;
-  gameId: number;
-  players: Player[];
-  
-  ballPosX: number;
-  ballPosY: number;
-  ballVelX: number;
-  ballVelY: number;
-  
-  mode: string;
-  lastContact: number;
-  lastActivity: string;
 }
 
 export interface Friend {
@@ -550,7 +515,7 @@ class GameStateDatabaseManager {
       fields.push('ballPosY = ?');
       values.push(gameStateData.ballPosY);
     }
-    if (gameStateData.ballVelX !== undefined) {//TODO: add babylon physics?
+    if (gameStateData.ballVelX !== undefined) {
       fields.push('ballVelX = ?');
       values.push(gameStateData.ballVelX);
     }
@@ -834,6 +799,300 @@ class UsernameChangeDatabaseManager {
   }
 }
 
+class TournamentDatabaseManager {
+  private db: Database.Database;
+
+  constructor(database: Database.Database) {
+    this.db = database;
+  }
+
+  // Create a new tournament
+  createTournament(format: TFormat = 'single_elimination', matchDelay: number = 3): Tournament {
+    // Determine next friendlyId (sequential, gapless)
+    const row = this.db.prepare('SELECT COALESCE(MAX(friendlyId), 0) + 1 AS n FROM tournaments').get() as { n?: number } | undefined;
+    const nextFriendly = (row && typeof row.n === 'number' ? row.n : 1);
+
+    const stmt = this.db.prepare(`
+      INSERT INTO tournaments (format, matchDelay, status, createdAt, updatedAt, friendlyId)
+      VALUES (?, ?, 'idle', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
+    `);
+    
+    const result = stmt.run(format, matchDelay, nextFriendly);
+    return this.getTournamentById(result.lastInsertRowid as number)!;
+  }
+
+  // Get tournament by ID
+  getTournamentById(id: number): Tournament | undefined {
+    const stmt = this.db.prepare('SELECT * FROM tournaments WHERE id = ?');
+    return stmt.get(id) as Tournament | undefined;
+  }
+
+  // Get all tournaments
+  getAllTournaments(): Tournament[] {
+    const stmt = this.db.prepare('SELECT * FROM tournaments ORDER BY createdAt DESC');
+    return stmt.all() as Tournament[];
+  }
+
+  // Update tournament
+  updateTournament(id: number, data: Partial<Tournament>): Tournament | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.status) {
+      fields.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.format) {
+      fields.push('format = ?');
+      values.push(data.format);
+    }
+    if ((data as any).champion !== undefined) {
+      const champ = (data as any).champion as any;
+      const champId = champ && typeof champ === 'object' ? champ.id : champ;
+      fields.push('championId = ?');
+      values.push(champId ?? null);
+    }
+    if (fields.length === 0) {
+      return this.getTournamentById(id);
+    }
+
+    fields.push('updatedAt = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const stmt = this.db.prepare(`
+      UPDATE tournaments
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `);
+
+    stmt.run(...values);
+    return this.getTournamentById(id);
+  }
+
+  // Delete tournament
+  deleteTournament(id: number): boolean {
+    const stmt = this.db.prepare('DELETE FROM tournaments WHERE id = ?');
+    const result = stmt.run(id);
+    return result.changes > 0;
+  }
+
+  // Add player to tournament (playerId is tournament-internal ID)
+  addPlayer(tournamentId: number, playerId: number, user: User | undefined, alias: string, isAI: boolean = false, isLocal: boolean = false, isRemote: boolean = false): TournamentPlayer {
+    const stmt = this.db.prepare(`
+      INSERT INTO tournament_players (tournamentId, playerId, userId, alias, isAI, isLocal, isRemote)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(tournamentId, playerId, user?.id ?? null, alias, isAI ? 1 : 0, isLocal ? 1 : 0, isRemote ? 1 : 0);
+    // Return mapped player
+    const player = this.getPlayers(tournamentId).find(p => p.id === playerId);
+    if (!player) throw new Error('Failed to insert tournament player');
+    return player;
+  }
+
+  // Get player by tournament-internal ID
+  getPlayerById(id: number): TournamentPlayer | undefined {
+    const row = this.db.prepare('SELECT * FROM tournament_players WHERE playerId = ?').get(id) as any;
+    if (!row) return undefined;
+    return this.mapPlayerRow(row);
+  }
+
+  // Get all players for a tournament
+  getPlayers(tournamentId: number): TournamentPlayer[] {
+    const rows = this.db.prepare('SELECT * FROM tournament_players WHERE tournamentId = ? ORDER BY playerId').all(tournamentId) as any[];
+    return rows.map(r => this.mapPlayerRow(r));
+  }
+
+  private mapPlayerRow(r: any): TournamentPlayer {
+    return {
+      id: r.playerId,              // tournament-internal ID
+      playerId: r.playerId,
+      tournamentId: r.tournamentId,
+      alias: r.alias,
+      user: r.userId ? { id: r.userId } as any : undefined,
+      avatar: undefined,
+      eliminated: !!r.eliminated,
+      wins: r.wins ?? 0,
+      losses: r.losses ?? 0,
+      totalScore: r.totalScore ?? 0,
+      averageScore: r.averageScore ?? 0,
+      isReady: !!r.isReady,
+      isAI: !!r.isAI,
+      isLocal: !!r.isLocal,
+      isRemote: !!r.isRemote,
+      gameId: r.gameId ?? undefined,
+      pos: r.pos ?? 0,
+      score: r.score ?? 0,
+      socketId: r.socketId ?? undefined,
+      connectionStatus: r.connectionStatus ?? 'connected',
+      lastActivity: r.lastActivity ?? new Date().toISOString()
+    } as TournamentPlayer;
+  }
+
+  // Update player
+  updatePlayer(id: number, data: Partial<TournamentPlayer>): TournamentPlayer | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.eliminated !== undefined) {
+      fields.push('eliminated = ?');
+      values.push(data.eliminated ? 1 : 0);
+    }
+    if (data.wins !== undefined) {
+      fields.push('wins = ?');
+      values.push(data.wins);
+    }
+    if (data.losses !== undefined) {
+      fields.push('losses = ?');
+      values.push(data.losses);
+    }
+    if (data.totalScore !== undefined) {
+      fields.push('totalScore = ?');
+      values.push(data.totalScore);
+    }
+    if (data.averageScore !== undefined) {
+      fields.push('averageScore = ?');
+      values.push(data.averageScore);
+    }
+    if (data.isReady !== undefined) {
+      fields.push('isReady = ?');
+      values.push(data.isReady ? 1 : 0);
+    }
+
+    if (fields.length === 0) {
+      return this.getPlayerById(id);
+    }
+
+    values.push(id);
+
+    const stmt = this.db.prepare(`
+      UPDATE tournament_players
+      SET ${fields.join(', ')}
+      WHERE playerId = ?
+    `);
+
+    stmt.run(...values);
+    return this.getPlayerById(id);
+  }
+
+  // Create match
+  createMatch(tournamentId: number, matchId: number, p1: TournamentPlayer | null, p2: TournamentPlayer | null): TournamentMatch {
+    const stmt = this.db.prepare(`
+      INSERT INTO tournament_matches (tournamentId, matchNumber, player1Id, player2Id, status)
+      VALUES (?, ?, ?, ?, 'pending')
+    `);
+    stmt.run(tournamentId, matchId, p1?.id ?? null, p2?.id ?? null);
+    // Return mapped match
+    const m = this.getMatches(tournamentId).find(x => x.matchId === matchId);
+    if (!m) throw new Error('Failed to create tournament match');
+    return m;
+  }
+
+  // Get match by ID
+  getMatchById(id: number): TournamentMatch | undefined {
+    const row = this.db.prepare('SELECT * FROM tournament_matches WHERE id = ?').get(id) as any;
+    if (!row) return undefined;
+    return this.mapMatchRow(row);
+  }
+
+  // Get all matches for a tournament
+  getMatches(tournamentId: number): TournamentMatch[] {
+    const rows = this.db.prepare('SELECT * FROM tournament_matches WHERE tournamentId = ? ORDER BY matchNumber').all(tournamentId) as any[];
+    return rows.map(r => this.mapMatchRow(r, tournamentId));
+  }
+
+  private mapMatchRow(r: any, tId?: number): TournamentMatch {
+    const tid = tId ?? r.tournamentId;
+    const p1 = r.player1Id != null ? this.getPlayers(tid).find(p => p.id === r.player1Id) : undefined;
+    const p2 = r.player2Id != null ? this.getPlayers(tid).find(p => p.id === r.player2Id) : undefined;
+    const winner = r.winnerId != null ? this.getPlayers(tid).find(p => p.id === r.winnerId) : undefined;
+    const loser = r.loserId != null ? this.getPlayers(tid).find(p => p.id === r.loserId) : undefined;
+    return {
+      matchId: r.matchNumber,
+      tournamentId: tid,
+      p1,
+      p2,
+      winner,
+      loser,
+      gameId: r.gameId ?? undefined,
+      roomId: r.roomId ?? undefined,
+      status: r.status,
+      createdAt: r.createdAt ?? new Date().toISOString(),
+      startedAt: r.startedAt ?? undefined,
+      finishedAt: r.finishedAt ?? undefined,
+      disputeReason: r.disputeReason ?? undefined,
+      // Additionally map scores if present
+      ...(p1 ? { p1: { ...p1, score: r.player1Score ?? p1.score, isReady: !!r.player1Ready } } : {} as any),
+      ...(p2 ? { p2: { ...p2, score: r.player2Score ?? p2.score, isReady: !!r.player2Ready } } : {} as any)
+    } as TournamentMatch;
+  }
+
+  // Update match
+  updateMatch(id: number, data: Partial<TournamentMatch>): TournamentMatch | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (data.status) {
+      fields.push('status = ?');
+      values.push(data.status);
+    }
+    if (data.winner !== undefined) {
+      fields.push('winnerId = ?');
+      values.push((data.winner as any)?.id ?? null);
+    }
+    if (data.loser !== undefined) {
+      fields.push('loserId = ?');
+      values.push((data.loser as any)?.id ?? null);
+    }
+    if (data.gameId !== undefined) {
+      fields.push('gameId = ?');
+      values.push(data.gameId);
+    }
+    if (data.roomId !== undefined) {
+      fields.push('roomId = ?');
+      values.push(data.roomId);
+    }
+    if (data.p1 !== undefined) {
+      if ((data.p1 as any).score !== undefined) { fields.push('player1Score = ?'); values.push((data.p1 as any).score); }
+      if ((data.p1 as any).isReady !== undefined) { fields.push('player1Ready = ?'); values.push((data.p1 as any).isReady ? 1 : 0); }
+    }
+    if (data.p2 !== undefined) {
+      if ((data.p2 as any).score !== undefined) { fields.push('player2Score = ?'); values.push((data.p2 as any).score); }
+      if ((data.p2 as any).isReady !== undefined) { fields.push('player2Ready = ?'); values.push((data.p2 as any).isReady ? 1 : 0); }
+    }
+    if (data.createdAt !== undefined) {
+      fields.push('createdAt = ?');
+      values.push(data.createdAt);
+    }
+    if (data.disputeReason !== undefined) {
+      fields.push('disputeReason = ?');
+      values.push(data.disputeReason);
+    }
+    if (data.startedAt !== undefined) {
+      fields.push('startedAt = ?');
+      values.push(data.startedAt);
+    }
+    if (data.finishedAt !== undefined) {
+      fields.push('finishedAt = ?');
+      values.push(data.finishedAt);
+    }
+
+    if (fields.length === 0) {
+      return this.getMatchById(id);
+    }
+
+    values.push(id);
+
+    const stmt = this.db.prepare(`
+      UPDATE tournament_matches
+      SET ${fields.join(', ')}
+      WHERE id = ?
+    `);
+
+    stmt.run(...values);
+    return this.getMatchById(id);
+  }
+}
+
 class InvitationDatabaseManager {
   private db: Database.Database;
 
@@ -936,6 +1195,7 @@ export class DatabaseManager extends BaseDatabaseManager {
   public invitations: InvitationDatabaseManager;
   public emailVerifications: EmailVerificationDatabaseManager;
   public usernameChanges: UsernameChangeDatabaseManager;
+  public tournaments: TournamentDatabaseManager;
 
   constructor() {
     super();
@@ -947,6 +1207,7 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.invitations = new InvitationDatabaseManager(this.db);
     this.emailVerifications = new EmailVerificationDatabaseManager(this.db);
     this.usernameChanges = new UsernameChangeDatabaseManager(this.db);
+    this.tournaments = new TournamentDatabaseManager(this.db);
   }
 
   protected initializeTables() {
@@ -958,6 +1219,7 @@ export class DatabaseManager extends BaseDatabaseManager {
     this.initializeInvitationsTable();
     this.initializeEmailVerificationsTable();
     this.initializeUsernameChangesTable();
+    this.initializeTournamentsTable();
     this.createSeedUser();
   }
 
@@ -982,8 +1244,6 @@ export class DatabaseManager extends BaseDatabaseManager {
     
     this.db.exec(createUsersTable);
   }
-
-
 
   private initializeGamesTable() {
     const createGamesTable = `
@@ -1107,6 +1367,121 @@ export class DatabaseManager extends BaseDatabaseManager {
     `;
     
     this.db.exec(createUsernameChangesTable);
+  }
+
+  private initializeTournamentsTable() {
+    // Main tournaments table
+    const createTournamentsTable = `
+      CREATE TABLE IF NOT EXISTS tournaments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL CHECK(status IN ('idle', 'in_progress', 'paused', 'completed')) DEFAULT 'idle',
+        format TEXT NOT NULL CHECK(format IN ('single_elimination', 'double_elimination', 'round_robin')) DEFAULT 'single_elimination',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        championId INTEGER,
+        matchDelay INTEGER DEFAULT 3,
+        allowSpectators BOOLEAN DEFAULT TRUE,
+        friendlyId INTEGER
+      )
+    `;
+    
+    // Tournament players table
+    const createTournamentPlayersTable = `
+      CREATE TABLE IF NOT EXISTS tournament_players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tournamentId INTEGER NOT NULL,
+        playerId INTEGER NOT NULL,
+        userId INTEGER,
+        alias TEXT NOT NULL,
+        eliminated BOOLEAN DEFAULT FALSE,
+        wins INTEGER DEFAULT 0,
+        losses INTEGER DEFAULT 0,
+        totalScore INTEGER DEFAULT 0,
+        averageScore REAL DEFAULT 0.0,
+        isReady BOOLEAN DEFAULT FALSE,
+        isAI BOOLEAN DEFAULT FALSE,
+        isLocal BOOLEAN DEFAULT FALSE,
+        isRemote BOOLEAN DEFAULT FALSE,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `;
+    
+    // Tournament matches table
+    const createTournamentMatchesTable = `
+      CREATE TABLE IF NOT EXISTS tournament_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tournamentId INTEGER NOT NULL,
+        matchNumber INTEGER NOT NULL,
+        player1Id INTEGER,
+        player2Id INTEGER,
+        winnerId INTEGER,
+        loserId INTEGER,
+        gameId INTEGER,
+        roomId TEXT,
+        player1Score INTEGER,
+        player2Score INTEGER,
+        status TEXT NOT NULL CHECK(status IN ('pending', 'ready', 'in_progress', 'completed', 'disputed')) DEFAULT 'pending',
+        player1Ready BOOLEAN DEFAULT FALSE,
+        player2Ready BOOLEAN DEFAULT FALSE,
+        disputeReason TEXT,
+        startedAt DATETIME,
+        finishedAt DATETIME,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
+        FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE SET NULL
+      )
+    `;
+    
+    this.db.exec(createTournamentsTable);
+    this.db.exec(createTournamentPlayersTable);
+    this.db.exec(createTournamentMatchesTable);
+    
+    // Migration: Add isAI, isLocal, and isRemote columns if they don't exist
+    try {
+      const columns = this.db.prepare("PRAGMA table_info('tournament_players')").all() as Array<{ name: string }>;
+      const hasIsAI = columns.some(col => col.name === 'isAI');
+      const hasIsLocal = columns.some(col => col.name === 'isLocal');
+      const hasIsRemote = columns.some(col => col.name === 'isRemote');
+      
+      if (!hasIsAI) {
+        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isAI BOOLEAN DEFAULT FALSE');
+        console.log('✅ Added isAI column to tournament_players');
+      }
+      if (!hasIsLocal) {
+        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isLocal BOOLEAN DEFAULT FALSE');
+        console.log('✅ Added isLocal column to tournament_players');
+      }
+      if (!hasIsRemote) {
+        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isRemote BOOLEAN DEFAULT FALSE');
+        console.log('✅ Added isRemote column to tournament_players');
+      }
+    } catch (error) {
+      console.log('ℹ️ Tournament player columns migration check:', error instanceof Error ? error.message : 'unknown');
+    }
+
+    // Migration: Add friendlyId to tournaments and backfill sequential values
+    try {
+      const tCols = this.db.prepare("PRAGMA table_info('tournaments')").all() as Array<{ name: string }>;
+      const hasFriendly = tCols.some(c => c.name === 'friendlyId');
+      if (!hasFriendly) {
+        this.db.exec('ALTER TABLE tournaments ADD COLUMN friendlyId INTEGER');
+      }
+      const rows = this.db.prepare(
+        "SELECT id, friendlyId FROM tournaments ORDER BY datetime(createdAt) ASC, id ASC"
+      ).all() as Array<{ id: number; friendlyId: number | null }>;
+      let seq = 1;
+      const updateStmt = this.db.prepare('UPDATE tournaments SET friendlyId = ? WHERE id = ?');
+      for (const r of rows) {
+        if (r.friendlyId == null) {
+          updateStmt.run(seq, r.id);
+        }
+        seq++;
+      }
+    } catch (e) {
+      console.log('ℹ️ tournaments.friendlyId migration:', e instanceof Error ? e.message : 'unknown');
+    }
   }
 
   private createSeedUser() {

@@ -1,22 +1,5 @@
-interface Player {
-  id: string;
-  username: string;
-  isReady: boolean;
-  isAI?: boolean;
-  isLocal: boolean;
-  difficulty?: string;
-  socketId?: string;
-}
-
-interface GameRoom {
-  roomId: string;
-  hostId: string;
-  players: Player[];
-  maxPlayers: number;
-  status: 'waiting' | 'playing' | 'finished';
-  gameId?: number;
-  createdAt: Date;
-}
+import { get } from 'http';
+import { CorePlayer as Player, GameRoom } from '../../../shared/gameTypes';
 
 class GameRoomManager {
   private rooms: Map<string, GameRoom> = new Map();
@@ -32,18 +15,26 @@ class GameRoomManager {
   }
 
   // Create a new game room
-  createRoom(hostId: string, hostUsername: string, maxPlayers: number = 2): GameRoom {
+  createRoom(hostId: string, hostUsername: string, maxPlayers: number = 2, opts?: { hostIsAI?: boolean; hostIsLocal?: boolean; difficulty?: string }): GameRoom {
     const roomId = this.generateRoomId();
-    
+
     const room: GameRoom = {
       roomId,
       hostId,
       players: [{
-        id: hostId,
-        username: hostUsername,
-        isReady: true,
-        isAI: false,
-        isLocal: false
+        id: 0,
+        playerId: hostId,
+        alias: hostUsername,
+        avatar: undefined,
+        isReady: false,
+        isAI: !!opts?.hostIsAI,
+        isLocal: opts?.hostIsLocal === undefined ? !opts?.hostIsAI : !!opts?.hostIsLocal,
+        difficulty: opts?.difficulty,
+        user: undefined,
+        pos: 0,
+        score: 0,
+        connectionStatus: 'connected',
+        lastActivity: new Date().toISOString()
       }],
       maxPlayers,
       status: 'waiting',
@@ -79,17 +70,23 @@ class GameRoomManager {
     }
 
     // Check if player already in room
-    if (room.players.some(p => p.id === playerId)) {
+    if (room.players.some(p => p.playerId === playerId)) {
       return { success: false, message: 'Already in this room' };
     }
 
     room.players.push({
-      id: playerId,
-      username,
+      id: room.players.length,
+      playerId: playerId,
+      alias: username,
       isReady: isReady,
       isAI: isAI,
       isLocal: isLocal,
-      difficulty: difficulty
+      avatar: undefined,
+      user: undefined,
+      pos: 0,
+      score: 0,
+      connectionStatus: 'connected',
+      lastActivity: new Date().toISOString()
     });
 
     console.log(`✅ ${username} ${isAI ? `(${difficulty || 'normal'}) (AI)` : ''} joined room ${roomId}`);
@@ -101,7 +98,7 @@ class GameRoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return false;
 
-    const playerIndex = room.players.findIndex(p => p.id === playerId);
+    const playerIndex = room.players.findIndex(p => p.playerId === playerId);
     if (playerIndex === -1) return false;
 
     room.players.splice(playerIndex, 1);
@@ -115,7 +112,7 @@ class GameRoomManager {
 
     // Assign new host if needed
     if (playerId === room.hostId && room.players.length > 0) {
-      room.hostId = room.players[0].id;
+      room.hostId = room.players[0].playerId;
     }
 
     return true;
@@ -126,7 +123,7 @@ class GameRoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return false;
 
-    const player = room.players.find(p => p.id === playerId);
+    const player = room.players.find(p => p.playerId === playerId);
     if (!player) return false;
 
     player.isReady = !player.isReady;
@@ -181,7 +178,7 @@ class GameRoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return false;
 
-    const player = room.players.find(p => p.id === playerId);
+    const player = room.players.find(p => p.playerId === playerId);
     if (!player) return false;
 
     player.socketId = socketId;

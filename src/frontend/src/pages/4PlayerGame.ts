@@ -4,8 +4,7 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils'
-import { toggleTournaments } from '../tournament';
+import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom } from '../utils/gameUtils';
 
 export let pongGame: PongGame | null = null;
 
@@ -15,7 +14,7 @@ export async function render4PlayerGame(): Promise<void> {
     pongGame = new PongGame();
 
     if (room) {
-        pongGame.hasLocal = room.players.some(p => p.id === 'local');
+        pongGame.hasLocal = room.players.some(p => p.playerId === 'local');
     }
     
     const root = document.getElementById('app-root');
@@ -51,17 +50,16 @@ export async function render4PlayerGame(): Promise<void> {
             <button id="pauseBtn" class="btn btn-pause">Pause Game</button>
             <button id="endBtn" class="btn btn-end">End Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
-            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         
         <div class="player-info">
-            <span id="player1Name" class="player1-name">${players[0].username}</span>
+            <span id="player1Name" class="player1-name">${players[0].alias}</span>
             <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">${players[1].username}</span>
+            <span id="player2Name" class="player2-name">${players[1].alias}</span>
             <span class="vs-text">vs</span> 
-            <span id="player3Name" class="player3-name">${players[2].username}</span>
+            <span id="player3Name" class="player3-name">${players[2].alias}</span>
             <span class="vs-text">vs</span> 
-            <span id="player4Name" class="player4-name">${players[3].username}</span>
+            <span id="player4Name" class="player4-name">${players[3].alias}</span>
         </div>
         <div class="score-container">
             <span id="player1score" class="player1-score">0</span> 
@@ -81,8 +79,6 @@ export async function render4PlayerGame(): Promise<void> {
             <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
-        <hr>
-        <div id="tournamentRoot" class="t-section"></div>
     `;
     
      
@@ -145,7 +141,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const tournamentsBtn = document.getElementById('tournamentsBtn');
 
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
@@ -185,10 +180,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
                 }
             }
         });
-    }
-
-    if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', toggleTournaments);
     }
 }
 

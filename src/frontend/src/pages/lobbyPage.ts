@@ -3,12 +3,11 @@ import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { 
-  Player, 
-  GameRoom, 
   getCurrentRoom,
   setCurrentRoom,
   clearRoomState
 } from '../utils/roomState';
+import { CorePlayer as Player, GameRoom } from '../../../shared/gameTypes';
 
 let currentUserId: string | null = null;
 let pollInterval: number | null = null;
@@ -211,37 +210,13 @@ async function showGameStartCountdown(): Promise<void> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.id = 'countdown-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.95);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      animation: fadeIn 0.3s ease-out;
-    `;
+    overlay.className = 'countdown-overlay animate-fade-in';
 
     const countdownText = document.createElement('div');
-    countdownText.style.cssText = `
-      font-size: 10em;
-      font-weight: bold;
-      color: rgb(52 211 153);
-      text-shadow: 0 0 30px rgba(52, 211, 153, 0.5);
-      animation: pulse 1s ease-in-out;
-    `;
+    countdownText.className = 'countdown-text animate-pulse';
 
     const messageText = document.createElement('div');
-    messageText.style.cssText = `
-      font-size: 2em;
-      color: rgb(209 213 219);
-      margin-top: 1em;
-      opacity: 0.8;
-    `;
+    messageText.className = 'countdown-message';
     messageText.textContent = 'Get Ready!';
 
     overlay.appendChild(countdownText);
@@ -256,11 +231,10 @@ async function showGameStartCountdown(): Promise<void> {
       
       if (count > 0) {
         countdownText.textContent = count.toString();
-        // Reset animation
-        countdownText.style.animation = 'none';
-        setTimeout(() => {
-          countdownText.style.animation = 'pulse 1s ease-in-out';
-        }, 10);
+        // Retrigger pulse animation by toggling the class
+        countdownText.classList.remove('animate-pulse');
+        void (countdownText as HTMLElement).offsetWidth; // force reflow
+        countdownText.classList.add('animate-pulse');
       } else {
         countdownText.textContent = 'GO!';
         countdownText.style.color = 'rgb(251 191 36)';
@@ -269,7 +243,8 @@ async function showGameStartCountdown(): Promise<void> {
         clearInterval(countdownInterval);
         
         setTimeout(() => {
-          overlay.style.animation = 'fadeOut 0.3s ease-in';
+          overlay.classList.remove('animate-fade-in');
+          overlay.classList.add('animate-fade-out');
           setTimeout(() => {
             overlay.remove();
             resolve();
@@ -363,7 +338,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       const currentRoom = getCurrentRoom();
       if (currentRoom) {
-        const player = currentRoom.players.find(p => p.id === playerId);
+        const player = currentRoom.players.find(p => p.playerId === playerId);
         if (player) {
           player.isReady = isReady;
           setCurrentRoom({ ...currentRoom });
@@ -382,7 +357,7 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       if (currentRoom) {
         const updatedRoom = {
           ...currentRoom,
-          players: currentRoom.players.filter(p => p.id !== playerId)
+          players: currentRoom.players.filter(p => p.playerId !== playerId)
         };
         setCurrentRoom(updatedRoom);
         const root = document.getElementById('app-root');
@@ -432,10 +407,10 @@ function renderLobby(root: HTMLElement): void {
   const minPlayersRequired = maxPlayers === 4 ? 4 : 2;
   const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
-	const currentPlayer = players.find(p => p.id === currentUserId);
+	const currentPlayer = players.find(p => p.playerId === currentUserId);
   let hasGuest = false;
-  let hasLocal = players.some(p => p.id === 'local');
-  
+  let hasLocal = players.some(p => p.playerId === 'local');
+
 	root.innerHTML = `
 	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
 		<div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">
@@ -472,16 +447,16 @@ function renderLobby(root: HTMLElement): void {
 			${players.map(player => `
 			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
 				<div>
-				  <span style="color: rgb(229 231 235);">${player.username}</span>
-				  ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
-				  ${player.id === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
+				  <span style="color: rgb(229 231 235);">${player.alias}</span>
+				  ${player.playerId === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
+				  ${player.playerId === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
 				</div>
 				<div style="display: flex; align-items: center; gap: 0.5em;">
 				  <span style="color: ${player.isReady ? 'rgb(34 197 94)' : 'rgb(156 163 175)'}; font-size: 0.9em;">
 					${player.isReady ? '✓ Ready' : 'Not Ready'}
 				  </span>
 				  ${player.isAI && isHost ? `
-					<button class="remove-player-btn" data-player-id="${player.id}"
+					<button class="remove-player-btn" data-player-id="${player.playerId}"
 							style="background: rgb(220 38 38); color: white; border: none; border-radius: 4px; padding: 0.25em 0.5em; font-size: 0.8em; cursor: pointer;">
 					  Remove
 					</button>
@@ -727,7 +702,7 @@ async function addLocalPlayer(): Promise<void> {
         playerId: localId,
         username: username,
         isAI: false,
-        isReady: true,
+        isReady: false,
         isLocal: true
       })
     });

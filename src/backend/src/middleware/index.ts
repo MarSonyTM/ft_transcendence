@@ -50,6 +50,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     '/assets/',           // Static assets from Vite
     '/api/room/',         // Room API routes
     '/api/game/',         // Game API routes
+    '/api/tournament/',   // Tournament API routes (guest access)
     '/game/',             // WebSocket game routes
     '/room/',
     '/join/',             // Join room links

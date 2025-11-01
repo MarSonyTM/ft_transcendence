@@ -1,4 +1,4 @@
-import './styles.css';
+import './styles/styles.css';
 import { AppPage } from './types';
 import { getCurrentPage, setCurrentPage, setCurrentUser } from './utils/globalState';
 import { renderLandingPage } from './pages/landingPage';
@@ -17,6 +17,7 @@ import { renderEditProfilePage } from './pages/editProfilePage';
 import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
+import { renderTournamentPage, cleanupTournamentPage } from './pages/tournamentPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -101,6 +102,9 @@ function handleRouting(): void {
     case '/verify-email':
       setCurrentPage('verifyEmail');
       break;
+    case '/tournament':
+      setCurrentPage('tournament');
+      break;
     default:
       setCurrentPage('landing');
   }
@@ -110,8 +114,11 @@ function handleRouting(): void {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
 
-  if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame') {
+  if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame' && page !== 'tournament') {
     cleanupLobby();
+  }
+  if (page !== 'tournament') {
+    cleanupTournamentPage();
   }
 
   switch (page) {
@@ -173,6 +180,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'verifyEmail':
       renderVerifyEmailPage();
+      break;
+    case 'tournament':
+      await renderTournamentPage();
       break;
     default:
       renderLandingPage();

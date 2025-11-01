@@ -190,7 +190,8 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
 
 // Get player number (1, 2, 3, 4) based on their position in the room
 function getPlayerNumber(room: any, playerId: string): number {
-  const index = room.players.findIndex((p: any) => p.id === playerId);
+  // Match using room player's external identifier
+  const index = room.players.findIndex((p: any) => p.playerId === playerId);
   return index >= 0 ? index + 1 : 1;
 }
 

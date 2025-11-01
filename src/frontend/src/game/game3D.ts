@@ -1,12 +1,32 @@
 import { PongGame } from './PongGame';
-import { GameState } from '../types';
-import { Engine, Scene, ArcRotateCamera, Vector3, MeshBuilder, HemisphericLight, Color3, StandardMaterial, AbstractMesh, Color4 } from "@babylonjs/core";
+import { CoreGameState as GameState } from '../../../shared/gameTypes';
+import { Engine } from '@babylonjs/core/Engines/engine';
+import { Scene } from '@babylonjs/core/scene';
+import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
+import { Vector3 } from '@babylonjs/core/Maths/math'
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import { Color4 } from '@babylonjs/core/Maths/math.color';
+import { Effect } from '@babylonjs/core/Materials/effect';
+import '@babylonjs/core/Shaders/default.vertex';
+import '@babylonjs/core/Shaders/default.fragment';
+import { ShaderStore } from '@babylonjs/core/Engines/shaderStore';
 
 interface PaddleMeshes {
     left?: AbstractMesh;
     right?: AbstractMesh;
     top?: AbstractMesh;
     bottom?: AbstractMesh;
+}
+
+interface BorderMeshes {
+    north?: AbstractMesh;
+    south?: AbstractMesh;
+    east?: AbstractMesh;
+    west?: AbstractMesh;
 }
 
 export class baby3D {
@@ -16,7 +36,7 @@ export class baby3D {
     private light!: HemisphericLight;
     private table!: AbstractMesh;
     private ball!: AbstractMesh;
-    private borders: { north?: AbstractMesh; south?: AbstractMesh; east?: AbstractMesh; west?: AbstractMesh } = {};
+    private borders: BorderMeshes = {};
     private paddles: PaddleMeshes = {};
     private mode: string;
     private initialized = false;
@@ -63,8 +83,8 @@ export class baby3D {
     }
 
     async createScene(): Promise<Scene> {        
-        if (!this.checkWebGLSupport())
-            throw new Error('WebGL is not supported in this browser');
+        // if (!this.checkWebGLSupport())
+        //     throw new Error('WebGL is not supported in this browser');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         let canvas = document.getElementById('renderCanvas') as HTMLCanvasElement | null;
@@ -83,15 +103,48 @@ export class baby3D {
             console.log('✅ [3D] Canvas created and appended to:', gameContainer.id || 'body');
         }
 
-        this.engine = new Engine(canvas, true, {
-            preserveDrawingBuffer: true,
-            stencil: true,
-            antialias: true,
-            powerPreference: 'high-performance'
-        });
+        this.engine = new Engine(canvas);
 
         this.scene = new Scene(this.engine);
         this.scene.clearColor = new Color4(0.04, 0.06, 0.10, 1);
+
+        if (!ShaderStore.ShadersRepository || ShaderStore.ShadersRepository === "") {
+            ShaderStore.ShadersRepository = "https://cdn.babylonjs.com/shaders/";
+        }
+
+        const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && !(import.meta as any).env.PROD;
+        const urlHasDebug = typeof window !== 'undefined' && window.location && /(^|[?&])shaderDebug=1(&|$)/.test(window.location.search);
+        let lsHasDebug = false;
+        try {
+            lsHasDebug = typeof window !== 'undefined' && !!window.localStorage && window.localStorage.getItem('shaderDebug') === '1';
+        } catch {}
+        if (isDev || urlHasDebug || lsHasDebug) {
+            this.scene.onNewMaterialAddedObservable.add(mat => {
+                (mat as any).onError = (effect: Effect, errors: string) => {
+                    try {
+                        const anyEff = effect as any;
+                        const vs: string = anyEff.getVertexShaderSource?.() || anyEff._vertexSourceCode || '';
+                        const fs: string = anyEff.getFragmentShaderSource?.() || anyEff._fragmentSourceCode || '';
+                        const numberize = (code: string) => code
+                            .split('\n')
+                            .map((l, i) => `${(i + 1).toString().padStart(4, ' ')} | ${l}`)
+                            .join('\n');
+                        console.error('[Babylon Shader Compile Error]', {
+                            material: mat.name,
+                            errors
+                        });
+                        if (vs) {
+                            console.log('[Vertex Shader Source]\n' + numberize(vs));
+                        }
+                        if (fs) {
+                            console.log('[Fragment Shader Source]\n' + numberize(fs));
+                        }
+                    } catch (e) {
+                        console.error('[Shader Error Logger Failed]', e);
+                    }
+                };
+            });
+        }
 
         this.setupCameraLight(canvas);
 
@@ -115,46 +168,68 @@ export class baby3D {
             }
         });
 
-        window.addEventListener('resize', () => this.engine.resize());
+        window.addEventListener('resize', () => {
+            this.engine.resize();
+            // this.fitCameraToTable();
+        });
+
         if (canvas.parentElement && 'ResizeObserver' in window) {
-            const ro = new ResizeObserver(() => this.engine?.resize());
+            const ro = new ResizeObserver(() => {
+                this.engine?.resize();
+                // this.fitCameraToTable();
+            });
             ro.observe(canvas.parentElement);
         }
 
         return this.scene;
     }
 
-    private checkWebGLSupport(): boolean {
-        console.log('🔍 [3D] Checking WebGL support...');
-        try {
-            const canvas = document.createElement('canvas');
-            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            const supported = !!(window.WebGLRenderingContext && gl);
-            console.log(supported ? '✅ [3D] WebGL is supported' : '❌ [3D] WebGL is NOT supported');
-            return supported;
-        } catch(e) {
-            console.error('❌ [3D] WebGL check failed:', e);
-            return false;
-        }
-    }
+    // private checkWebGLSupport(): boolean {
+    //     console.log('🔍 [3D] Checking WebGL support...');
+    //     try {
+    //         const canvas = document.createElement('canvas');
+    //         const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    //         const supported = !!(window.WebGLRenderingContext && gl);
+    //         console.log(supported ? '✅ [3D] WebGL is supported' : '❌ [3D] WebGL is NOT supported');
+    //         return supported;
+    //     } catch(e) {
+    //         console.error('❌ [3D] WebGL check failed:', e);
+    //         return false;
+    //     }
+    // }
 
     private setupCameraLight(canvas: HTMLCanvasElement) {
         this.camera = new ArcRotateCamera(
             'cam', 
             Math.PI / 2 + Math.PI, 
-            1.05, 
-            480, 
+            0.95, 
+            350, 
             new Vector3(0, 0, 0), 
             this.scene
         );
         this.camera.lowerBetaLimit = 0.6;
-        this.camera.upperBetaLimit = 1.2;
-        this.camera.wheelDeltaPercentage = 0.01;
+        this.camera.upperBetaLimit = 1.3;
         this.camera.attachControl(canvas, true);
 
         this.light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
         this.light.intensity = 0.85;
     }
+
+    // private fitCameraToTable(marginScale = 1.1) {//TODO: maybe use this but fix it first, works well without at the moment though
+    //     if (!this.camera || !this.engine) return;
+
+    //     const halfW = this.values.tableX / 2;
+    //     const halfH = this.values.tableY / 2;
+
+    //     const aspect = this.engine.getRenderWidth() / Math.max(1, this.engine.getRenderHeight());
+    //     const fov = this.camera.fov;
+
+    //     const distV = halfH / Math.tan(fov / 2);
+    //     const distH = halfW / (Math.tan(fov / 2) * aspect);
+    //     const minRadius = Math.max(distV, distH) * marginScale;
+
+    //     this.camera.radius = Math.max(minRadius, 1);
+    // }
 
     private setupTable(mode: '2P' | '4P') {
         this.table?.dispose();
@@ -187,7 +262,8 @@ export class baby3D {
 
         this.borders = { north, south, east, west };
 
-        this.camera.radius = (mode === '4P') ? 600 : 480;
+        // this.fitCameraToTable();
+        this.camera.radius = (mode === '4P') ? 600 : 350;
     }
 
     private setupBall() {
@@ -253,8 +329,8 @@ export class baby3D {
             this.setupTable(state.mode === '4P' ? '4P' : '2P');
             this.setupBall();
             this.setupPaddles(state.mode === '4P' ? '4P' : '2P');
-            this.mode = state.mode;
-
+            this.mode = state.mode === '4P' ? '4P' : '2P';
+            // this.fitCameraToTable();
         }
 
         const halfX = this.values.tableX / 2;

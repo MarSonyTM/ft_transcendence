@@ -8,8 +8,8 @@ import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
-import tournamentRoutes from './routes/tournament';
 import roomRoutes from './routes/room';
+import tournamentRoutes from './routes/tournament';
 import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
@@ -85,6 +85,8 @@ const start = async (): Promise<void> => {
     await server.register(roomWebSocketRoutes);
     console.log('✅ WebSocket routes registered');
     
+  // Tournament routes removed – tournament is now frontend-only
+    
     // NOW add the auth guard (it won't affect already-registered routes)
     server.addHook('onRequest', authGuard);
     console.log('✅ Authentication middleware registered');
@@ -124,9 +126,6 @@ const start = async (): Promise<void> => {
             playersByGame: '/api/players/game/:gameId',
             playersByUser: '/api/players/user/:userId',
             playerStats: '/api/players/:id/stats',
-            tournamentStart: '/api/tournament/start',
-            tournamentState: '/api/tournament/state',
-            tournamentResult: '/api/tournament/result',
             createRoom: '/api/room/create',
             ping: '/api/ping',
             health: '/health',

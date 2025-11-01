@@ -1,9 +1,11 @@
+import { GameRoom } from '../../../shared/gameTypes';
+
 interface RoomWebSocketConfig {
   roomId: string;
   playerId: string;
   onConnect?: () => void;
   onDisconnect?: () => void;
-  onRoomState?: (room: any) => void;
+  onRoomState?: (room: GameRoom) => void;
   onGameState?: (state: any) => void;
   onPlayerMove?: (playerId: string, position: number) => void;
   onPlayerReady?: (playerId: string, isReady: boolean) => void;
@@ -153,6 +155,12 @@ export class RoomWebSocketManager {
       case 'playerDisconnected':
         if (this.config.onPlayerDisconnected) {
           this.config.onPlayerDisconnected(message.playerId);
+        }
+        break;
+
+      case 'playerJoined':
+        if (message.room && this.config.onRoomState) {
+          this.config.onRoomState(message.room);
         }
         break;
 

@@ -1,6 +1,7 @@
 import { PongGame } from "../game/PongGame";
-import { GameRoom, getCurrentRoom } from "./roomState";
-import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { GameRoom } from '../../../shared/gameTypes';
+import { getCurrentRoom } from "./roomState";
+import { disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from "./auth";
 import { baby3D } from "../game/game3D";
 
@@ -13,18 +14,24 @@ export async function setGameScreen(pongGame: PongGame) {
     
     try {
         await pongGame.connectWebSocket();
-        console.log('✅ Connected to shared game WebSocket');
-        pongGame.updateStatus("Connected - Click Start to begin");
-        if (pongGame.startRenderLoop) pongGame.startRenderLoop();
-
-        try {
-            const baby = new baby3D(pongGame);
-            await baby.createScene();
-        } catch (e) {
-            console.error('❌ Failed to start 3D renderer:', e);
-        }
     } catch (error) {
         console.error('❌ Failed to connect to game WebSocket:', error);
+    }
+    
+    console.log('🎮 Setting game screen...');
+    console.log('🎮 Starting render loop...');
+    pongGame.startRenderLoop();
+    
+    console.log('🎮 Creating baby3D instance and scene...');
+    try {
+        // Create baby3D instance if it doesn't exist
+        if (!pongGame.babylonGame) {
+            pongGame.babylonGame = new baby3D(pongGame);
+        }
+        await pongGame.babylonGame.createScene();
+        console.log('✅ 3D scene created successfully');
+    } catch (e) {
+        console.error('❌ Failed to create 3D scene:', e);
     }
 }
 
@@ -37,7 +44,7 @@ export function endGame(pongGame: PongGame) {
             if (room) {
                 const winner = room.players[winnerId - 1];
                 if (winner) {
-                    showGameEndScreen(winner.id, winner.username, pongGame);
+                    showGameEndScreen(winner.playerId, winner.alias!, pongGame);
                 }
             }
         }
@@ -65,7 +72,7 @@ export function endGame(pongGame: PongGame) {
                 const room = getCurrentRoom();
                 if (room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
-                    didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
+                    didWin = !!winnerPlayer && (winnerPlayer.playerId === user.username);
                 } else {
                     didWin = (winnerId === 1);
                 }
@@ -166,11 +173,11 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
 
 // Update connection status
 export function updateConnectionStatus(status: string, isConnected: boolean): void {
-    // const wsStatus = document.getElementById('wsStatus');
-    // if (wsStatus) {
-    //     wsStatus.textContent = status;
-    //     wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
-    // }
+    const wsStatus = document.getElementById('wsStatus');
+    if (wsStatus) {
+        wsStatus.textContent = status;
+        wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
+    }
 }
 
 export async function setEffectiveRoom(): Promise<GameRoom | null> {
@@ -222,5 +229,46 @@ export async function setEffectiveRoom(): Promise<GameRoom | null> {
     
     // Return whatever we have, even if gameId is still missing
     return effectiveRoom || null;
+}
+
+export function setupRoomKeyboardControls(ws: RoomWebSocketManager, hasLocal: boolean): () => void {
+    const keys: { [key: string]: boolean } = {};
+    const movementKeys = new Set<string>(['w', 's', 'o', 'l']);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        const wasPressed = keys[key];
+        keys[key] = true;
+        if (!wasPressed && movementKeys.has(key)) {
+            e.preventDefault();
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, true, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, true, false);
+            }
+        }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        keys[key] = false;
+        if (movementKeys.has(key)) {
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, false, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, false, false);
+            }
+        }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+    };
 }
 

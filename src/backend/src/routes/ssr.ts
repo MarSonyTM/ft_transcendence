@@ -6,12 +6,17 @@ import { readFileSync, existsSync } from 'fs';
 async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
   
   // Path to the built frontend files from Vite
-  const frontendDistPath = path.resolve('/app/frontend/dist');
+  // In local dev the Docker-like path may not exist; fall back to a local temp folder
+  const dockerDistPath = path.resolve('/app/frontend/dist');
+  const fallbackLocalDist = path.resolve(path.join(__dirname, '..', 'src', 'tmp_frontend_dist'));
+  const frontendDistPath = existsSync(dockerDistPath) ? dockerDistPath : fallbackLocalDist;
   const indexPath = path.join(frontendDistPath, 'index.html');
 
   // Register static asset serving for Vite build output
+  const assetsRoot = path.join(frontendDistPath, 'assets');
+  // Ensure the assets root exists (in dev it may be a placeholder)
   await fastify.register(require('@fastify/static'), {
-    root: path.join(frontendDistPath, 'assets'),
+    root: assetsRoot,
     prefix: '/assets/',
     decorateReply: false
   });

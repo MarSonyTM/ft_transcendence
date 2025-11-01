@@ -4,12 +4,15 @@ import { broadcastGameStartToRoom, broadcastToRoom, broadcastCountdownToRoom } f
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
-import { GameState } from '../database/index';
+import { CoreGameState as GameState } from '../../../shared/gameTypes';
 
 interface CreateRoomBody {
   hostId: string;
   hostUsername: string;
   maxPlayers?: number;
+  hostIsAI?: boolean;
+  difficulty?: string;
+  hostIsLocal?: boolean;
 }
 
 interface JoinRoomBody {
@@ -37,7 +40,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     reply: FastifyReply
   ) => {
     try {
-      const { hostId, hostUsername, maxPlayers = 2 } = request.body;
+      const { hostId, hostUsername, maxPlayers = 2, hostIsAI, difficulty, hostIsLocal } = request.body;
 
       if (!hostId || !hostUsername) {
         return reply.code(400).send({
@@ -46,7 +49,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const room = gameRoomManager.createRoom(hostId, hostUsername, maxPlayers);
+      const room = gameRoomManager.createRoom(hostId, hostUsername, maxPlayers, { hostIsAI, hostIsLocal, difficulty });
 
       return reply.code(201).send({
         success: true,
@@ -95,7 +98,8 @@ async function roomRoutes(fastify: FastifyInstance) {
     try {
       const { roomId } = request.params;
       const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
-      const isReady = (isAI || isLocal) ? true : false;
+      // Only AI joins are auto-ready; local/remote humans must manually ready
+      const isReady = isAI ? true : false;
 
       if (!playerId || !username) {
         return reply.code(400).send({
@@ -299,29 +303,29 @@ async function roomRoutes(fastify: FastifyInstance) {
             : ['left', 'right'];
           
           const players = room.players.map((roomPlayer, index) => {
-            let playerId: number;
-            const parsedId = parseInt(roomPlayer.id);
+            let id: number;
+            const parsedId = parseInt(roomPlayer.playerId);
             
             if (!isNaN(parsedId) && parsedId > 0) {
-              playerId = parsedId;
+              id = parsedId;
               
               try {
                 const position = positions[index] || 'left';
-                database.players.addPlayerToGame(gameId, playerId, position);
+                database.players.addPlayerToGame(gameId, id, position);
               } catch (err) {
-                console.warn(`⚠️ Could not add player ${playerId} to database`);
+                console.warn(`⚠️ Could not add player ${id} to database`);
               }
             } else {
-              playerId = index + 1;
+              id = index + 1;
             }
             
             return {
-              id: playerId,
-              name: roomPlayer.username,
+              id: id,
+              playerId: roomPlayer.playerId,
+              alias: roomPlayer.alias,
               gameId: gameId,
               pos: gameMode === '4P' ? 160 : 70,
               material: null,
-              color: { r: 1, g: 1, b: 1 },
               score: 0,
               connectionStatus: 'connected',
               lastActivity: new Date().toISOString()
@@ -331,7 +335,22 @@ async function roomRoutes(fastify: FastifyInstance) {
           const initialGameState: GameState = {
             id: 0,
             gameId: gameId,
-            players: players,
+            players: players.map(player => ({
+              id: player.id,
+              playerId: player.playerId,
+              alias: player.alias,
+              avatar: undefined,
+              material: null,
+              user: undefined,
+              isReady: false,
+              isAI: false,
+              isLocal: false,
+              gameId: gameId,
+              pos: player.pos,
+              score: player.score,
+              connectionStatus: player.connectionStatus,
+              lastActivity: new Date().toISOString()
+            })),
             ballPosX: 200,
             ballPosY: gameMode === '4P' ? 200 : 100,
             ballVelX: 0,
@@ -380,8 +399,9 @@ async function roomRoutes(fastify: FastifyInstance) {
   fastify.post('/api/room/:roomId/end', async (request, reply) => {
     const { roomId } = request.params as { roomId: string };
     const room = gameRoomManager.getRoom(roomId);
+    // Be idempotent: if the room doesn't exist, treat as already ended
     if (!room) {
-      return reply.status(404).send({ success: false, message: 'Room not found' });
+      return reply.send({ success: true, message: 'Room already ended' });
     }
 
     try {

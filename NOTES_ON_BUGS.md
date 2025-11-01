@@ -11,6 +11,6 @@
 
 [ ] button styles to make them pop on hover missing
 
-[X] lift paddles on top of table instead of being inside table(?)
+[ ] lift paddles on top of table instead of being inside table(?)
 
 [ ] maybe add logout button if logged in but not verified? otherwise you get stuck
