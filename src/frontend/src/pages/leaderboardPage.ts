@@ -1,4 +1,5 @@
 import { getCurrentUser, setCurrentPage } from '../utils/globalState';
+import { CorePlayer as Player } from '../../../shared/gameTypes';
 import { renderApp } from '../main';
 
 interface LeaderboardUser {
@@ -15,16 +16,6 @@ interface GameResult {
     createdAt: string;
     players?: Player[];
     points?: number[];
-}
-
-interface Player {
-  id: string;
-  username: string;
-  isReady: boolean;
-  isAI?: boolean;
-  isLocal: boolean;
-  difficulty?: string;
-  socketId?: string;
 }
 
 function getApiEndpoint(): string {
@@ -179,12 +170,12 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             }
                                             // Get winner name and AI status
                                             if (winner) {
-                                                winnerName = winner.username || `Player ${winner.id}`;
+                                                winnerName = winner.alias || `Player ${winner.playerId}`;
                                             }
                                             
                                             // Get loser name and AI status
                                             if (loser) {
-                                                loserName = loser.username || `Player ${loser.id}`;
+                                                loserName = loser.alias || `Player ${loser.playerId}`;
                                             }
                                         }
 
@@ -223,10 +214,10 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             let losers = new Array<Player>();
                                             
                                             if (game.winner) {
-                                                winner = game.players.find((p: any) => p.id === game.winner);
+                                                winner = game.players.find((p: any) => p.id === game.winner.id);
                                                 let i = 0;
                                                 for (i; game.players[i]; i++) {
-                                                    if (game.players[i].username !== game.winner.username)
+                                                    if (game.players[i].alias !== game.winner.alias)
                                                         losers.push(game.players[i]);
                                                 }
                                             } else {
@@ -241,14 +232,14 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             }
                                             // Get winner name and AI status
                                             if (winner) {
-                                                winnerName = winner.username || `Player ${winner.id}`;
+                                                winnerName = winner.alias || `Player ${winner.playerId}`;
                                             }
                                             
                                             // Get loser name and AI status
                                             if (losers) {
                                                 let i = 0;
                                                 for (i; losers[i]; i++)
-                                                    loserNames[i] = losers[i].username || `Player ${losers[i].id}`;
+                                                    loserNames[i] = losers[i].alias || `Player ${losers[i].playerId}`;
                                             }
                                         }
 

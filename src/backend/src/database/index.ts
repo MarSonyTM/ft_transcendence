@@ -245,14 +245,14 @@ class GameDatabaseManager {
     // Game methods
     getAllGames(): Game[] {
         const stmt = this.db.prepare('SELECT * FROM games ORDER BY id DESC');
-        const games = stmt.all() as Game[];
+        return stmt.all() as Game[];
     
-        // Parse JSON fields
-        return games.map(game => ({
-            ...game,
-            players: game.players ? (typeof game.players === 'string' ? JSON.parse(game.players) : game.players) : [],
-            points: game.points ? (typeof game.points === 'string' ? JSON.parse(game.points) : game.points) : []
-        }));
+        // // Parse JSON fields
+        // return games.map(game => ({
+        //     ...game,
+        //     players: game.players ? (typeof game.players === 'string' ? JSON.parse(game.players) : game.players) : [],
+        //     points: game.points ? (typeof game.points === 'string' ? JSON.parse(game.points) : game.points) : []
+        // }));
     }
 
     getGameById(id: number): Game | undefined {
