@@ -1,5 +1,6 @@
 import { get } from "http";
-import { GameState, database, Player } from "../database";
+import { database } from "../database";
+import { CoreGameState as GameState } from "../../../shared/gameTypes";
 import { broadcastToGame } from "../websocket/websocketHandler";
 import { AIPongPlayer, AIDifficulty } from "./aiPlayer";
 
@@ -119,7 +120,7 @@ export class BaseGameEngine {
         const scoresArr = this.gameState.players.map(p => p.score || 0);
         const maxScore = Math.max(...scoresArr);
         const winnerId = scoresArr.findIndex(score => score === maxScore) + 1;
-        const winnerName = `Player ${this.gameState.players[winnerId - 1]?.name || winnerId}`;
+        const winnerName = `Player ${this.gameState.players[winnerId - 1].alias || winnerId}`;
         const orientationToSeat: Record<number, string> = this.gameState.mode === '4P'
             ? { 1: 'left', 2: 'top', 3: 'right', 4: 'bottom' }
             : { 1: 'left', 2: 'right' };
@@ -598,8 +599,8 @@ export class BaseGameEngine {
                 else
                     clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleHeight));
             }
-            const isAI = this.isPlayerAI(playerId);
-            console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
+            // const isAI = this.isPlayerAI(playerId);
+            // console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
 
             this.gameState.players[playerId - 1].pos = clampedPos;
         }

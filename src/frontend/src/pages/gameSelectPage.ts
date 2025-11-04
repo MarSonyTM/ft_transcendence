@@ -11,6 +11,7 @@ export function renderGameSelectPage(): void {
             <div class="game-mode-options">
                 <button id="2PBtn" class="btn btn-game-mode">1 vs 1 Match</button>
                 <button id="4PBtn" class="btn btn-game-mode">4 Player Match</button>
+                <button id="tournamentBtn" class="btn btn-game-mode">Tournament</button>
             </div>
             <button id="backToLandingBtn" class="btn btn-back">Back</button>
         </div>
@@ -38,6 +39,19 @@ export function renderGameSelectPage(): void {
             setCurrentGameMode('4P');
             history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
+            renderApp();
+        });
+    }
+    
+    const tournamentBtn = document.getElementById('tournamentBtn');
+    if (tournamentBtn) {
+        tournamentBtn.addEventListener('click', () => {
+            if (!getCurrentUser()) {
+                setCurrentUser('Player 1');
+            }
+            setCurrentGameMode('2P');
+            history.pushState({ page: 'tournament' }, '', '/tournament');
+            setCurrentPage('tournament');
             renderApp();
         });
     }

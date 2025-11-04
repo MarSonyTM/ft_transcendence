@@ -1,13 +1,17 @@
-import { database, Player } from '../database/index';
+import { database } from '../database/index';
+import { CorePlayer as Player, CoreGameState } from '../../../shared/gameTypes';
 
-export class GameState {
-    id?: number;
+export class GameState implements CoreGameState {
+    id: number = 0;
+    gameId: number = 0;
     ballPosX: number = 0;
     ballPosY: number = 0;
     ballVelX: number = 0;
     ballVelY: number = 0;
     players: Player[] = [];
-    gameMode: string = "";
+    mode: string = "";
+    lastContact: number = 0;
+    lastActivity: string = new Date().toISOString();
 
     getBallPosX() {
         return this.ballPosX;
@@ -47,11 +51,18 @@ export class GameState {
             ballVelY: this.ballVelY,
             players: this.players.map(player => ({
                 id: player.id,
-                name: player.name,
-                position: player.pos,
+                playerId: player.playerId,
+                alias: player.alias,
+                avatar: player.avatar,
+                isReady: player.isReady,
+                isAI: player.isAI,
+                isLocal: player.isLocal,
+                user: player.user,
+                socketId: player.socketId,
+                pos: player.pos,
                 score: player.score
             })),
-            gameMode: this.gameMode
+            mode: this.mode
         };
     }
 }

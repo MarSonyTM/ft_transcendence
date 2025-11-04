@@ -8,8 +8,8 @@ import gameStateRoutes from './routes/gameState';
 import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
-import tournamentRoutes from './routes/tournament';
 import roomRoutes from './routes/room';
+import tournamentRoutes from './routes/tournament';
 import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
@@ -102,44 +102,41 @@ const start = async (): Promise<void> => {
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
-        // Basic API info route
-        fastify.get('/api', async (request: FastifyRequest, reply: FastifyReply) => {
-            return {
-                message: 'Transcendence API with SSR',
-                version: '0.0.7',
-                features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
-                endpoints: {
-                    auth: '/api/auth',
-                    createUser: '/api/auth/create',
-                    login: '/api/auth/login',
-                    users: '/api/users',
-                    userById: '/api/users/:id',
-                    games: '/api/game',
-                    gamesById: '/api/game/:id',
-                    joinGame: '/api/game/:id/join',
-                    gameState: '/api/gamestate',
-                    gameStateById: '/api/gamestate/:id',
-                    players: '/api/players',
-                    playerById: '/api/players/:id',
-                    playersByGame: '/api/players/game/:gameId',
-                    playersByUser: '/api/players/user/:userId',
-                    playerStats: '/api/players/:id/stats',
-                    tournamentStart: '/api/tournament/start',
-                    tournamentState: '/api/tournament/state',
-                    tournamentResult: '/api/tournament/result',
-                    createRoom: '/api/room/create',
-                    ping: '/api/ping',
-                    health: '/health',
-                    webSocket: '/game/:gameid/ws'
-                },
-                pages: {
-                    landing: '/',
-                    login: '/login',
-                    game: '/game',
-                    gameWithId: '/game/:gameId'
-                }
-            };
-        });
+      // Basic API info route
+      fastify.get('/api', async (request: FastifyRequest, reply: FastifyReply) => {
+        return {
+          message: 'Transcendence API with SSR',
+          version: '0.0.7',
+          features: ['WebSocket', 'Server-Side Rendering', 'Real-time Pong'],
+          endpoints: {
+            auth: '/api/auth',
+            createUser: '/api/auth/create',
+            login: '/api/auth/login',
+            users: '/api/users',
+            userById: '/api/users/:id',
+            games: '/api/game',
+            gamesById: '/api/game/:id',
+            joinGame: '/api/game/:id/join',
+            gameState: '/api/gamestate',
+            gameStateById: '/api/gamestate/:id',
+            players: '/api/players',
+            playerById: '/api/players/:id',
+            playersByGame: '/api/players/game/:gameId',
+            playersByUser: '/api/players/user/:userId',
+            playerStats: '/api/players/:id/stats',
+            createRoom: '/api/room/create',
+            ping: '/api/ping',
+            health: '/health',
+            webSocket: '/game/:gameid/ws'
+          },
+          pages: {
+            landing: '/',
+            login: '/login',
+            game: '/game',
+            gameWithId: '/game/:gameId'
+          }
+        };
+      });
 
         // Health check endpoint
         fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {

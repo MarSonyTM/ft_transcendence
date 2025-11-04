@@ -478,30 +478,30 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     // ==== Get all users with stats ====
     fastify.get('/stats', async (request, reply) => {
         try {
-             const users = database.users.getAllUsers();
+            const users = database.users.getAllUsers();
+            
+            const usersWithStats = users.map(user => ({
+                id: user.id,
+                username: user.username,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                gamesWon: user.gamesWon || 0,
+                gamesLost: user.gamesLost || 0,
+                avatar: user.avatar
+            }));
              
-             const usersWithStats = users.map(user => ({
-                 id: user.id,
-                 username: user.username,
-                 firstName: user.firstName,
-                 lastName: user.lastName,
-                 gamesWon: user.gamesWon || 0,
-                 gamesLost: user.gamesLost || 0,
-                 avatar: user.avatar
-             }));
-             
-             return {
-                 success: true,
-                 count: usersWithStats.length,
-                 data: usersWithStats
-             };
-         } catch (error) {
-             fastify.log.error(error);
-             reply.code(500).send({
-                 success: false,
-                 message: 'Failed to fetch user stats'
-             });
-         }
+            return {
+                success: true,
+                count: usersWithStats.length,
+                data: usersWithStats
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to fetch user stats'
+            });
+        }
     });
 
     // ==== Update game statistics (protected) ====

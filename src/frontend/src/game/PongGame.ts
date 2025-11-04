@@ -1,4 +1,5 @@
-import { Player, GameState, WebSocketMessage } from '../types';
+import { CorePlayer as Player } from '../../../shared/gameTypes';
+import { CoreGameState as GameState, WebSocketMessage } from '../../../shared/gameTypes';
 import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
 import { RoomWebSocketManager } from '../utils/roomWebSocket';
@@ -7,7 +8,6 @@ import { baby3D } from './game3D';
 
 export class PongGame {
     gameId?: number = 0;
-    // viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
     babylonGame?: baby3D;
@@ -19,12 +19,14 @@ export class PongGame {
     players: Player[] = [];
 
     gameState: GameState = {
-        gameId: this.gameId,
+        id: 0,
+        gameId: this.gameId!,
         players: [],
 		ballPosX: 200,
         ballPosY: getCurrentGameMode() === '4P' ? 200 : 100,
         mode: getCurrentGameMode(),
-        lastContact: 0
+        lastContact: 0,
+        lastActivity: ''
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
@@ -142,7 +144,7 @@ export class PongGame {
         
         const currentUser = authService.getCurrentUser();
         if (currentUser && currentUser.id)
-            this.playerId = parseInt(currentUser.id);
+            this.playerId = currentUser.id;
         
         try {
             const room = getCurrentRoom();
@@ -315,7 +317,7 @@ export class PongGame {
                 if (message.state) {
                     const s = message.state as any;
 
-                    this.gameState.ballPosX = s.ballPosX === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosX;
+                    this.gameState.ballPosX = s.ballPosX === undefined ? 200 : s.ballPosX;
                     this.gameState.ballPosY = s.ballPosY === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosY;
                     this.gameState.lastContact = s.lastContact === undefined ? 0 : s.lastContact;
 
@@ -407,6 +409,8 @@ export class PongGame {
             case 'ping':
                 console.log("pong");
                 break;
+            case 'pong':
+                break;
                 
             default:
                 console.log("Unknown WebSocket message:", message);
@@ -484,7 +488,7 @@ export class PongGame {
     sendPlayerMove(position: number): void {
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            if (this.playerId === undefined) this.playerId = 0;// TODO: why default to 1? -> this.playerId = 1; // Default to player 1 if unset
+            if (this.playerId === undefined) this.playerId = 1;// TODO: why default to 1? // Default to player 1 if unset
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: this.playerId,

@@ -1,19 +1,21 @@
+import { GameRoom } from '../../../shared/gameTypes';
+
 interface RoomWebSocketConfig {
-    roomId: string;
-    playerId: string;
-    onConnect?: () => void;
-    onDisconnect?: () => void;
-    onRoomState?: (room: any) => void;
-    onGameState?: (state: any) => void;
-    onPlayerMove?: (playerId: string, position: number) => void;
-    onPlayerReady?: (playerId: string, isReady: boolean) => void;
-    onPlayerDisconnected?: (playerId: string) => void;
-    onScore?: (scores: any) => void;
-    onGameStart?: (gameId: number) => void;
-    onCountdown?: () => void;
-    onGameEnd?: (data: { winnerId: string; winnerSeat?: string; winnerName?: string; players?: any[] }) => void;
-    onChat?: (message: any) => void;
-    onError?: (error: Error) => void;
+  roomId: string;
+  playerId: string;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onRoomState?: (room: GameRoom) => void;//TODO:MERGE room: any
+  onGameState?: (state: any) => void;
+  onPlayerMove?: (playerId: string, position: number) => void;
+  onPlayerReady?: (playerId: string, isReady: boolean) => void;
+  onPlayerDisconnected?: (playerId: string) => void;
+  onScore?: (scores: any) => void;
+  onGameStart?: (gameId: number) => void;
+  onCountdown?: () => void;
+  onGameEnd?: (data: { winnerId: string; winnerSeat?: string; winnerName?: string; players?: any[] }) => void;
+  onChat?: (message: any) => void;
+  onError?: (error: Error) => void;
 }
 
 export class RoomWebSocketManager {
@@ -153,6 +155,12 @@ export class RoomWebSocketManager {
             case 'playerDisconnected':
                 if (this.config.onPlayerDisconnected) {
                     this.config.onPlayerDisconnected(message.playerId);
+                }
+                break;
+
+            case 'playerJoined':
+                if (message.room && this.config.onRoomState) {
+                this.config.onRoomState(message.room);
                 }
                 break;
 

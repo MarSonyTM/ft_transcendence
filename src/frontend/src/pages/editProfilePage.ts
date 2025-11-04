@@ -3,14 +3,10 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { updateUserProfile, deleteUserAccount } from '../_api/user';
+import { CoreUser } from '../../../shared/gameTypes';
 
-interface UserProfile {
-    id: number;
-    username: string;
+interface UserProfile extends CoreUser {
     email?: string;
-    firstName: string;
-    lastName: string;
-    avatar?: string;
     gamesWon: number;
     gamesLost: number;
 }

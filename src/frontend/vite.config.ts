@@ -13,14 +13,7 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'terser',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          babylon: ['@babylonjs/core']
-        }
-      }
-    }
+    minify: 'terser'
   },
   server: {
     host: '0.0.0.0',

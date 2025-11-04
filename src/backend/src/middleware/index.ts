@@ -50,17 +50,18 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         return; // Allow public GET for leaderboard
     }
 
-    // Check prefix matches for public route patterns
-    const publicPrefixes = [
-        '/assets/',
-        '/api/room',     
-        '/api/game',        
-        '/game/',
-        '/room/',
-        '/join/',
-        '/verify-email',
-        '/resend-verification',
-    ];
+  // Check prefix matches for public route patterns
+  const publicPrefixes = [
+    '/assets/',
+    '/api/room/',
+    '/api/game/',
+    '/api/tournament/',
+    '/game/',
+    '/room/',
+    '/join/',
+    '/verify-email',
+    '/resend-verification',
+  ];
 
     if (publicPrefixes.some(prefix => url.startsWith(prefix))) {
         return;

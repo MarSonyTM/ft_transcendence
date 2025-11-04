@@ -4,12 +4,15 @@ import { broadcastGameStartToRoom, broadcastToRoom, broadcastCountdownToRoom } f
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
-import { GameState } from '../database/index';
+import { CoreGameState as GameState } from '../../../shared/gameTypes';
 
 interface CreateRoomBody {
-    hostId: string;
-    hostUsername: string;
-    maxPlayers?: number;
+  hostId: string;
+  hostUsername: string;
+  maxPlayers?: number;
+  isAi?: boolean;
+  difficulty?: string;
+  hostIsLocal?: boolean;
 }
 
 interface JoinRoomBody {
@@ -31,13 +34,13 @@ interface LeaveRoomBody {
 
 async function roomRoutes(fastify: FastifyInstance) {
   
-    // Create a new room
-    fastify.post('/api/room/create', async (
-            request: FastifyRequest<{ Body: CreateRoomBody }>, 
-            reply: FastifyReply
-        ) => {
-        try {
-            const { hostId, hostUsername, maxPlayers = 2 } = request.body;
+  // Create a new room
+  fastify.post('/api/room/create', async (
+    request: FastifyRequest<{ Body: CreateRoomBody }>, 
+    reply: FastifyReply
+  ) => {
+    try {
+      const { hostId, hostUsername, maxPlayers = 2, isAi, difficulty, hostIsLocal } = request.body;
 
             if (!hostId || !hostUsername) {
                 return reply.code(400).send({
@@ -46,7 +49,7 @@ async function roomRoutes(fastify: FastifyInstance) {
                 });
             }
 
-            const room = gameRoomManager.createRoom(hostId, hostUsername, maxPlayers);
+      const room = gameRoomManager.createRoom(hostId, hostUsername, maxPlayers, { isAi, hostIsLocal, difficulty });
 
             return reply.code(201).send({
                 success: true,
@@ -294,52 +297,67 @@ async function roomRoutes(fastify: FastifyInstance) {
             
                     console.log(`✅ Creating shared game ${gameId} for room ${roomId}`);
 
-                    const positions = gameMode === '4P' 
-                        ? ['left', 'top', 'right', 'bottom'] 
-                        : ['left', 'right'];
+          const positions = gameMode === '4P' 
+            ? ['left', 'top', 'right', 'bottom'] 
+            : ['left', 'right'];
+          
+          const players = room.players.map((roomPlayer, index) => {
+            let id: number;
+            const parsedId = parseInt(roomPlayer.playerId);
             
-                    const players = room.players.map((roomPlayer, index) => {
-                        let playerId: number;
-                        const parsedId = parseInt(roomPlayer.id);
+            if (!isNaN(parsedId) && parsedId > 0) {
+              id = parsedId;
               
-                        if (!isNaN(parsedId) && parsedId > 0) {
-                            playerId = parsedId;
-                
-                            try {
-                                const position = positions[index] || 'left';
-                                database.players.addPlayerToGame(gameId, playerId, position);
-                            } catch (err) {
-                                console.warn(`⚠️ Could not add player ${playerId} to database`);
-                            }
-                        } else {
-                            playerId = index + 1;
-                        }
-              
-                        return {
-                            id: playerId,
-                            name: roomPlayer.username,
-                            gameId: gameId,
-                            pos: gameMode === '4P' ? 160 : 70,
-                            material: null,
-                            color: { r: 1, g: 1, b: 1 },
-                            score: 0,
-                            connectionStatus: 'connected',
-                            lastActivity: new Date().toISOString()
-                        };
-                    });
+              try {
+                const position = positions[index] || 'left';
+                database.players.addPlayerToGame(gameId, id, position);
+              } catch (err) {
+                console.warn(`⚠️ Could not add player ${id} to database`);
+              }
+            } else {
+              id = index + 1;
+            }
+            
+            return {
+              id: id,
+              playerId: roomPlayer.playerId,
+              alias: roomPlayer.alias,
+              gameId: gameId,
+              pos: gameMode === '4P' ? 160 : 70,
+              material: null,
+              score: 0,
+              connectionStatus: 'connected',
+              lastActivity: new Date().toISOString()
+            };
+          });
 
-                    const initialGameState: GameState = {
-                        id: 0,
-                        gameId: gameId,
-                        players: players,
-                        ballPosX: 200,
-                        ballPosY: gameMode === '4P' ? 200 : 100,
-                        ballVelX: 0,
-                        ballVelY: 0,
-                        mode: gameMode,
-                        lastContact: 0,
-                        lastActivity: new Date().toISOString(),
-                    };
+          const initialGameState: GameState = {
+            id: 0,
+            gameId: gameId,
+            players: players.map(player => ({
+              id: player.id,
+              playerId: player.playerId,
+              alias: player.alias,
+              avatar: undefined,
+              material: null,
+              user: undefined,
+              isReady: false,
+              isAI: false,
+              isLocal: false,
+              gameId: gameId,
+              pos: player.pos,
+              score: player.score,
+              connectionStatus: player.connectionStatus,
+              lastActivity: new Date().toISOString()
+            })),
+            ballPosX: 200,
+            ballPosY: gameMode === '4P' ? 200 : 100,
+            ballVelX: 0,
+            ballVelY: 0,
+            mode: gameMode,
+            lastContact: 0,
+            lastActivity: new Date().toISOString(),
+          };
 
                     const gameEngine: BaseGameEngine = new BaseGameEngine(initialGameState);
 
@@ -376,13 +394,13 @@ async function roomRoutes(fastify: FastifyInstance) {
         }
     });
 
-    // End the current game and reset room to waiting for a fresh start
-    fastify.post('/api/room/:roomId/end', async (request, reply) => {
-        const { roomId } = request.params as { roomId: string };
-        const room = gameRoomManager.getRoom(roomId);
-        if (!room) {
-            return reply.status(404).send({ success: false, message: 'Room not found' });
-        }
+  // End the current game and reset room to waiting for a fresh start
+  fastify.post('/api/room/:roomId/end', async (request, reply) => {
+    const { roomId } = request.params as { roomId: string };
+    const room = gameRoomManager.getRoom(roomId);
+    if (!room) {
+      return reply.send({ success: true, message: 'Room already ended' });
+    }
 
         try {
             const gameId = room.gameId;

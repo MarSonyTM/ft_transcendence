@@ -4,8 +4,8 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
-import { toggleTournaments } from '../tournament';
+import { setGameScreen,  cleanupGame,  updateConnectionStatus, setEffectiveRoom, endGame, showGameEndScreen } from '../utils/gameUtils'
+import { CorePlayer as Player } from '../../../shared/gameTypes';
 
 export let pongGame: PongGame | null = null;
 
@@ -15,20 +15,24 @@ export async function render2PlayerGame(): Promise<void> {
     pongGame = new PongGame();
 
     if (room)
-        pongGame.hasLocal = room.players.some(p => p.id === 'local');
+        pongGame.hasLocal = room.players.some(p => p.playerId === 'local' || p.isLocal);
 
     const root = document.getElementById('app-root');
     if (!root) return;
     
     // Get players from lobby
     const lobbyPlayers = getLobbyPlayers();
-    const players = [
-        lobbyPlayers[0] || { username: 'Player 1', isAI: false },
-        lobbyPlayers[1] || { username: 'Player 2', isAI: false },
-    ];
     
     // Get authenticated user info for fallback
     const user = authService.getCurrentUser();
+    const player1Name = getPlayerName(0, lobbyPlayers);//TODO:MERGE test this
+    const player2Name = getPlayerName(1, lobbyPlayers);
+    
+    const players = [
+        // lobbyPlayers[0] || { username: user?.username || player1Name, isAI: false },//TODO:MERGE test this
+        lobbyPlayers[0] || { username: player1Name, isAI: false },//TODO:MERGE
+        lobbyPlayers[1] || { username: player2Name, isAI: false },//TODO:MERGE
+    ];
     
     root.innerHTML = `
         <h1 class="main-title">Pong Game</h1>
@@ -48,14 +52,13 @@ export async function render2PlayerGame(): Promise<void> {
             <button id="pauseBtn" class="btn btn-pause">Pause Game</button>
             <button id="endBtn" class="btn btn-end">End Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
-            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${players[0].username}</span>
+                <span id="player1Name" class="player1-name">${player1Name}</span>
                 <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">${players[1].username}</span>
+                <span id="player2Name" class="player2-name">${player2Name}</span>
             </div>
             <div class="score-container">
                 <span id="player1score" class="player1-score">0</span> 
@@ -67,14 +70,12 @@ export async function render2PlayerGame(): Promise<void> {
             <canvas id="renderCanvas"></canvas>
         </div>
         <div class="controls-info">
-            <p style="color: #60a5fa; font-weight: bold;">${players[0].username} W / S</p>
-            ${pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Local PLayer - O/L</p>' : ''}
+            <p style="color: #60a5fa; font-weight: bold;">${player1Name} W / S</p>
+            ${pongGame.hasLocal ? `<p style="color: #60a5fa; font-weight: bold;">${player2Name} - O/L</p>` : ''}
         </div>
-        <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
-        <hr>
-        <div id="tournamentRoot" class="t-section"></div>
+        <button id="backToLandingBtn" class="btn btn-back">${room?.roomId?.startsWith('tournament-') ? 'Back to Tournament' : 'Back to Home'}</button>
     `;
-    
+    //TODO:MERGE <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
     await setupGameButtons(pongGame);
 
     const backBtn = document.getElementById('backToLandingBtn');
@@ -84,8 +85,14 @@ export async function render2PlayerGame(): Promise<void> {
                 cleanupGame(pongGame);
                 endGame(pongGame);
             }
-            history.pushState({ page: 'landing' }, '', '/landing');
-            setCurrentPage('landing');
+            // If it's a tournament game, go back to tournament page
+            if (room?.roomId?.startsWith('tournament-')) {
+                history.pushState({ page: 'tournament' }, '', '/tournament');
+                setCurrentPage('tournament');
+            } else {
+                history.pushState({ page: 'landing' }, '', '/landing');
+                setCurrentPage('landing');
+            }
             renderApp();
         });
     }
@@ -93,6 +100,11 @@ export async function render2PlayerGame(): Promise<void> {
     if (pongGame && room) {
         await initRoomBasedGame(room);
     }
+}
+
+function getPlayerName(idx: number, lobbyPlayers: Player[]): string {
+    const userName = lobbyPlayers[idx].user ? lobbyPlayers[idx].user.username : lobbyPlayers[idx]?.alias ? lobbyPlayers[idx].alias : `Player ${idx + 1}`;
+    return userName;
 }
 
 async function setupGameButtons(pongGame: PongGame): Promise<void> {
@@ -115,7 +127,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const tournamentsBtn = document.getElementById('tournamentsBtn');
 
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
@@ -156,10 +167,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             }
         });
     }
-
-    if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', toggleTournaments);
-    }
 }
 
 // Initialize room-based multiplayer game
@@ -193,6 +200,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onConnect: () => {
             console.log('✅ Connected to 2-player game room');
+            updateConnectionStatus('Connected (Room)', true);
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
@@ -202,6 +210,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onDisconnect: () => {
             console.log('Disconnected from 2-player game room');
+            updateConnectionStatus('Disconnected', false);
         },
         
         onGameState: (state) => {

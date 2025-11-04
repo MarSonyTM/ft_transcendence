@@ -1,6 +1,7 @@
 import { PongGame } from "../game/PongGame";
-import { GameRoom, getCurrentRoom } from "./roomState";
-import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { GameRoom } from '../../../shared/gameTypes';
+import { getCurrentRoom } from "./roomState";
+import { disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from "./auth";
 import { baby3D } from "../game/game3D";
 
@@ -41,8 +42,8 @@ export function endGame(pongGame: PongGame) {
             // Room-based game
             const winner = room.players[winnerId - 1];
             if (winner) {
-                winnerIdStr = winner.id;
-                winnerNameStr = winner.username;
+                winnerIdStr = winner.playerId;
+                winnerNameStr = winner.alias;
             } else {
                 winnerIdStr = winnerId.toString();
                 winnerNameStr = `Player ${winnerId}`;
@@ -79,7 +80,7 @@ export function endGame(pongGame: PongGame) {
                 let didWin = false;
                 if (room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
-                    didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
+                    didWin = !!winnerPlayer && (winnerPlayer.playerId === user.username);
                 } else {
                     didWin = (winnerId === 1);
                 }
@@ -208,6 +209,15 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
     }, 4000);
 }
 
+// Update connection status
+export function updateConnectionStatus(status: string, isConnected: boolean): void {
+    const wsStatus = document.getElementById('wsStatus');
+    if (wsStatus) {
+        wsStatus.textContent = status;
+        wsStatus.style.color = isConnected ? '#34d399' : '#ef4444';
+    }
+}
+
 export async function setEffectiveRoom(): Promise<GameRoom | null> {
     let room = getCurrentRoom();
 
@@ -257,5 +267,46 @@ export async function setEffectiveRoom(): Promise<GameRoom | null> {
     
     // Return whatever we have, even if gameId is still missing
     return effectiveRoom || null;
+}
+
+export function setupRoomKeyboardControls(ws: RoomWebSocketManager, hasLocal: boolean): () => void {
+    const keys: { [key: string]: boolean } = {};
+    const movementKeys = new Set<string>(['w', 's', 'o', 'l']);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        const wasPressed = keys[key];
+        keys[key] = true;
+        if (!wasPressed && movementKeys.has(key)) {
+            e.preventDefault();
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, true, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, true, false);
+            }
+        }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        keys[key] = false;
+        if (movementKeys.has(key)) {
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, false, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, false, false);
+            }
+        }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+    };
 }
 

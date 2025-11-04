@@ -1,3 +1,5 @@
+import { User as UserProfile } from '../../../backend/src/database';
+
 const getApiUrl = () => window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 const API_URL = getApiUrl();
 
@@ -6,18 +8,6 @@ interface DecodedToken {
     email: string;
     username: string;
     exp: number;
-}
-
-interface UserProfile {
-    id: string;
-    username: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    avatar?: string;
-    googleId?: string;
-    gamesWon: number;
-    gamesLost: number;
 }
 
 export class AuthService {

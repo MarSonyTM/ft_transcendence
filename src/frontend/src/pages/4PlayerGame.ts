@@ -4,8 +4,8 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
-import { toggleTournaments } from '../tournament';
+import { setGameScreen, endGame, cleanupGame,  updateConnectionStatus, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils';
+import { CorePlayer as Player } from '../../../shared/gameTypes';
 
 export let pongGame: PongGame | null = null;
 
@@ -15,7 +15,7 @@ export async function render4PlayerGame(): Promise<void> {
     pongGame = new PongGame();
 
     if (room) {
-        pongGame.hasLocal = room.players.some(p => p.id === 'local');
+        pongGame.hasLocal = room.players.some(p => p.playerId === 'local' || p.isLocal);
     }
     
     const root = document.getElementById('app-root');
@@ -23,11 +23,15 @@ export async function render4PlayerGame(): Promise<void> {
     
     // Get players from lobby
     const lobbyPlayers = getLobbyPlayers();
+    const player1Name = getPlayerName(0, lobbyPlayers);
+    const player2Name = getPlayerName(1, lobbyPlayers);
+    const player3Name = getPlayerName(2, lobbyPlayers);
+    const player4Name = getPlayerName(3, lobbyPlayers);
     const players = [
-        lobbyPlayers[0] || { username: 'Player 1', isAI: false },
-        lobbyPlayers[1] || { username: 'Player 2', isAI: false },
-        lobbyPlayers[2] || { username: 'Player 3', isAI: false },
-        lobbyPlayers[3] || { username: 'Player 4', isAI: false }
+        lobbyPlayers[0] || { username: player1Name, isAI: false },
+        lobbyPlayers[1] || { username: player2Name, isAI: false },
+        lobbyPlayers[2] || { username: player3Name, isAI: false },
+        lobbyPlayers[3] || { username: player4Name, isAI: false }
     ];
 
     // Get authenticated user info for fallback
@@ -51,17 +55,16 @@ export async function render4PlayerGame(): Promise<void> {
             <button id="pauseBtn" class="btn btn-pause">Pause Game</button>
             <button id="endBtn" class="btn btn-end">End Game</button>
             <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
-            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
         </div>
         
         <div class="player-info">
-            <span id="player1Name" class="player1-name">${players[0].username}</span>
+            <span id="player1Name" class="player1-name">${player1Name}</span>
             <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">${players[1].username}</span>
+            <span id="player2Name" class="player2-name">${player2Name}</span>
             <span class="vs-text">vs</span> 
-            <span id="player3Name" class="player3-name">${players[2].username}</span>
+            <span id="player3Name" class="player3-name">${player3Name}</span>
             <span class="vs-text">vs</span> 
-            <span id="player4Name" class="player4-name">${players[3].username}</span>
+            <span id="player4Name" class="player4-name">${player4Name}</span>
         </div>
         <div class="score-container">
             <span id="player1score" class="player1-score">0</span> 
@@ -77,12 +80,10 @@ export async function render4PlayerGame(): Promise<void> {
         </div>
         <div class="controls-info" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 5px; margin-top: 15px;">
             <p style="color: #60a5fa; font-weight: bold;">W / S</p>
-            ${!pongGame.hasLocal ? '<p style="color: #19d81cff; font-weight: bold;">Player 2 - Up/Down</p>' : ''}
+            ${!pongGame.hasLocal ? `<p style="color: #19d81cff; font-weight: bold;">${player2Name} - O/L</p>` : ''}
             <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
         </div>
         <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
-        <hr>
-        <div id="tournamentRoot" class="t-section"></div>
     `;
     
      
@@ -106,6 +107,11 @@ export async function render4PlayerGame(): Promise<void> {
     }
 }
 
+function getPlayerName(idx: number, lobbyPlayers: Player[]): string {
+    const userName = lobbyPlayers[idx].user ? lobbyPlayers[idx].user.username : lobbyPlayers[idx]?.alias ? lobbyPlayers[idx].alias : `Player ${idx + 1}`;
+    return userName;
+}
+
 async function setupGameButtons(pongGame: PongGame): Promise<void> {   
     
     let effectiveRoom = await setEffectiveRoom();
@@ -126,7 +132,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const tournamentsBtn = document.getElementById('tournamentsBtn');
 
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
@@ -167,10 +172,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             }
         });
     }
-
-    if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', toggleTournaments);
-    }
 }
 
 // Initialize room-based multiplayer game
@@ -203,6 +204,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onConnect: () => {
             console.log('✅ Connected to 4-player game room');
+            updateConnectionStatus('Connected (Room)', true);
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
@@ -212,6 +214,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         
         onDisconnect: () => {
             console.log('Disconnected from 4-player game room');
+            updateConnectionStatus('Disconnected', false);
         },
         
         onGameState: (state) => {

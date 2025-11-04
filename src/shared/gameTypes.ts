@@ -1,44 +1,68 @@
-export interface RGBColor {
-  r: number;
-  g: number;
-  b: number;
-}
-
-// Core player data structure
-export interface Player {
+//CORE USER
+export interface CoreUser {
   id: number;
-  name?: string; // Optional player name
-  gameId?: number;
-  pos: number; // Paddle position
-  score: number;
-  connectionStatus?: string;
-  lastActivity?: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  avatar: string | undefined;
 }
 
-// Core game state structure
-export interface GameState {
+//CORE PLAYER
+export interface CorePlayer {
+  id: number;
+  playerId: string;
+  alias: string;
+  avatar: string | undefined;
   gameId?: number;
-  players: Player[];
+  user: CoreUser | undefined;
+  pos: number;
+  score: number;
+  isReady: boolean;
+  isAI: boolean;
+  difficulty?: string;
+  isLocal: boolean;
+  socketId?: string;
+  connectionStatus: string;
+  lastActivity: string;
+}
+
+//CORE GAMEROOM
+export interface GameRoom {
+  roomId: string;
+  hostId: string;
+  players: CorePlayer[];
+  maxPlayers: number;
+  status: 'waiting' | 'playing' | 'finished';
+  gameId?: number;
+  createdAt: Date;
+}
+
+//CORE GAMESTATE
+export interface CoreGameState {
+  id: number;
+  gameId: number;
+  players: CorePlayer[];
   ballPosX: number;
   ballPosY: number;
   ballVelX?: number;
   ballVelY?: number;
-  mode: '2P' | '4P' | string;
+  mode: string;
   lastContact: number;
+  lastActivity: string;
 }
 
 // WebSocket message structure
 export interface WebSocketMessage {
   type: string;
   gameId?: number;
-  state?: GameState;
+  state?: CoreGameState;
   message?: string | null;
   winner?: number;
   winnerName?: string | null;
   winnerSeat?: string;
   winnerUiNumber?: number;
   mode?: string;
-  players?: Player[];
+  players?: CorePlayer[];
   finalScores?: Array<{
     playerId: number;
     score: number;

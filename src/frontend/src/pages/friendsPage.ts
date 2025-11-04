@@ -1,12 +1,8 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { CoreUser } from '../../../shared/gameTypes';
 
-interface User {
-  id: number;
-  username: string;
-  firstName: string;
-  lastName: string;
-  avatar: string;
+interface User extends CoreUser {
   friendshipStatus?: string | null;
 }
 

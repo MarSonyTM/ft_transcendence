@@ -1,8 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { database, Game, Player } from '../database/index';
-import { createGameEngine } from '../game/gameEngine';
+import { database, Game } from '../database/index';
+import { CorePlayer as Player } from '../../../shared/gameTypes';
 import type { BaseGameEngine } from '../game/gameEngine';
-
 import { JWT_SECRET } from '../config/index';
 import jwt from 'jsonwebtoken';
 
@@ -296,25 +295,27 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             
             // Get authenticated user ID from JWT token
             const userId = getUserIdFromRequest(request);
+            const user = userId ? database.users.getUserById(userId) : null;
             
             // Create the game
             const newGame = database.games.createGame(gameData);
             
             // If user is authenticated, create game state with their ID
-            if (userId) {
+            if (user) {
                 try {
                     const gameStateData = {
                         gameId: newGame.id,
                         ballPosX: 200,
-                        ballPosY: 100,
+                        ballPosY: gameData.mode === '4P' ? 200 : 100,
                         ballVelX: 0,
                         ballVelY: 0,
                         players: [{
                             id: 0,
-                            name: `${userId}`, // Placeholder, replace with actual user name if available
+                            alias: user.username,
                             gameId: newGame.id,
                             pos: 0,
                             score: 0,
+                            user: user,
                             connectionStatus: 'connected',
                             lastActivity: new Date().toISOString()
                         }],
@@ -603,7 +604,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     return;
                 }
             }
-            
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
@@ -748,30 +748,35 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     if (currentState && currentState.players) {
                         console.log(`📝 Getting ${currentState.players.length} players from game engine`);
                         
-                        gamePlayers = currentState.players.map((player: any, index: number) => {
+                        gamePlayers = currentState.players.map((player: Player, index: number) => {
                             let actualUserId = index + 1; // Fallback
                             
-                            if (player.username) {
+                            if (player.alias) {
                                 const userByUsername = database.users.getAllUsers().find(
-                                    u => u.username === player.username
+                                    u => u.username === player.alias
                                 );
                                 if (userByUsername) {
                                     actualUserId = userByUsername.id;
-                                    console.log(`   ✅ Found ${player.username} = user ID ${actualUserId}`);
+                                    console.log(`   ✅ Found ${player.alias} = user ID ${actualUserId}`);
                                 }
                             }
                             
                             return {
-                                id: actualUserId,
+                                id: actualUserId,// Use the REAL user ID from database
                                 gameId: gameId,
-                                playerId: actualUserId, // Use the REAL user ID from database
+                                playerId: player.playerId,
                                 playerPosition: index === 0 ? 'left' : 'right',
                                 score: player.score || 0,
                                 connectionStatus: 'connected',
                                 lastActivity: new Date().toISOString(),
                                 pos: player.pos || 0,
-                                color: player.color || { r: 255, g: 255, b: 255 },
-                                name: player.name || player.username
+                                alias: player.alias || `Player ${actualUserId}`,
+                                avatar: player.avatar || undefined,
+                                isAI: player.isAI || false,
+                                isLocal: player.isLocal || false,
+                                difficulty: player.difficulty || undefined,
+                                user: database.users.getUserById(actualUserId) || undefined,
+                                isReady: player.isReady || false
                             };
                         });
                     } else {
