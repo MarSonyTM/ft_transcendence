@@ -1,3 +1,5 @@
+import { presenceService } from './presenceService';
+
 const getApiUrl = () => window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 const API_URL = getApiUrl();
 
@@ -94,40 +96,27 @@ export class AuthService {
     
     // Fetch user profile from backend
     async fetchUserProfile(): Promise<UserProfile | null> {
-
-        if (localStorage.getItem('isGuest')) {
-            const guestStr = localStorage.getItem('currentUser');
-            let guest = null;
-
-            if (guestStr) {
-                try {
-                    guest = JSON.parse(guestStr);
-                } catch (e) {
-                    console.error('Failed to parse guest user:', e);
-                }
-            }
-            return guest;
-        }
         const token = this.getToken();
-        if (!token)
-            return null;
-
+        if (!token) return null;
+    
         try {
+            console.log('🔄 Fetching user profile from API...');
             const response = await fetch(`${API_URL}/api/users/profile`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
-
+    
             if (!response.ok) {
                 if (response.status === 401) {
-                    this.logout();
+                    await this.logout();
                 }
-            throw new Error('Failed to fetch user profile');
+                throw new Error('Failed to fetch user profile');
             }
-
+    
             const data = await response.json();
+            
             this.currentUser = data.data;
         
             // Store in localStorage for quick access
@@ -167,11 +156,35 @@ export class AuthService {
     }
 
     // Logout user
-    logout(): void {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('isGuest');
-        this.currentUser = null;
+    async logout(): Promise<void> {
+        try {
+            const isGuest = localStorage.getItem('isGuest') === 'true';
+            
+            if (isGuest) {
+                const authHeader = this.getAuthHeader();
+                if (authHeader) {
+                    try {
+                        const apiUrl = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+                        const response = await fetch(`${apiUrl}/api/users/me`, {
+                            method: 'DELETE',
+                            headers: authHeader
+                        });
+                        
+                        if (response.ok) {
+                            console.log('✅ Guest user deleted from database');
+                        }
+                    } catch (error) {
+                        console.error('❌ Error deleting guest user:', error);
+                    }
+                }
+            }
+        } finally {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isGuest');
+            this.currentUser = null;
+            presenceService.stopHeartbeat();
+        }
     }
 
     // Helper: authorization header for authenticated requests

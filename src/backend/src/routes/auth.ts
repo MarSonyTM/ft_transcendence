@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 import { database, User } from '../database/index';
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
@@ -6,6 +6,7 @@ import {JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 import { sendVerificationEmail } from '../config/email';
+import { presenceManager } from '../presence/presenceManager';
 
 // Types
 export interface CreateUserInput {
@@ -642,6 +643,61 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 		});
 	}
 	});
+
+    fastify.post('/presence/heartbeat', async (request: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const token = request.headers.authorization?.replace('Bearer ', '');
+            if (!token) {
+                return reply.code(401).send({ success: false });
+            }
+            const decoded = jwt.verify(token, JWT_SECRET!) as any;
+            if (!decoded || !decoded.id) {
+                return reply.code(401).send({ success: false });
+            }
+            presenceManager.updateHeartbeat(decoded.id, decoded.username || 'Unknown');
+            reply.code(200).send({ success: true });
+        } catch (error) {
+            reply.code(401).send({ success: false });
+        }
+    });
+
+    // Get specific user presence
+    fastify.get('/presence/user/:userId', async (request: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+        try {
+            const token = request.headers.authorization?.replace('Bearer ', '');
+            if (!token) return reply.code(401).send({ success: false });
+            jwt.verify(token, JWT_SECRET!);
+            
+            const userId = parseInt(request.params.userId);
+            const presence = presenceManager.getUserPresence(userId);
+            if (!presence) return reply.code(404).send({ success: false });
+            reply.code(200).send({ success: true, data: presence });
+        } catch (error) {
+            reply.code(401).send({ success: false });
+        }
+    });
+
+    // Get batch presence
+    fastify.post('/presence/batch', async (request: FastifyRequest<{ Body: { userIds: number[] } }>, reply: FastifyReply) => {
+        try {
+            const token = request.headers.authorization?.replace('Bearer ', '');
+            if (!token) return reply.code(401).send({ success: false });
+            jwt.verify(token, JWT_SECRET!);
+
+            const { userIds } = request.body;
+            if (!Array.isArray(userIds)) {
+                return reply.code(400).send({ success: false });
+            }
+            const presences = presenceManager.getMultiplePresences(userIds);
+            const result: Record<number, any> = {};
+            presences.forEach((presence, userId) => {
+                result[userId] = presence;
+            });
+            reply.code(200).send({ success: true, data: result });
+        } catch (error) {
+            reply.code(401).send({ success: false });
+        }
+    });
 
 }
 

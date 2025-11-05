@@ -6,6 +6,8 @@ export interface UpdateUserProfileData {
     lastName?: string;
     email?: string;
     avatar?: string;
+    gamesWon?: number;
+    gamesLost?: number;
 }
 
 export interface UpdateUserProfileResult {

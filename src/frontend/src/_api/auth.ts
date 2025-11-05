@@ -1,4 +1,5 @@
 import { setAccessToken, getAccessToken } from '../utils/api';
+import { presenceService } from '../utils/presenceService';
 import { API_BASE } from '../config';
 
 interface RegisterResult {
@@ -22,6 +23,7 @@ export async function loginUser(username: string, password: string): Promise<{ s
 		if (data?.data && !data.data.emailVerified) {
 			localStorage.setItem('pendingEmailVerification', data.data.email || '');
 		}
+        presenceService.startHeartbeat();
         return {
             success: data.success || false,
             username: data.data?.username,

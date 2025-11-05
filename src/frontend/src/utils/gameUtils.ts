@@ -103,9 +103,11 @@ export function endGame(pongGame: PongGame) {
                         const errorText = await statsResponse.text();
                         console.error('❌ Failed to update stats:', statsResponse.status, errorText);
                     } else {
-                        console.log('✅ Stats updated successfully');
-                        // Refresh user profile to get updated stats
-                        await authService.fetchUserProfile?.();
+                        console.log('✅ Stats updated successfully from frontend');
+                        if (authService.fetchUserProfile) {
+                            await authService.fetchUserProfile();
+                            console.log('✅ Profile refreshed');
+                        }
                     }
                 } catch (e) {
                     console.error('❌ Error updating user stats:', e);

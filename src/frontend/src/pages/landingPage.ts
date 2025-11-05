@@ -1,6 +1,8 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
+import { registerUser } from '../_api/auth.ts';
+import { updateUserProfile } from '../_api/user';
 
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -18,11 +20,13 @@ export async function renderLandingPage(): Promise<void> {
     }
     else {
         await authService.fetchUserProfile();
+        const isGuest = localStorage.getItem("isGuest");
         
         root.innerHTML = `
         <div class="landing-container">
         <h1 class="main-title">PING PONG</h1>
         <button id="profileBtn" class="btn btn-profile">Profile</button>
+        ${isGuest ? '<button id="createBtn" class="btn btn-profile">Create Account</button>': ''}
         <button id="leaderboardBtn" class="btn btn-profile">Leaderboard</button>
         <button id="playBtn" class="btn btn-play">Play</button>
         </div>
@@ -74,6 +78,14 @@ export async function renderLandingPage(): Promise<void> {
         });
     }
 
+    const createBtn = document.getElementById('createBtn');
+    if (createBtn) {
+        createBtn.addEventListener('click', () => {
+            saveAccount();
+            renderApp();
+        });
+    }
+
     const leaderboardBtn = document.getElementById('leaderboardBtn');
     if (leaderboardBtn) {
         leaderboardBtn.addEventListener('click', () => {
@@ -81,5 +93,37 @@ export async function renderLandingPage(): Promise<void> {
             setCurrentPage('leaderboard');
             renderApp();
         });
+    }
+
+    async function saveAccount() {
+        let email = prompt('Enter email address');
+        let emailConfirm = prompt('Confirm email address');
+        if (email == emailConfirm) {
+
+            let password = prompt('Enter password');
+            let passwordConfirm = prompt('Confirm password');
+            if (password == passwordConfirm) {
+                const user =  await authService.fetchUserProfile();
+                if (user && password) {
+                    user.gamesWon
+                    const result = await registerUser(
+	    			    user.username,
+		    		    password,
+			    	    user.firstName || 'Guest',
+				        user.lastName || 'User',
+				        email || undefined,
+				        user.avatar || undefined
+			        );              
+                    if (result.success) {
+                        updateUserProfile( {
+                            gamesWon: user.gamesWon,
+                            gamesLost: user.gamesLost
+                        });
+                        await authService.logout();
+                    }
+                }
+            }
+            alert('Account Created\nPlease verify email then update your details'); 
+        }
     }
 }

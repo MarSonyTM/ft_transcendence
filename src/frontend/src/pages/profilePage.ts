@@ -7,7 +7,8 @@ export async function renderProfilePage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
-    // Show loading state
+    const isGuest = localStorage.getItem('isGuest') === 'true';
+
     root.innerHTML = `
         <div class="profile-container">
             <div class="profile-card">
@@ -17,11 +18,9 @@ export async function renderProfilePage(): Promise<void> {
         </div>
     `;
 
-    const isGuest = localStorage.getItem('isGuest') === 'true';
-    
-    // Fetch fresh user data from server (not cached!)
-    const user = isGuest ? authService.getCurrentUser() : await authService.fetchUserProfile();
-    
+    console.log('🔄 Fetching fresh profile data...');
+    const user = await authService.fetchUserProfile();
+
     if (!user) {
         root.innerHTML = `
             <div class="profile-container">
@@ -50,9 +49,9 @@ export async function renderProfilePage(): Promise<void> {
         firstName: user.firstName || 'Guest',
         lastName: user.lastName || 'User',
         avatar: user.avatar || undefined,
-        gamesPlayed: 0,
-        gamesWon: 0,
-        gamesLost: 0
+        gamesPlayed: (user.gamesWon || 0) + (user.gamesLost || 0),
+        gamesWon: user.gamesWon || 0,
+        gamesLost: user.gamesLost || 0
     } : {
         username: user!.username,
         email: user!.email,
@@ -152,11 +151,11 @@ export async function renderProfilePage(): Promise<void> {
 
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            authService.logout();
+        logoutBtn.addEventListener('click', async () => {
+            await authService.logout();
             history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();
-        });
-    }
+        }); 
+    }    
 }

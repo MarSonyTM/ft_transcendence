@@ -2,6 +2,7 @@ import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
+import { presenceService } from '../utils/presenceService';
 import { 
   Player, 
   GameRoom, 

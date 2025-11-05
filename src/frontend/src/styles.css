@@ -314,20 +314,7 @@ h3 {
   margin: 0 1rem; /* mx-4 */
 }
 
-/* Game canvas */
-/* #gameScreen {
-  border: 2px solid rgb(255 255 255);
-  background-color: rgb(17 24 39);
-  margin-bottom: 1.5rem;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
-  will-change: transform;
-  transform: translateZ(0);
-} */
+
 
 /* Controls info */
 .controls-info {
