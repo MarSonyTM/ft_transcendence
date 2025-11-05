@@ -18,27 +18,34 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { authService } from './utils/auth';
+import { renderStartPage } from './pages/startPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-const publicPages = ['/', '/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
 
 // Centralized routing handler
-function handleRouting(): void {
+async function handleRouting(): Promise<void> {
   const path = window.location.pathname;
 
+
   if (!publicPages.includes(path)) {
-    const authToken = localStorage.getItem('authToken');
+    await authService.whenReady(); 
+    const user = await authService.getCurrentUser();
     
-    if (!authToken) {
-      history.pushState({ page: 'login' }, '', '/login');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    if (!user) {
+      console.log('User not authenticated, redirecting to login');
+      if (path !== '/login') {
+        history.pushState({ page: 'login' }, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
       return;
     }
     
-    const needsVerification = localStorage.getItem('needEmailVerification');
-    if (needsVerification === 'true') {
+    const needsVerification = authService.isEmailVerificationNeeded();
+    if (needsVerification) {
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
@@ -106,6 +113,9 @@ function handleRouting(): void {
     case '/leaderboard':
       setCurrentPage('leaderboard');
       break; 
+    case '/ping-pong':
+      setCurrentPage('pingPong');
+      break;
     default:
       setCurrentPage('landing');
   }
@@ -133,7 +143,7 @@ export async function renderApp(): Promise<void> {
       renderRegisterPage();
       break;
     case 'authCallback':
-      renderAuthCallbackPage();
+      await renderAuthCallbackPage();
       break;
     case 'join':
       if (currentRoomId) {
@@ -182,6 +192,9 @@ export async function renderApp(): Promise<void> {
     case 'leaderboard':
       renderLeaderboardPage();
       break; 
+    case 'pingPong':
+      renderStartPage();
+      break;
     default:
       renderLandingPage();
   }

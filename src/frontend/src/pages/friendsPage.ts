@@ -1,5 +1,6 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { authService } from '../utils/auth';
 
 interface User {
   id: number;
@@ -102,9 +103,7 @@ async function loadFriends() {
   try {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/list`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -127,9 +126,7 @@ async function loadPendingRequests() {
   try {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -158,9 +155,7 @@ async function searchUsers(query: string) {
   try {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/search?q=${encodeURIComponent(query)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -181,9 +176,9 @@ async function sendFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/request`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       },
       body: JSON.stringify({ friendId })
     });
@@ -210,9 +205,7 @@ async function acceptFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/accept/${friendId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -233,9 +226,7 @@ async function rejectFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/reject/${friendId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -259,9 +250,7 @@ async function removeFriend(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/${friendId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -281,9 +270,9 @@ async function inviteToGame(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/invitations/send`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       },
       body: JSON.stringify({ 
         friendId,
@@ -453,9 +442,7 @@ async function loadInvitations() {
   try {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/invitations/pending`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -523,9 +510,7 @@ async function acceptInvitation(invitationId: number, roomId: string) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/invitations/accept/${invitationId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -547,9 +532,7 @@ async function rejectInvitation(invitationId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/invitations/reject/${invitationId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();

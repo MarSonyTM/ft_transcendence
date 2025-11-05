@@ -290,7 +290,7 @@ async function handleAccountDeletion(): Promise<void> {
         
         if (result.success) {
             // Logout and redirect to landing page
-            authService.logout();
+            await authService.logout();
             history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();

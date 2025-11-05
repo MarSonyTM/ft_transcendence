@@ -83,18 +83,12 @@ export function endGame(pongGame: PongGame) {
                 } else {
                     didWin = (winnerId === 1);
                 }
-                try {
-                    const authHeader = authService.getAuthHeader?.();
-                    if (!authHeader) {
-                        console.warn('⚠️ No auth token available, skipping stats update');
-                        return;
-                    }
-                
+                try {                
                     const statsResponse = await fetch(`${apiEndpoint}/api/users/stats`, {
                         method: 'POST',
+                        credentials: 'include',
                         headers: { 
                             'Content-Type': 'application/json', 
-                            ...authHeader  // FIXED: Properly include auth token
                         },
                         body: JSON.stringify({ won: didWin })
                     });

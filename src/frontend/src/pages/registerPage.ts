@@ -1,5 +1,6 @@
 import { registerUser } from '../_api/auth';
 import { validateEmail } from '../utils/validateEmail';
+import { authService } from '../utils/auth';
 
 
 
@@ -108,8 +109,8 @@ export default function renderRegisterPage(): void {
 				setSuccess('Account created! Please check your email for verification...');
 				// Store email for verification page
 				if (email) {
-					localStorage.setItem('needEmailVerification', 'true');
-					localStorage.setItem('pendingEmailVerification', email);
+					authService.setNeededEmailVerification(true);
+					authService.setPendingEmailVerification(email);
 				}
 				setTimeout(() => {
 					history.pushState({ page: 'verifyEmail' }, '', '/verify-email');

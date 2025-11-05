@@ -1,6 +1,7 @@
 import { setCurrentUser } from '../utils/globalState';
 import { createGuestUser } from '../_api/auth';
 import { updateUserProfile } from '../_api/user';
+import { authService } from '../utils/auth';
 
 export function renderTempLoginPage(): void {
   const root = document.getElementById('app-root');
@@ -55,10 +56,7 @@ export function renderTempLoginPage(): void {
       const username = usernameInput.value.trim() || undefined;
       const result = await createGuestUser(username);
 
-      if (result.success && result.token) {
-        // Store the token
-        localStorage.setItem('authToken', result.token);
-        
+      if (result.success && result.token) {        
         // Mark as guest user
         localStorage.setItem('isGuest', 'true');
 

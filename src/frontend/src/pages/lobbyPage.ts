@@ -75,12 +75,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   const gameMode = getCurrentGameMode();
   const maxPlayers = gameMode === '2P' ? 2 : 4;
 
-  const token = authService.getToken();
   const response = await fetch('/api/room/create', {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       hostId: userId,
@@ -116,12 +115,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
   console.log('[JOIN] Joining room:', roomId);
   
-  const token = authService.getToken();
   const response = await fetch(`/api/room/${roomId}/join`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       playerId: userId,
@@ -182,12 +180,11 @@ async function startGame(): Promise<void> {
   console.log('Starting game for room:', currentRoom.roomId);
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ 
         hostId: currentUserId
@@ -628,12 +625,11 @@ async function toggleReady(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/ready`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });
@@ -665,12 +661,11 @@ async function addAIOpponent(): Promise<void> {
   console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: aiId,
@@ -716,12 +711,11 @@ async function addLocalPlayer(): Promise<void> {
   }
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: localId,
@@ -750,12 +744,11 @@ async function removePlayer(playerId: string): Promise<void> {
   if (!currentRoom) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId })
     });
@@ -773,12 +766,11 @@ async function leaveRoom(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });
