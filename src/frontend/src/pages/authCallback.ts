@@ -1,18 +1,17 @@
 import { authService } from "../utils/auth";
 
-export default function renderAuthCallbackPage(): void {
+export default  async function renderAuthCallbackPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
     const success = urlParams.get('success');
     const error = urlParams.get('error');
     const email = urlParams.get('email');
     const needEmailVerification = urlParams.get('needEmailVerification');
 
-    if (success === 'true' && token) {
+    if (success === 'true') {
         authService.setPendingEmailVerification(email || '');
         if (needEmailVerification === 'true') {
             authService.setNeededEmailVerification(true);
@@ -30,6 +29,9 @@ export default function renderAuthCallbackPage(): void {
                 }
             </style>
         `;
+
+        await authService.fetchUserProfile();
+
         
         // Redirect to dashboard after short delay
         console.log("it logged in")

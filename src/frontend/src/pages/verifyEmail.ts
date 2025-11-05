@@ -9,7 +9,8 @@ export async function renderVerifyEmailPage(): Promise<void> {
 
     // Get email from URL parameters or localStorage
     const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get('email') || authService.getPendingEmailVerification() || '';
+    const email = urlParams.get('email') || null;
+    authService.setPendingEmailVerification(email);
     if (!email || email.length === 0 || email === 'null' || email === 'undefined') {
         authService.setPendingEmailVerification(null);
         authService.setNeededEmailVerification(false);

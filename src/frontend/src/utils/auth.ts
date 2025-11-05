@@ -1,3 +1,6 @@
+import { publicPages, renderApp } from "../main";
+import { setCurrentPage } from "./globalState";
+
 const getApiUrl = () =>
   window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
 const API_URL = getApiUrl();
@@ -107,6 +110,11 @@ export class AuthService {
       return guest;
     }
 
+    const path = window.location.pathname;
+    if (publicPages.includes(path)) {
+      return null;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
       credentials: "include",
@@ -115,22 +123,23 @@ export class AuthService {
         },
       });
 
+
       if (!response.ok) {
         if (response.status === 401) {
-          this.logout();
+          await this.logout();
+        } else if (response.status === 403) {
+          this.neededEmailVerification = true;
+          const data1 = await response.json();
+          console.log('Redirecting to verify email:', data1.redirectUrl);
+          window.location.href = data1.redirectUrl;
         }
         throw new Error("Failed to fetch user profile");
       }
 
       const data = await response.json();
       this.currentUser = data.data;
-
-      // Store in localStorage for quick access
-      //localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-
       return this.currentUser;
     } catch (error) {
-      console.error("Error fetching user profile:", error);
       return null;
     }
   }
@@ -140,32 +149,7 @@ export class AuthService {
     if (this.currentUser) {
       return this.currentUser;
     }
-
-    // Try to get from localStorage
-    const stored = await fetch(`${API_URL}/api/users/current`, {
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    if (!stored) {
-      return null;
-    }
-
-    const storedData = await stored.json();
-    if (!storedData.success) {
-      return null;
-    }
-    if (storedData.data) {
-      try {
-        this.currentUser = storedData.data;
-        return this.currentUser;
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
+    return await this.fetchUserProfile();
   }
 
   // Check if user is authenticated
@@ -184,6 +168,9 @@ export class AuthService {
       console.error("Error during logout:", error);
     }
     this.currentUser = null;
+    setCurrentPage('pingPong');
+    await renderApp();
+    history.pushState({ page: 'pingPong' }, '', '/ping-pong');
     localStorage.removeItem("isGuest");
   }
 

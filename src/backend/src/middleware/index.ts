@@ -25,6 +25,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/ping',
         '/api',
         '/api/auth/verify-email',
+        '/api/auth/logout',
         '/api/auth/resend-verification',
         
         // Auth endpoints
@@ -59,6 +60,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/room/',
         '/join/',
         '/verify-email',
+        '/logout',
         '/resend-verification',
     ];
 

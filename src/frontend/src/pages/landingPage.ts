@@ -10,18 +10,11 @@ export async function renderLandingPage(): Promise<void> {
     // to avoid briefly showing guest/login UI when a valid session exists.
     await authService.whenReady();
 
-    if (!authService.isAuthenticated()) {
-        root.innerHTML = `
-        <div class="landing-container">
-            <h1 class="main-title">PING PONG</h1>
-            <button id="loginBtn" class="btn btn-login">Login</button>
-            <button id="registerBtn" class="btn btn-register">Register</button>
-            <button id="guestBtn" class="btn btn-register">Play as Guest</button>
-        </div>
-        `;
-    }
-    else {
-        await authService.fetchUserProfile();
+
+        const res = await authService.fetchUserProfile();
+        if (!res) {
+            return;
+        }
         
         root.innerHTML = `
         <div class="landing-container">
@@ -31,34 +24,6 @@ export async function renderLandingPage(): Promise<void> {
         <button id="playBtn" class="btn btn-play">Play</button>
         </div>
         `;
-    }
-    
-    const loginBtn = document.getElementById('loginBtn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-            history.pushState({ page: 'login' }, '', '/login');
-            setCurrentPage('login');
-            renderApp();
-        });
-    }
-    
-    const registerBtn = document.getElementById('registerBtn');
-    if (registerBtn) {
-        registerBtn.addEventListener('click', () => {
-            history.pushState({ page: 'register' }, '', '/register');
-            setCurrentPage('register');
-            renderApp();
-        });
-    }
-
-    const guestBtn = document.getElementById('guestBtn');
-    if (guestBtn) {
-        guestBtn.addEventListener('click', () => {
-            history.pushState({ page: 'tempLogin' }, '', '/tempLogin');
-            setCurrentPage('tempLogin');
-            renderApp();
-        });
-    }
     
     const playBtn = document.getElementById('playBtn');
     if (playBtn) {

@@ -505,7 +505,7 @@ async function userRoutes(
 
       reply.setCookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
         sameSite: "lax",
         path: "/",
         maxAge: 7 * 24 * 60 * 60, // 1 week
@@ -622,6 +622,14 @@ async function userRoutes(
         { expiresIn: "1w" }
       );
 
+      reply.setCookie("token", jwtToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 1 week
+      });
+
       reply.code(200).send({
         success: true,
         message: "Google authentication successful",
@@ -675,6 +683,15 @@ async function userRoutes(
         JWT_SECRET,
         { expiresIn: "24h" }
       );
+
+
+      reply.setCookie("token", token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 24 * 60 * 60, // 24 hours
+      });
 
       reply.code(201).send({
         success: true,

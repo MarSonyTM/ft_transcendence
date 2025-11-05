@@ -96,9 +96,6 @@ export async function deleteUserAccount(): Promise<DeleteAccountResult> {
         const response = await fetch(`${API_BASE}/api/users/me`, {
             method: 'DELETE',
             credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-            }
         });
 
         const data = await response.json();
