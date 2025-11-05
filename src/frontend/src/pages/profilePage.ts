@@ -152,8 +152,8 @@ export async function renderProfilePage(): Promise<void> {
 
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            authService.logout();
+        logoutBtn.addEventListener('click', async () => {
+            await authService.logout();
             history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();

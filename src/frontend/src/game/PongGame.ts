@@ -230,9 +230,9 @@ export class PongGame {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/new`, {
                 method: "POST",
+                credentials: 'include',
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({ 
                     mode: selectedMode, 
@@ -256,8 +256,7 @@ export class PongGame {
         return new Promise<void>((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
-            const token = localStorage.getItem('authToken');
-            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws?token=${token}`;
+            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
@@ -435,9 +434,9 @@ export class PongGame {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${this.gameId}/start`, {
                 method: "POST",
+                credentials: 'include',
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
                     gameId: this.gameId
@@ -567,10 +566,10 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
-                     method: "POST",
+                    method: "POST",
+                    credentials: 'include',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify({
                         gameId: this.gameId
@@ -617,9 +616,9 @@ export class PongGame {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/end`, {
                     method: "POST",
+                    credentials: 'include',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify({
                         gameId: this.gameId

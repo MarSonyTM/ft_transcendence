@@ -1,5 +1,5 @@
-import { setAccessToken, getAccessToken } from '../utils/api';
 import { API_BASE } from '../config';
+import { authService } from '../utils/auth';
 
 interface RegisterResult {
 	success: boolean;
@@ -12,6 +12,7 @@ export async function loginUser(username: string, password: string): Promise<{ s
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
     
     const res = await fetch(`${apiEndpoint}/api/auth/login`, {
+		credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -20,7 +21,7 @@ export async function loginUser(username: string, password: string): Promise<{ s
     if (res.ok) {
         const data = await res.json().catch(() => ({}));
 		if (data?.data && !data.data.emailVerified) {
-			localStorage.setItem('pendingEmailVerification', data.data.email || '');
+			authService.setPendingEmailVerification(data.data.email || '');
 		}
         return {
             success: data.success || false,
@@ -66,6 +67,7 @@ export async function registerUser(
 	try {
 		const resp = await fetch(`${API_BASE}/api/auth/create`, {
 			method: 'POST',
+			credentials: 'include',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				username: username.trim(),
@@ -143,6 +145,7 @@ export async function createGuestUser(username?: string): Promise<{
     try {
         const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: username || undefined })
         });
@@ -179,6 +182,7 @@ export async function verifyEmail(verificationCode: string, email: string): Prom
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/verify-email`, {
 			method: 'POST',
+			credentials: 'include',
 			headers: { 
                 'Content-Type': 'application/json',
 			},
@@ -213,6 +217,7 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/resend-verification`, {
 			method: 'POST',
+			credentials: 'include',
 			headers: { 'Content-Type': 'application/json',
 			 },
 			body: JSON.stringify({ email })

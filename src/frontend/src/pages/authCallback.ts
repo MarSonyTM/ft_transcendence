@@ -1,3 +1,5 @@
+import { authService } from "../utils/auth";
+
 export default function renderAuthCallbackPage(): void {
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -11,11 +13,9 @@ export default function renderAuthCallbackPage(): void {
     const needEmailVerification = urlParams.get('needEmailVerification');
 
     if (success === 'true' && token) {
-        // Store the token and redirect to dashboard
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('pendingEmailVerification', email || '');
+        authService.setPendingEmailVerification(email || '');
         if (needEmailVerification === 'true') {
-            localStorage.setItem('needEmailVerification', 'true');
+            authService.setNeededEmailVerification(true);
         }
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">

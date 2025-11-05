@@ -18,6 +18,7 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { authService } from './utils/auth';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -29,16 +30,19 @@ function handleRouting(): void {
   const path = window.location.pathname;
 
   if (!publicPages.includes(path)) {
-    const authToken = localStorage.getItem('authToken');
+    const user = authService.getCurrentUser();
     
-    if (!authToken) {
-      history.pushState({ page: 'login' }, '', '/login');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    if (!user) {
+      console.log('User not authenticated, redirecting to login');
+      if (path !== '/login') {
+        history.pushState({ page: 'login' }, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
       return;
     }
     
-    const needsVerification = localStorage.getItem('needEmailVerification');
-    if (needsVerification === 'true') {
+    const needsVerification = authService.isEmailVerificationNeeded();
+    if (needsVerification) {
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;

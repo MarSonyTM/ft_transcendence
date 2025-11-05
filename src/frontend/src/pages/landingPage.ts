@@ -6,6 +6,10 @@ export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
+    // Ensure auth initialization completes before deciding what to render
+    // to avoid briefly showing guest/login UI when a valid session exists.
+    await authService.whenReady();
+
     if (!authService.isAuthenticated()) {
         root.innerHTML = `
         <div class="landing-container">

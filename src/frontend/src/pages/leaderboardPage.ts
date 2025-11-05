@@ -33,6 +33,7 @@ function getApiEndpoint(): string {
 
 async function fetchAllGames(): Promise<GameResult[]> {
     try {
+        //TODO: check if the api needs authentication for this endpoint
         const response = await fetch(`${getApiEndpoint()}/api/game`);
         if (!response.ok) {
             console.error('Failed to fetch games:', response.status);
@@ -52,6 +53,7 @@ async function fetchAllGames(): Promise<GameResult[]> {
 async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
     try {
         // Fetch all users with their stats
+        //TODO: check if the api needs authentication for this endpoint
         const response = await fetch(`${getApiEndpoint()}/api/users/stats`);
         if (!response.ok) {
             console.error('Failed to fetch leaderboard:', response.status);

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { FRONTEND_URL, JWT_SECRET } from '../config';
 import { database } from '../database';
 
-type JwtUser = { id: number; email: string; username: string };
+export type JwtUser = { id: number; email: string; username: string };
 
 export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     const url = request.url;
@@ -67,9 +67,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     }
 
     // All other routes require authentication
-    const auth = request.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-
+    const token = request.cookies.token;
     if (!token) {
         reply.code(401).send({ 
             success: false, 
