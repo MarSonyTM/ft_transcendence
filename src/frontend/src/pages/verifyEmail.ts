@@ -7,16 +7,13 @@ export async function renderVerifyEmailPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
-    // Get email from URL parameters or localStorage
+    // Get email from URL parameters or pending value set after registration
     const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get('email') || null;
-    authService.setPendingEmailVerification(email);
-    if (!email || email.length === 0 || email === 'null' || email === 'undefined') {
-        authService.setPendingEmailVerification(null);
-        authService.setNeededEmailVerification(false);
-        await authService.logout();
-        return;
-    }
+    const emailFromUrl = urlParams.get('email');
+    const email = (emailFromUrl && emailFromUrl !== 'null' && emailFromUrl !== 'undefined')
+        ? emailFromUrl
+        : (authService.getPendingEmailVerification() || '');
+    authService.setPendingEmailVerification(email || null);
 
     root.innerHTML = `
         <div class="verify-email-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">

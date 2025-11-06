@@ -45,16 +45,17 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 });
                 return;
             }
-            let userData = database.users.getUserById(user.id);
+            const dbUser = database.users.getUserById(user.id);
 
             // Don't send sensitive data
-            if (userData) {
-                const { password, ...userWithoutPassword } = userData;
-                userData = userWithoutPassword;
+            let responseData: Omit<User, 'password'> | undefined = undefined;
+            if (dbUser) {
+                const { password, ...userWithoutPassword } = dbUser as User;
+                responseData = userWithoutPassword as Omit<User, 'password'>;
             }
             return {
                 success: true,
-                data: userData
+                data: responseData
             };
         } catch (error) {
             fastify.log.error(error);

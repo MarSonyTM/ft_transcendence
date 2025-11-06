@@ -97,17 +97,15 @@ export class AuthService {
   // Fetch user profile from backend
   async fetchUserProfile(): Promise<UserProfile | null> {
     if (localStorage.getItem("isGuest")) {
-      const guestStr = this.getCurrentUser();
-      let guest = null;
-
-      if (guestStr) {
-        try {
-          guest = guestStr;
-        } catch (e) {
-          console.error("Failed to parse guest user:", e);
-        }
+      // Guest mode: read cached user directly to avoid recursion
+      try {
+        const raw = localStorage.getItem("currentUser");
+        const guest = raw ? (JSON.parse(raw) as UserProfile) : null;
+        this.currentUser = guest;
+        return this.currentUser;
+      } catch {
+        return null;
       }
-      return guest;
     }
 
     const path = window.location.pathname;

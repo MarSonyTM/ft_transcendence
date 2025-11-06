@@ -177,7 +177,27 @@ class UserDatabaseManager {
 
         // Handle Google OAuth users who don't have passwords
         const password = userData.password || (userData.googleId ? '' : null);
-        const result = stmt.run(userData.firstName, userData.lastName, userData.email, userData.username, password, userData.avatar, userData.googleId, userData.gamesWon || 0, userData.gamesLost || 0, userData.emailVerified);
+        // SQLite binding compatibility: convert undefined -> null, booleans -> 1/0
+        const email = userData.email ?? null;
+        const username = userData.username ?? null;
+        const avatar = userData.avatar ?? null;
+        const googleId = userData.googleId ?? null;
+        const gamesWon = userData.gamesWon ?? 0;
+        const gamesLost = userData.gamesLost ?? 0;
+        const emailVerified = userData.emailVerified === true ? 1 : (userData.emailVerified === false ? 0 : 0);
+
+        const result = stmt.run(
+            userData.firstName,
+            userData.lastName,
+            email,
+            username,
+            password,
+            avatar,
+            googleId,
+            gamesWon,
+            gamesLost,
+            emailVerified
+        );
         const insertedUser = this.getUserById(result.lastInsertRowid as number);
         
         if (!insertedUser) {
