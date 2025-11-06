@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ft_transcendence - Pong Prototype</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script>
+      // Runtime endpoint configuration for dev/prod/tunnels
+      (function(){
+        var loc = window.location;
+        var isHttps = loc.protocol === 'https:';
+        var host = loc.host; // includes port if present
+        // Default: same-origin API; backend assumed on same host with WS upgrades
+        var api = loc.origin;
+        var ws = (isHttps ? 'wss://' : 'ws://') + host;
+        // If running Vite locally, default backend port 3000
+        if (loc.port === '5173' || loc.port === '8080') {
+          api = loc.protocol + '//' + loc.hostname + ':3000';
+          ws = (isHttps ? 'wss://' : 'ws://') + loc.hostname + ':3000';
+        }
+        window.__INITIAL_STATE__ = Object.assign({}, window.__INITIAL_STATE__ || {}, {
+          apiEndpoint: api,
+          wsEndpoint: ws
+        });
+      })();
+    </script>
+    <script type="module" src="/main.ts"></script>
+</head>
+<body>
+
+
+    <div id="app-root"></div>
+
+</body>
+</html>

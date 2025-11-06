@@ -1,0 +1,827 @@
+diff --git a/src/backend/src/database/index.ts b/src/backend/src/database/index.ts
+index 93680fe..af4dfdb 100644
+--- a/src/backend/src/database/index.ts
++++ b/src/backend/src/database/index.ts
+@@ -245,8 +245,8 @@ class GameDatabaseManager {
+     // Game methods
+     getAllGames(): Game[] {
+         const stmt = this.db.prepare('SELECT * FROM games ORDER BY id DESC');
+-        return stmt.all() as Game[];
+-    
++        const games = stmt.all() as Game[];
++        return games;
+         // // Parse JSON fields
+         // return games.map(game => ({
+         //     ...game,
+@@ -295,59 +295,59 @@ class GameDatabaseManager {
+         players: any; 
+         points: any;
+       }>): Game | undefined {
+-    const fields: string[] = [];
+-    const values: any[] = [];
+-    
+-    if (gameData.status) {
+-        fields.push('status = ?');
+-        values.push(gameData.status);
+-    }
+-    
+-    if (gameData.startedAt) {
+-        fields.push('startedAt = ?');
+-        values.push(gameData.startedAt);
+-    }
+-    
+-    if (gameData.endedAt) {
+-        fields.push('endedAt = ?');
+-        values.push(gameData.endedAt);
+-    }
+-    
+-    if (gameData.winnerId !== undefined) {
+-        fields.push('winnerId = ?');
+-        values.push(gameData.winnerId);
+-    }
++        const fields: string[] = [];
++        const values: any[] = [];
++        
++        if (gameData.status) {
++            fields.push('status = ?');
++            values.push(gameData.status);
++        }
++        
++        if (gameData.startedAt) {
++            fields.push('startedAt = ?');
++            values.push(gameData.startedAt);
++        }
++        
++        if (gameData.endedAt) {
++            fields.push('endedAt = ?');
++            values.push(gameData.endedAt);
++        }
++        
++        if (gameData.winnerId !== undefined) {
++            fields.push('winnerId = ?');
++            values.push(gameData.winnerId);
++        }
+ 
+-    if (gameData.players !== undefined) {
+-        fields.push('players = ?');
+-        values.push(typeof gameData.players === 'string' ? gameData.players : JSON.stringify(gameData.players));
+-    }
++        if (gameData.players !== undefined) {
++            fields.push('players = ?');
++            values.push(typeof gameData.players === 'string' ? gameData.players : JSON.stringify(gameData.players));
++        }
+ 
+-    if (gameData.points !== undefined) {
+-        fields.push('points = ?');
+-        values.push(typeof gameData.points === 'string' ? gameData.points : JSON.stringify(gameData.points));
+-    }
+-    
+-    if (fields.length === 0) {
++        if (gameData.points !== undefined) {
++            fields.push('points = ?');
++            values.push(typeof gameData.points === 'string' ? gameData.points : JSON.stringify(gameData.points));
++        }
++        
++        if (fields.length === 0) {
++            return this.getGameById(id);
++        }
++        
++        values.push(id);
++        
++        const stmt = this.db.prepare(`
++            UPDATE games 
++            SET ${fields.join(', ')} 
++            WHERE id = ?
++        `);
++        
++        const result = stmt.run(...values);
++        
++        if (result.changes === 0) {
++            return undefined;
++        }
++        
+         return this.getGameById(id);
+     }
+-    
+-    values.push(id);
+-    
+-    const stmt = this.db.prepare(`
+-        UPDATE games 
+-        SET ${fields.join(', ')} 
+-        WHERE id = ?
+-    `);
+-    
+-    const result = stmt.run(...values);
+-    
+-    if (result.changes === 0) {
+-        return undefined;
+-    }
+-    
+-    return this.getGameById(id);
+-}
+ 
+     deleteGame(id: number): boolean {
+         const stmt = this.db.prepare('DELETE FROM games WHERE id = ?');
+@@ -550,32 +550,32 @@ class GameStateDatabaseManager {
+         const fields: string[] = [];
+         const values: any[] = [];
+ 
+-    if (gameStateData.ballPosX !== undefined) {
+-      fields.push('ballPosX = ?');
+-      values.push(gameStateData.ballPosX);
+-    }
+-    if (gameStateData.ballPosY !== undefined) {
+-      fields.push('ballPosY = ?');
+-      values.push(gameStateData.ballPosY);
+-    }
+-    if (gameStateData.ballVelX !== undefined) {
+-      fields.push('ballVelX = ?');
+-      values.push(gameStateData.ballVelX);
+-    }
+-    if (gameStateData.ballVelY !== undefined) {
+-      fields.push('ballVelY = ?');
+-      values.push(gameStateData.ballVelY);
+-    }
++        if (gameStateData.ballPosX !== undefined) {
++        fields.push('ballPosX = ?');
++        values.push(gameStateData.ballPosX);
++        }
++        if (gameStateData.ballPosY !== undefined) {
++        fields.push('ballPosY = ?');
++        values.push(gameStateData.ballPosY);
++        }
++        if (gameStateData.ballVelX !== undefined) {
++        fields.push('ballVelX = ?');
++        values.push(gameStateData.ballVelX);
++        }
++        if (gameStateData.ballVelY !== undefined) {
++        fields.push('ballVelY = ?');
++        values.push(gameStateData.ballVelY);
++        }
+ 
+-    if (gameStateData.players !== undefined) {
+-      fields.push('players = ?');
+-      values.push(JSON.stringify(gameStateData.players));
+-    }
++        if (gameStateData.players !== undefined) {
++        fields.push('players = ?');
++        values.push(JSON.stringify(gameStateData.players));
++        }
+ 
+-    if (gameStateData.mode !== undefined) {
+-      fields.push('mode = ?');
+-      values.push(gameStateData.mode);
+-    }
++        if (gameStateData.mode !== undefined) {
++        fields.push('mode = ?');
++        values.push(gameStateData.mode);
++        }
+ 
+         if (fields.length === 0) {
+             return this.getGameStateByGameId(gameId);
+@@ -946,28 +946,40 @@ class TournamentDatabaseManager {
+   }
+ 
+   private mapPlayerRow(r: any): TournamentPlayer {
++    // Hydrate user from userId (if present)
++    const user = r.userId != null ? this.db.prepare('SELECT id, username, firstName, lastName, avatar, emailVerified, gamesWon, gamesLost FROM users WHERE id = ?').get(r.userId) as any : undefined;
++
+     return {
+-      id: r.playerId,              // tournament-internal ID
+-      playerId: r.playerId,
+-      tournamentId: r.tournamentId,
+-      alias: r.alias,
+-      user: r.userId ? { id: r.userId } as any : undefined,
+-      avatar: undefined,
+-      eliminated: !!r.eliminated,
+-      wins: r.wins ?? 0,
+-      losses: r.losses ?? 0,
+-      totalScore: r.totalScore ?? 0,
+-      averageScore: r.averageScore ?? 0,
+-      isReady: !!r.isReady,
+-      isAI: !!r.isAI,
+-      isLocal: !!r.isLocal,
+-      isRemote: !!r.isRemote,
+-      gameId: r.gameId ?? undefined,
+-      pos: r.pos ?? 0,
+-      score: r.score ?? 0,
+-      socketId: r.socketId ?? undefined,
+-      connectionStatus: r.connectionStatus ?? 'connected',
+-      lastActivity: r.lastActivity ?? new Date().toISOString()
++    id: r.playerId,              // tournament-internal ID
++    playerId: r.playerId,
++    tournamentId: r.tournamentId,
++    alias: user.alias ? r.alias : 'Guest',
++    user: user ? { 
++        id: user.id, 
++        username: user.username, 
++        firstName: user.firstName,
++        lastName: user.lastName,
++        avatar: user.avatar,
++        emailVerified: !!user.emailVerified,
++        gamesWon: user.gamesWon ?? 0,
++        gamesLost: user.gamesLost ?? 0
++    } as User : undefined,
++    avatar: undefined,
++    eliminated: !!r.eliminated,
++    wins: r.wins ?? 0,
++    losses: r.losses ?? 0,
++    totalScore: r.totalScore ?? 0,
++    averageScore: r.averageScore ?? 0,
++    isReady: !!r.isReady,
++    isAI: !!r.isAI,
++    isLocal: !!r.isLocal,
++    isRemote: !!r.isRemote,
++    gameId: r.gameId ?? undefined,
++    pos: r.pos ?? 0,
++    score: r.score ?? 0,
++    socketId: r.socketId ?? undefined,
++    connectionStatus: r.connectionStatus ?? 'connected',
++    lastActivity: r.lastActivity ?? new Date().toISOString()
+     } as TournamentPlayer;
+   }
+ 
+@@ -1300,8 +1312,7 @@ export class DatabaseManager extends BaseDatabaseManager {
+                 startedAt DATETIME NULL,
+                 endedAt DATETIME NULL,
+                 winnerId INTEGER NULL,
+-                difficulty TEXT NOT NULL DEFAULT 'normal',
+-                FOREIGN KEY (winnerId) REFERENCES users(id)
++                difficulty TEXT NOT NULL DEFAULT 'normal'
+             )   
+         `;
+       
+@@ -1314,11 +1325,18 @@ export class DatabaseManager extends BaseDatabaseManager {
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 gameId INTEGER NOT NULL,
+                 playerId INTEGER NOT NULL,
++                alias TEXT NOT NULL,
++                coreUser JSON DEFAULT '[]',
++                socketId TEXT,
++                avatar TEXT,
++                difficulty TEXT NOT NULL DEFAULT 'normal',
++                playerPosition TEXT NOT NULL,
+                 pos INTEGER NOT NULL DEFAULT 0,
+                 score INTEGER NOT NULL DEFAULT 0,
+                 connectionStatus TEXT NOT NULL DEFAULT 'connected',
+                 lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
+                 FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE,
++                FOREIGN KEY (user) REFERENCES users(id),
+                 FOREIGN KEY (playerId) REFERENCES users(id),
+                 UNIQUE(gameId, playerId)
+             )  
+@@ -1336,10 +1354,10 @@ export class DatabaseManager extends BaseDatabaseManager {
+                 ballPosY INTEGER NOT NULL DEFAULT 0,
+                 ballVelX INTEGER NOT NULL DEFAULT 0,
+                 ballVelY INTEGER NOT NULL DEFAULT 0,
++                players JSON DEFAULT '[]',
+                 mode TEXT NOT NULL DEFAULT '2P',
+                 lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
+-                FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
+-            )
++                FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE            )
+         `;
+       
+         this.db.exec(createGameStateTable);
+@@ -1449,7 +1467,8 @@ export class DatabaseManager extends BaseDatabaseManager {
+         isRemote BOOLEAN DEFAULT FALSE,
+         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+         FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
+-        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
++        FOREIGN KEY (userId) REFERENCES users(id),
++        FOREIGN KEY (alias) REFERENCES users(username)
+       )
+     `;
+     
+@@ -1482,29 +1501,6 @@ export class DatabaseManager extends BaseDatabaseManager {
+     this.db.exec(createTournamentsTable);
+     this.db.exec(createTournamentPlayersTable);
+     this.db.exec(createTournamentMatchesTable);
+-    
+-    // Migration: Add isAI, isLocal, and isRemote columns if they don't exist
+-    try {
+-      const columns = this.db.prepare("PRAGMA table_info('tournament_players')").all() as Array<{ name: string }>;
+-      const hasIsAI = columns.some(col => col.name === 'isAI');
+-      const hasIsLocal = columns.some(col => col.name === 'isLocal');
+-      const hasIsRemote = columns.some(col => col.name === 'isRemote');
+-      
+-      if (!hasIsAI) {
+-        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isAI BOOLEAN DEFAULT FALSE');
+-        console.log('✅ Added isAI column to tournament_players');
+-      }
+-      if (!hasIsLocal) {
+-        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isLocal BOOLEAN DEFAULT FALSE');
+-        console.log('✅ Added isLocal column to tournament_players');
+-      }
+-      if (!hasIsRemote) {
+-        this.db.exec('ALTER TABLE tournament_players ADD COLUMN isRemote BOOLEAN DEFAULT FALSE');
+-        console.log('✅ Added isRemote column to tournament_players');
+-      }
+-    } catch (error) {
+-      console.log('ℹ️ Tournament player columns migration check:', error instanceof Error ? error.message : 'unknown');
+-    }
+ 
+     // Migration: Add friendlyId to tournaments and backfill sequential values
+     try {
+diff --git a/src/backend/src/game/gameState.ts b/src/backend/src/game/gameState.ts
+index 87b0e82..c94a4e7 100644
+--- a/src/backend/src/game/gameState.ts
++++ b/src/backend/src/game/gameState.ts
+@@ -26,12 +26,12 @@ export class GameState implements CoreGameState {
+     }
+ 
+     getPlayerPos(playerId: number) {
+-        const player = this.players.find(p => p.id === playerId);
++        const player = this.players.find(p => p.playerId === playerId.toString());
+         return player ? player.pos : null;
+     }
+ 
+     getPlayerScore(playerId: number) {
+-        const player = this.players.find(p => p.id === playerId);
++        const player = this.players.find(p => p.playerId === playerId.toString());
+         return player ? player.score : null;
+     }
+ 
+diff --git a/src/backend/src/middleware/index.ts b/src/backend/src/middleware/index.ts
+index 21bfd02..3eb4a3b 100644
+--- a/src/backend/src/middleware/index.ts
++++ b/src/backend/src/middleware/index.ts
+@@ -54,7 +54,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
+   const publicPrefixes = [
+     '/assets/',
+     '/api/room/',
+-    '/api/game/',
++    '/api/game',
+     '/api/tournament/',
+     '/game/',
+     '/room/',
+diff --git a/src/backend/src/routes/game.ts b/src/backend/src/routes/game.ts
+index ac08d82..9a2cb7e 100644
+--- a/src/backend/src/routes/game.ts
++++ b/src/backend/src/routes/game.ts
+@@ -35,44 +35,44 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+     // Get all games
+     fastify.get('/', async (request, reply) => {
+         try {
+-            const games = database.games.getAllGames();
++            const games = database.games.getAllGames() as Game[];
+         
+             // Map games and use players from the game object (JSON field)
+-            const gamesWithPlayers = games.map(game => {
+-                let players = game.players || [];
+-                let points = game.points || [];
++            // const gamesWithPlayers = games.map(game => {
++                // let players = game.players || [];
++                // let points = game.points || [];
+                 
+-                // If players is a string, parse it
+-                if (typeof players === 'string') {
+-                    try {
+-                        players = JSON.parse(players);
+-                    } catch (e) {
+-                        console.error(`Failed to parse players for game ${game.id}:`, e);
+-                        players = [];
+-                    }
+-                }
++                // // If players is a string, parse it
++                // if (typeof players === 'string') {
++                //     try {
++                //         players = JSON.parse(players);
++                //     } catch (e) {
++                //         console.error(`Failed to parse players for game ${game.id}:`, e);
++                //         players = [];
++                //     }
++                // }
+ 
+-                // If points is a string, parse it
+-                if (typeof points === 'string') {
+-                    try {
+-                        points = JSON.parse(points);
+-                    } catch (e) {
+-                        console.error(`Failed to parse points for game ${game.id}:`, e);
+-                        points = [];
+-                    }
+-                }
++                // // If points is a string, parse it
++                // if (typeof points === 'string') {
++                //     try {
++                //         points = JSON.parse(points);
++                //     } catch (e) {
++                //         console.error(`Failed to parse points for game ${game.id}:`, e);
++                //         points = [];
++                //     }
++                // }
+                 
+-                return {
+-                    ...game,
+-                    players: players,
+-                    points: points
+-                };
+-            });
++                // return {
++                //     ...game,
++                //     players: players,
++                //     points: points
++                // };
++            // });
+             
+             return {
+                 success: true,
+-                count: gamesWithPlayers.length,
+-                data: gamesWithPlayers
++                count: games.length,
++                data: games
+             };
+         } catch (error) {
+             fastify.log.error(error);
+@@ -262,7 +262,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+             
+             // Check if player is in this game
+             const players = database.players.getPlayers(gameId);
+-            const player = players.find(p => p.id === playerIdNum);
++            const player = players.find(p => p.playerId === playerId);
+             
+             if (!player) {
+                 reply.code(404).send({
+@@ -311,6 +311,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                         ballVelY: 0,
+                         players: [{
+                             id: 0,
++                            playerId: user.id.toString(),
+                             alias: user.username,
+                             gameId: newGame.id,
+                             pos: 0,
+@@ -377,7 +378,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                 return;
+             }
+             
+-            const existingPlayer = currentPlayers.find(p => p.id === playerId);
++            const existingPlayer = currentPlayers.find(p => p.playerId === playerId.toString());
+             if (existingPlayer) {
+                 reply.code(409).send({
+                     success: false,
+@@ -762,9 +763,9 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                             }
+                             
+                             return {
+-                                id: actualUserId,// Use the REAL user ID from database
++                                id: actualUserId,
+                                 gameId: gameId,
+-                                playerId: player.playerId,
++                                playerId: actualUserId.toString(),// Use the REAL user ID from database
+                                 playerPosition: index === 0 ? 'left' : 'right',
+                                 score: player.score || 0,
+                                 connectionStatus: 'connected',
+@@ -797,12 +798,12 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                 if (user) {
+                     // Registered user - use their username
+                     displayName = user.username;
+-                } else if (player.name) {
+-                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
++                } else if (player.alias) {
++                    if (player.alias.toLowerCase().includes('ai') || player.alias.toLowerCase().includes('bot')) {
+                         const difficulty = player.difficulty || 'Normal';
+                         displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                     } else {
+-                        displayName = player.name;
++                        displayName = player.alias;
+                     }
+                 } else {
+                     displayName = `Player ${player.playerId}`;
+@@ -810,9 +811,10 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                 
+                 return {
+                     id: player.playerId.toString(),
+-                    username: displayName,
++                    alias: displayName,
+                     score: player.score || 0,
+-                    position: player.playerPosition || 'unknown'
++                    position: player.playerPosition || 'unknown',
++                    user: user || null
+                 };
+             });
+             
+@@ -929,7 +931,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
+                 message: 'Player position updated',
+                 gameId: gameId,
+                 playerId: playerIdNum,
+-                position: position
++                pos: position
+             };
+         } catch (error) {
+             fastify.log.error(error);
+diff --git a/src/backend/src/routes/players.ts b/src/backend/src/routes/players.ts
+index f8d8566..a7d6352 100644
+--- a/src/backend/src/routes/players.ts
++++ b/src/backend/src/routes/players.ts
+@@ -486,7 +486,7 @@ async function playerRoutes(fastify: FastifyInstance, options: FastifyPluginOpti
+             
+             for (const game of allGames) {
+                 const gamePlayers = database.players.getPlayers(game.id);
+-                const userInGame = gamePlayers.find((p) => p.id === playerId);
++                const userInGame = gamePlayers.find((p) => p.playerId === playerId.toString());
+                 
+                 if (userInGame) {
+                     playerGames.push({
+diff --git a/src/backend/src/websocket/roomHandler.ts b/src/backend/src/websocket/roomHandler.ts
+index 6ef75e0..68bc122 100644
+--- a/src/backend/src/websocket/roomHandler.ts
++++ b/src/backend/src/websocket/roomHandler.ts
+@@ -113,11 +113,12 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
+         
+                 // Check if this is a guest move from a local player
+                 if (message.isGuest) {
+-                    // Find the "local" player in the room
+-                    const localPlayer = room.players.find((p: any) => p.id === 'local');
+-                    if (localPlayer) {
+-                        targetPlayerId = 'local';
+-                        targetPlayerNum = getPlayerNumber(room, 'local');
++                    // Find the local player (host local paddle)
++                    const localIndex = room.players.findIndex((p: any) => p.isLocal);
++                    if (localIndex >= 0) {
++                        const localPlayer = room.players[localIndex];
++                        targetPlayerId = localPlayer.playerId;
++                        targetPlayerNum = localIndex + 1;
+                         console.log(`📤 Guest move from ${playerId} controlling local player (position ${targetPlayerNum})`);
+                     }
+                 }
+@@ -165,11 +166,11 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
+             if (room.gameId) {
+                 let targetPlayerNum = getPlayerNumber(room, playerId);
+           
+-                // If this is a guest key press, control player 2 (the local guest)
++                // If this is a guest key press, control the local player's paddle
+                 if (message.isGuest) {
+-                    const localPlayer = room.players.find((p: any) => p.id === 'local');
+-                    if (localPlayer) {
+-                        targetPlayerNum = getPlayerNumber(room, 'local');
++                    const localIndex = room.players.findIndex((p: any) => p.isLocal);
++                    if (localIndex >= 0) {
++                        targetPlayerNum = localIndex + 1;
+                     }
+                 }
+           
+diff --git a/src/database/database.db b/src/database/database.db
+index 9d76f6b..0ce3b74 100644
+Binary files a/src/database/database.db and b/src/database/database.db differ
+diff --git a/src/frontend/src/pages/2PlayerGame.ts b/src/frontend/src/pages/2PlayerGame.ts
+index edd4938..0144ccc 100644
+--- a/src/frontend/src/pages/2PlayerGame.ts
++++ b/src/frontend/src/pages/2PlayerGame.ts
+@@ -234,9 +234,9 @@ async function initRoomBasedGame(room: any): Promise<void> {
+         
+         onGameEnd: (data: any) => {
+             console.log('2-player game ended in room, winner:', data);
+-            const winner = room.players.find((p: any) => p.id === data.winnerId);
+-            const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
+-            const winnerId = winner ? winner.id : data.winnerId;
++            const winner = room.players.find((p: any) => p.playerId === data.winnerId);
++            const winnerName = winner ? winner.alias ? winner.alias : winner.username : `Player ${data.winnerId}`;
++            const winnerId = winner ? winner.playerId : data.winnerId;
+         
+             showGameEndScreen(winnerId, winnerName, pongGame!);
+         },
+@@ -342,7 +342,7 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
+     if (playerId === currentPlayerId) 
+         return;
+     
+-    const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
++    const playerIndex = room.players.findIndex((p: any) => p.id.toString() === playerId);
+     const currentPos = pongGame.gameState.players[playerIndex].pos || position;
+     pongGame.gameState.players[playerIndex].pos = currentPos + (position - currentPos);
+ }
+diff --git a/src/frontend/src/pages/4PlayerGame.ts b/src/frontend/src/pages/4PlayerGame.ts
+index 48e29c4..2e0a78a 100644
+--- a/src/frontend/src/pages/4PlayerGame.ts
++++ b/src/frontend/src/pages/4PlayerGame.ts
+@@ -342,7 +342,7 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
+     if (playerId === currentPlayerId) 
+         return;
+     
+-    const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
++    const playerIndex = room.players.findIndex((p: any) => p.id.toString() === playerId);
+     const currentPos = pongGame.gameState.players[playerIndex].pos || position;
+     pongGame.gameState.players[playerIndex].pos = currentPos + (position - currentPos);
+ }
+diff --git a/src/frontend/src/pages/leaderboardPage.ts b/src/frontend/src/pages/leaderboardPage.ts
+index 13685c6..40020dd 100644
+--- a/src/frontend/src/pages/leaderboardPage.ts
++++ b/src/frontend/src/pages/leaderboardPage.ts
+@@ -1,5 +1,6 @@
+ import { getCurrentUser, setCurrentPage } from '../utils/globalState';
+ import { CorePlayer as Player } from '../../../shared/gameTypes';
++import { Game as GameResult } from '../../../backend/src/database/index';
+ import { renderApp } from '../main';
+ 
+ interface LeaderboardUser {
+@@ -9,14 +10,14 @@ interface LeaderboardUser {
+     winRate: number;
+ }
+ 
+-interface GameResult {
+-    id: number;
+-    mode: string;
+-    winner: Player;
+-    createdAt: string;
+-    players?: Player[];
+-    points?: number[];
+-}
++// interface GameResult {
++//     id: number;
++//     mode: string;
++//     winner: Player;
++//     createdAt: string;
++//     players?: Player[];
++//     points?: number[];
++// }
+ 
+ function getApiEndpoint(): string {
+ 	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
+@@ -153,18 +154,16 @@ export async function renderLeaderboardPage(): Promise<void> {
+                                         let winnerName = 'Unknown';
+                                         let loserName = 'Unknown';
+                                         
+-                                        if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
++                                        if (game.players && game.players.length >= 2) {
+                                             // Find winner by winnerId or by highest score
+                                             let winner, loser;
+                                             
+                                             if (game.winner) {
+-                                                winner = game.players.find((p: any) => p.id === game.winner);
+-                                                loser = game.players.find((p: any) => p.id !== game.winner);
++                                                winner = game.players.find((p: Player) => p.playerId === game.winner!.playerId);
++                                                loser = game.players.find((p: Player) => p.playerId !== game.winner!.playerId);
+                                             } else {
+                                                 // Sort by score to find winner
+-                                                const sortedPlayers = [...game.players].sort((a: any, b: any) => 
+-                                                    (b.score || 0) - (a.score || 0)
+-                                                );
++                                                const sortedPlayers = [...game.players].sort((a: Player, b: Player) => b.score - a.score);
+                                                 winner = sortedPlayers[0];
+                                                 loser = sortedPlayers[1];
+                                             }
+@@ -208,23 +207,20 @@ export async function renderLeaderboardPage(): Promise<void> {
+                                         let winnerName = 'Unknown';
+                                         let loserNames: string[] = ['Unknown', 'Unknown', 'Unknown', 'Unknown'];
+                                         
+-                                        if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
++                                        if (game.players && game.players.length >= 2) {
+                                             // Find winner by winnerId or by highest score
+                                             let winner;
+                                             let losers = new Array<Player>();
+                                             
+                                             if (game.winner) {
+-                                                winner = game.players.find((p: any) => p.id === game.winner.id);
+-                                                let i = 0;
+-                                                for (i; game.players[i]; i++) {
+-                                                    if (game.players[i].alias !== game.winner.alias)
++                                                winner = game.players.find((p: Player) => p.playerId === game.winner!.playerId);
++                                                for (let i = 0; game.players[i]; i++) {
++                                                    if (game.players[i].playerId !== game.winner.playerId)
+                                                         losers.push(game.players[i]);
+                                                 }
+                                             } else {
+                                                 // Sort by score to find winner
+-                                                const sortedPlayers = [...game.players].sort((a: any, b: any) => 
+-                                                    (b.score || 0) - (a.score || 0)
+-                                                );
++                                                const sortedPlayers = [...game.players].sort((a: Player, b: Player) => a.score - b.score);
+                                                 winner = sortedPlayers[0];
+                                                 losers[0] = sortedPlayers[1];
+                                                 losers[1] = sortedPlayers[2];
+@@ -237,8 +233,7 @@ export async function renderLeaderboardPage(): Promise<void> {
+                                             
+                                             // Get loser name and AI status
+                                             if (losers) {
+-                                                let i = 0;
+-                                                for (i; losers[i]; i++)
++                                                for (let i = 0; losers[i]; i++)
+                                                     loserNames[i] = losers[i].alias || `Player ${losers[i].playerId}`;
+                                             }
+                                         }
+diff --git a/src/frontend/src/pages/lobbyPage.ts b/src/frontend/src/pages/lobbyPage.ts
+index 4557390..78322de 100644
+--- a/src/frontend/src/pages/lobbyPage.ts
++++ b/src/frontend/src/pages/lobbyPage.ts
+@@ -778,4 +778,4 @@ export function cleanupLobby(): void {
+   clearRoomState();
+ }
+ 
+-export type { Player, GameRoom };
++// export type { Player, GameRoom };
+diff --git a/src/frontend/src/utils/gameUtils.ts b/src/frontend/src/utils/gameUtils.ts
+index 47f8637..a5349c1 100644
+--- a/src/frontend/src/utils/gameUtils.ts
++++ b/src/frontend/src/utils/gameUtils.ts
+@@ -80,7 +80,7 @@ export function endGame(pongGame: PongGame) {
+                 let didWin = false;
+                 if (room && Array.isArray(room.players)) {
+                     const winnerPlayer = room.players[winnerId - 1];
+-                    didWin = !!winnerPlayer && (winnerPlayer.playerId.toString() === user.id.toString());
++                    didWin = !!winnerPlayer && (winnerPlayer.user?.id.toString() === user.id.toString());
+                 } else {
+                     didWin = (winnerId === 1);
+                 }
+diff --git a/src/frontend/src/utils/roomWebSocket.ts b/src/frontend/src/utils/roomWebSocket.ts
+index b470085..ecc0a58 100644
+--- a/src/frontend/src/utils/roomWebSocket.ts
++++ b/src/frontend/src/utils/roomWebSocket.ts
+@@ -1,11 +1,9 @@
+-import { GameRoom } from '../../../shared/gameTypes';
+-
+ interface RoomWebSocketConfig {
+   roomId: string;
+   playerId: string;
+   onConnect?: () => void;
+   onDisconnect?: () => void;
+-  onRoomState?: (room: GameRoom) => void;//TODO:MERGE room: any
++  onRoomState?: (room: any) => void;
+   onGameState?: (state: any) => void;
+   onPlayerMove?: (playerId: string, position: number) => void;
+   onPlayerReady?: (playerId: string, isReady: boolean) => void;
+diff --git a/src/frontend/src/utils/tournamentEngine.ts b/src/frontend/src/utils/tournamentEngine.ts
+index 7ce7608..5464496 100644
+--- a/src/frontend/src/utils/tournamentEngine.ts
++++ b/src/frontend/src/utils/tournamentEngine.ts
+@@ -48,7 +48,7 @@ export function createTournament(): Tournament {
+                 avatar: undefined,
+                 connectionStatus: 'connected',
+                 lastActivity: new Date().toISOString(),
+-                user: undefined,
++                user: user,
+                 playerId: `host-${user.id}`
+             } as TournamentPlayer;
+             state.players.push(hostPlayer);
+diff --git a/src/shared/tournamentTypes.ts b/src/shared/tournamentTypes.ts
+index 0bc599f..1180fb2 100644
+--- a/src/shared/tournamentTypes.ts
++++ b/src/shared/tournamentTypes.ts
+@@ -64,68 +64,3 @@ export interface TournamentArchive {
+ 	matches: { id: number; p1: TournamentPlayer; p2: TournamentPlayer; winner?: TournamentPlayer }[];
+ 	champion: TournamentPlayer;
+ }
+-
+-// Serialized / API facing types
+-// export interface SerializedPlayer {
+-// 	id: number;
+-// 	alias: string;
+-// 	userId?: number;
+-// 	eliminated: boolean;
+-// 	wins: number;
+-// 	losses: number;
+-// 	totalScore: number;
+-// 	averageScore: number;
+-// 	isReady: boolean;
+-// 	isAI: boolean;
+-// 	isLocal: boolean;
+-// }
+-
+-// export interface SerializedMatchHistoryItem {
+-// 	matchId: number;
+-// 	player1: string;
+-// 	player2: string;
+-// 	winner: string;
+-// 	loser: string;
+-// 	player1Score?: number;
+-// 	player2Score?: number;
+-// 	status: MatchStatus;
+-// 	gameId?: number;
+-// 	startedAt?: string;
+-// 	finishedAt?: string;
+-// 	disputeReason?: string;
+-// }
+-
+-// export interface SerializedMatch {
+-// 	matchId: number;
+-// 	player1: SerializedPlayer | null;
+-// 	player2: SerializedPlayer | null;
+-// 	gameId?: number;
+-// 	roomId?: string;
+-// 	status: MatchStatus;
+-// 	player1Ready: boolean;
+-// 	player2Ready: boolean;
+-// 	startedAt?: string;
+-// }
+-
+-// export interface SerializedNextMatchPreview {
+-// 	order: number;
+-// 	player1: string;
+-// 	player2?: string | null;
+-// }
+-
+-// export interface SerializedTournamentState {
+-// 	id: number;
+-// 	status: TStatus;
+-// 	createdAt: string;
+-// 	updatedAt: string;
+-// 	players: SerializedPlayer[];
+-// 	currentMatch: SerializedMatch | null;
+-// 	queue: string[];
+-// 	nextMatches: SerializedNextMatchPreview[];
+-// 	matchHistory: SerializedMatchHistoryItem[];
+-// 	championId?: number;
+-// 	championAlias?: string | null;
+-// 	format: TFormat;
+-// 	matchDelay: number;
+-// 	allowSpectators: boolean;
+-// }

@@ -1,0 +1,58 @@
+services:
+  backend:
+    container_name: backend_dev
+    build: ./backend/.
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/config:/app/config
+      - ./backend/.env:/app/.env 
+      - ./backend/package.json:/app/package.json
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/dist:/app/frontend/dist
+      - transcendence_db:/app/database
+    environment:
+      - NODE_ENV=development
+      - FORCE_COLOR=1
+      - DATABASE_PATH=/app/database/database.db
+    tty: true
+    restart: unless-stopped
+    networks:
+      - transcendence_dev
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  frontend:
+    build: 
+      context: ./frontend/
+      dockerfile: Dockerfile.dev
+    container_name: frontend_dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+    environment:
+      - VITE_BACKEND_URL=http://backend_dev:3000
+    restart: unless-stopped
+    networks:
+      - transcendence_dev
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  transcendence_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: database/
+
+networks:
+  transcendence_dev:
+    driver: bridge
