@@ -120,28 +120,17 @@ export function showGameEndScreen(winnerId: string, winnerName: string, pongGame
 
     const overlay = document.createElement('div');
     overlay.id = 'gameEndOverlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.9);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    `;
-
+    overlay.className = 'neon-grid';
     overlay.innerHTML = `
-        <div style="background: rgb(55 65 81); padding: 3em; border-radius: 12px; text-align: center; max-width: 500px;">
+        <div class="grid-anim"></div>
+        <div class="glass-card" style="text-align: center; max-width: 500px; padding: 3em;">
             <div style="font-size: 4em; margin-bottom: 0.2em;">🏆</div>
-            <h2 style="color: rgb(52 211 153); font-size: 2.5em; margin: 0 0 0.3em 0;">Game Over!</h2>
-            <p style="color: rgb(209 213 219); font-size: 1.8em; margin-bottom: 1.5em; font-weight: bold;">
+            <h2 style="color: #0ff; font-size: 2.5em; margin: 0 0 0.3em 0; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">Game Over!</h2>
+            <p style="color: #fff; font-size: 1.8em; margin-bottom: 1.5em; font-weight: bold; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);">
                 ${winnerName} wins!
             </p>
             <div style="display: flex; gap: 1em; justify-content: center;">
-                <button id="backToHomeBtn" style="background: rgb(99 102 241); color: white; border: none; padding: 1em 2em; border-radius: 8px; font-size: 1.1em; cursor: pointer; font-weight: 600; transition: background 0.2s;">
+                <button id="backToHomeBtn" class="btn btn-neon primary">
                     Back to Home
                 </button>
             </div>
@@ -183,13 +172,15 @@ export function showPlayerDisconnectedMessage(playerName: string): void {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: rgb(220 38 38);
+        background: rgba(239, 68, 68, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(239, 68, 68, 0.5);
         color: white;
         padding: 1em 1.5em;
         border-radius: 8px;
         z-index: 999;
         font-weight: 600;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
         animation: slideIn 0.3s ease-out;
     `;
     notification.innerHTML = `⚠️ ${playerName} disconnected`;
