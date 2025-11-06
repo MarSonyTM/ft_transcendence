@@ -9,9 +9,10 @@ export async function renderProfilePage(): Promise<void> {
 
     // Show loading state
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card">
-                <h2 style="text-align: center">Profile</h2>
+        <div class="neon-grid profile-container" style="width:100%; max-width:980px;">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="padding: 2em; width:100%;">
+                <h2 class="title-neon" style="text-align: center">Profile</h2>
                 <p style="text-align: center; color: rgb(156 163 175);">Loading...</p>
             </div>
         </div>
@@ -24,9 +25,10 @@ export async function renderProfilePage(): Promise<void> {
     
     if (!user) {
         root.innerHTML = `
-            <div class="profile-container">
-                <div class="profile-card">
-                    <h2 style="text-align: center">Profile</h2>
+            <div class="neon-grid profile-container" style="width:100%; max-width:980px;">
+                <div class="grid-anim"></div>
+                <div class="glass-card" style="padding: 2em; width:100%;">
+                    <h2 class="title-neon" style="text-align: center">Profile</h2>
                     <p style="text-align: center; color: rgb(239 68 68);">Failed to load profile. Please try logging in again.</p>
                     <button id="backToLandingBtn" class="btn btn-back" style="margin-top: 2em;">Back to Home</button>
                 </div>
@@ -68,9 +70,10 @@ export async function renderProfilePage(): Promise<void> {
         ? ((userData.gamesWon / userData.gamesPlayed) * 100).toFixed(1) : 0;
   
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card">
-                <h2 style="text-align: center">Profile</h2>
+        <div class="neon-grid profile-container" style="width:100%; max-width:980px;">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="padding: 2em; width:100%;">
+                <h2 class="title-neon" style="text-align: center">Profile</h2>
                 
                 ${userData.avatar ? `
                     <div style="text-align: center; margin-bottom: 1.5em;">
@@ -85,7 +88,7 @@ export async function renderProfilePage(): Promise<void> {
                     </div>
                 ` : ''}
                 
-                <div class="username-section">
+                <div class="username-section" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <h3>Username</h3>
                     <p style="font-size: 1.8em; font-weight: bold; color: rgb(229 231 235); margin: 0;">${userData.username}</p>
                     ${userData.email ? `<p style="color: rgb(156 163 175); font-size: 0.9em; margin-top: 0.5em;">${userData.email}</p>` : ''}
@@ -117,11 +120,11 @@ export async function renderProfilePage(): Promise<void> {
             </div>
             
             <div style="display: flex; gap: 1em; margin-top: 2em; justify-content: center;">
-                <button id="friendListBtn" class="btn btn-friends" style="font-size: 1.1em; background: #38bdf8; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
+                <button id="friendListBtn" class="btn-neon accent" style="font-size: 1.05em;">
                     Friend List
                 </button>
-                ${!localStorage.getItem('isGuest') ? '<button id="editProfileBtn" class="btn" style="font-size: 1.1em; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;"> Edit Profile </button>' : ''}
-                <button id="logoutBtn" class="btn" style="font-size: 1.1em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
+                ${!localStorage.getItem('isGuest') ? '<button id="editProfileBtn" class="btn-neon accent" style="font-size: 1.05em;"> Edit Profile </button>' : ''}
+                <button id="logoutBtn" class="btn" style="font-size: 1.05em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.7em 2em; cursor: pointer;">
                     Logout
                 </button>
             </div>
