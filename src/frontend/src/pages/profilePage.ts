@@ -74,7 +74,14 @@ export async function renderProfilePage(): Promise<void> {
                 
                 ${userData.avatar ? `
                     <div style="text-align: center; margin-bottom: 1.5em;">
-                        <img src="${userData.avatar}" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6;">
+                        <img 
+                            src="${(userData.avatar || '').trim()}" 
+                            alt="Avatar" 
+                            referrerpolicy="no-referrer" 
+                            loading="lazy"
+                            style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6;"
+                            onerror="this.style.display='none';"
+                        >
                     </div>
                 ` : ''}
                 
@@ -126,8 +133,8 @@ export async function renderProfilePage(): Promise<void> {
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
-            history.pushState({ page: 'landing' }, '', '/');
-            setCurrentPage('landing');
+            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+            setCurrentPage('gameSelect');
             renderApp();
         });
     }
