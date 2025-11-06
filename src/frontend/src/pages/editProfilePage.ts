@@ -29,10 +29,11 @@ export async function renderEditProfilePage(): Promise<void> {
 
     // Show loading state
     root.innerHTML = `
-        <div style="display: flex; justify-content: center; align-items: center; height: 80vh;">
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1em;"></div>
-                <p style="color: #666;">Loading profile...</p>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="text-align: center; max-width: 400px;">
+                <div style="width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1em;"></div>
+                <p style="color: #9ca3af;">Loading profile...</p>
             </div>
         </div>
         <style>
@@ -48,10 +49,13 @@ export async function renderEditProfilePage(): Promise<void> {
     
     if (!user) {
         root.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
-                <h2 style="color: #f87171; margin-bottom: 1em;">Error Loading Profile</h2>
-                <p style="color: #666; margin-bottom: 2em;">Failed to load user profile</p>
-                <button id="backToProfileBtn" class="btn btn-back">Back to Profile</button>
+            <div class="neon-grid">
+                <div class="grid-anim"></div>
+                <div class="glass-card" style="text-align: center; max-width: 400px;">
+                    <h2 style="color: #ef4444; margin-bottom: 1em;">Error Loading Profile</h2>
+                    <p style="color: #9ca3af; margin-bottom: 2em;">Failed to load user profile</p>
+                    <button id="backToProfileBtn" class="btn btn-neon accent">Back to Profile</button>
+                </div>
             </div>
         `;
         
@@ -78,9 +82,13 @@ export async function renderEditProfilePage(): Promise<void> {
     };
 
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card" style="max-width: 600px; margin: 0 auto;">
-                <h2 style="text-align: center; margin-bottom: 2em;">Edit Profile</h2>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="max-width: 600px; width: 100%;">
+
+                <div style="text-align: center; margin-bottom: 2em;">
+                    <h2 class="title-neon" style="font-size: 2rem;">Edit Profile</h2>
+                </div>
                 
                 <div style="margin-bottom: 2em;">
                     <h3 style="color: rgb(229 231 235); margin-bottom: 1em; border-bottom: 1px solid rgb(55 65 81); padding-bottom: 0.5em;">Account Information</h3>
@@ -91,7 +99,7 @@ export async function renderEditProfilePage(): Promise<void> {
                             <div style="flex: 1; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235);">
                                 ${userData.username}
                             </div>
-                            <button type="button" id="changeUsernameBtn" class="btn" style="background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 0.75em 1.5em; cursor: pointer;">
+                            <button type="button" id="changeUsernameBtn" class="btn btn-neon primary">
                                 Change Username
                             </button>
                         </div>
@@ -103,7 +111,7 @@ export async function renderEditProfilePage(): Promise<void> {
                             <div style="flex: 1; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235);">
                                 ${userData.email || 'Not set'}
                             </div>
-                            <button type="button" id="changeEmailBtn" class="btn" style="background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 0.75em 1.5em; cursor: pointer;">
+                            <button type="button" id="changeEmailBtn" class="btn btn-neon primary">
                                 Change Email
                             </button>
                         </div>
@@ -117,36 +125,36 @@ export async function renderEditProfilePage(): Promise<void> {
                 <form id="editProfileForm" style="display: flex; flex-direction: column; gap: 1.5em;">
                     <div class="form-group">
                         <label for="firstName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">First Name</label>
-                        <input 
-                            type="text" 
-                            id="firstName" 
-                            name="firstName" 
-                            value="${userData.firstName || ''}" 
+                        <input
+                            type="text"
+                            id="firstName"
+                            name="firstName"
+                            value="${userData.firstName || ''}"
                             required
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
+                            style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em;"
                         >
                     </div>
                     
                     <div class="form-group">
                         <label for="lastName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Last Name</label>
-                        <input 
-                            type="text" 
-                            id="lastName" 
-                            name="lastName" 
-                            value="${userData.lastName || ''}" 
+                        <input
+                            type="text"
+                            id="lastName"
+                            name="lastName"
+                            value="${userData.lastName || ''}"
                             required
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
+                            style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em;"
                         >
                     </div>
                     
                     <div class="form-group">
                         <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Avatar URL</label>
-                        <input 
-                            type="url" 
-                            id="avatar" 
-                            name="avatar" 
+                        <input
+                            type="url"
+                            id="avatar"
+                            name="avatar"
                             value="${userData.avatar || ''}"
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
+                            style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em;"
                         >
                     </div>
                     
@@ -154,10 +162,10 @@ export async function renderEditProfilePage(): Promise<void> {
                     <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none;"></div>
                     
                     <div style="display: flex; gap: 1em; margin-top: 1em;">
-                        <button type="submit" id="saveProfileBtn" class="btn" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
+                        <button type="submit" id="saveProfileBtn" class="btn btn-neon primary" style="flex: 1;">
                             Save Changes
                         </button>
-                        <button type="button" id="cancelBtn" class="btn btn-back" style="flex: 1; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
+                        <button type="button" id="cancelBtn" class="btn btn-neon accent" style="flex: 1;">
                             Cancel
                         </button>
                     </div>
@@ -168,7 +176,7 @@ export async function renderEditProfilePage(): Promise<void> {
                     <p style="color: rgb(156 163 175); font-size: 0.9em; text-align: center; margin-bottom: 1.5em;">
                         Once you delete your account, there is no going back. Please be certain.
                     </p>
-                    <button id="deleteAccountBtn" class="btn" style="width: 100%; background: #dc2626; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
+                    <button id="deleteAccountBtn" class="btn btn-neon danger" style="width: 100%;">
                         Delete Account
                     </button>
                 </div>
