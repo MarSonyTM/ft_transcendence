@@ -16,50 +16,53 @@ export function renderFriendsPage(): void {
   if (!root) return;
 
   root.innerHTML = `
-    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <h1 style="color: white; font-size: 2rem;">Friends</h1>
-        <button id="backBtn" style="padding: 10px 20px; background: #374151; color: white; border: none; border-radius: 5px; cursor: pointer;">
-          ← Back
-        </button>
-      </div>
-
-      <!-- Search Users -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: white; margin-bottom: 15px;">Add Friends</h2>
-        <div style="display: flex; gap: 10px;">
-          <input 
-            type="text" 
-            id="friendSearch" 
-            placeholder="Search by username..." 
-            style="flex: 1; padding: 10px; background: #374151; border: 1px solid #4b5563; border-radius: 5px; color: white;"
-          >
-          <button 
-            id="searchBtn" 
-            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;"
-          >
-            Search
+    <div class="neon-grid">
+      <div class="grid-anim"></div>
+      <div class="glass-card" style="max-width: 1200px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+          <h1 class="title-neon" style="font-size: 2rem;">Friends</h1>
+          <button id="backBtn" class="btn btn-neon accent">
+            ← Back
           </button>
         </div>
-        <div id="searchResults" style="margin-top: 15px;"></div>
-      </div>
 
-      <!-- Pending Requests -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: white; margin-bottom: 15px;">Friend Requests (<span id="requestCount">0</span>)</h2>
-        <div id="pendingRequests"></div>
-      </div>
+        <!-- Search Users -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Add Friends</h2>
+          <div style="display: flex; gap: 10px;">
+            <input
+              type="text"
+              id="friendSearch"
+              placeholder="Search by username..."
+              style="flex: 1; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 5px; color: white;"
+            >
+            <button
+              id="searchBtn"
+              class="btn btn-neon primary"
+            >
+              Search
+            </button>
+          </div>
+          <div id="searchResults" style="margin-top: 15px;"></div>
+        </div>
 
-      <!-- Friends List -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px;">
-        <h2 style="color: white; margin-bottom: 15px;">Your Friends (<span id="friendCount">0</span>)</h2>
-        <div id="friendsList"></div>
-      </div>
+        <!-- Pending Requests -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Friend Requests (<span id="requestCount">0</span>)</h2>
+          <div id="pendingRequests"></div>
+        </div>
 
-      <!-- Game Invitations -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: white; margin-bottom: 15px;">Game Invitations (<span id="invitationCount">0</span>)</h2>
-        <div id="gameInvitations"></div>
+        <!-- Friends List -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Your Friends (<span id="friendCount">0</span>)</h2>
+          <div id="friendsList"></div>
+        </div>
+
+        <!-- Game Invitations -->
+        <div class="glass-card" style="padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Game Invitations (<span id="invitationCount">0</span>)</h2>
+          <div id="gameInvitations"></div>
+        </div>
       </div>
     </div>
   `;
@@ -306,11 +309,11 @@ function displayFriends(friends: User[]) {
   }
 
   container.innerHTML = friends.map(friend => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${friend.avatar ? 
-          `<img 
-            src="${friend.avatar}" 
+        ${friend.avatar ?
+          `<img
+            src="${friend.avatar}"
             alt="${friend.username}"
             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -324,15 +327,15 @@ function displayFriends(friends: User[]) {
         </div>
       </div>
       <div style="display: flex; gap: 10px;">
-        <button 
+        <button
           onclick="window.inviteToGame(${friend.id})"
-          style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon primary"
         >
           🎮 Invite
         </button>
-        <button 
+        <button
           onclick="window.removeFriend(${friend.id})"
-          style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon danger"
         >
           Remove
         </button>
@@ -354,11 +357,11 @@ function displayPendingRequests(requests: User[]) {
   }
 
   container.innerHTML = requests.map(user => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${user.avatar ? 
-          `<img 
-            src="${user.avatar}" 
+        ${user.avatar ?
+          `<img
+            src="${user.avatar}"
             alt="${user.username}"
             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -372,15 +375,15 @@ function displayPendingRequests(requests: User[]) {
         </div>
       </div>
       <div style="display: flex; gap: 10px;">
-        <button 
+        <button
           onclick="window.acceptRequest(${user.id})"
-          style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon primary"
         >
           ✓ Accept
         </button>
-        <button 
+        <button
           onclick="window.rejectRequest(${user.id})"
-          style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon accent"
         >
           ✗ Reject
         </button>
@@ -402,11 +405,11 @@ function displaySearchResults(results: User[]) {
   }
 
   container.innerHTML = results.map(user => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${user.avatar ? 
-          `<img 
-            src="${user.avatar}" 
+        ${user.avatar ?
+          `<img
+            src="${user.avatar}"
             alt="${user.username}"
             style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -420,13 +423,13 @@ function displaySearchResults(results: User[]) {
         </div>
       </div>
       <div>
-        ${user.friendshipStatus === 'accepted' ? 
+        ${user.friendshipStatus === 'accepted' ?
           '<span style="color: #10b981;">✓ Friends</span>' :
-          user.friendshipStatus === 'pending' ? 
+          user.friendshipStatus === 'pending' ?
           '<span style="color: #f59e0b;">⏳ Request Sent</span>' :
-          `<button 
+          `<button
             onclick="window.sendRequest(${user.id})"
-            style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;"
+            class="btn btn-neon primary"
           >
             + Add Friend
           </button>`
@@ -467,11 +470,11 @@ function displayInvitations(invitations: any[]) {
   }
 
   container.innerHTML = invitations.map(inv => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${inv.from.avatar ? 
-          `<img 
-            src="${inv.from.avatar}" 
+        ${inv.from.avatar ?
+          `<img
+            src="${inv.from.avatar}"
             alt="${inv.from.username}"
             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -485,15 +488,15 @@ function displayInvitations(invitations: any[]) {
         </div>
       </div>
       <div style="display: flex; gap: 10px;">
-        <button 
+        <button
           onclick="window.acceptInvitation(${inv.id}, '${inv.roomId}')"
-          style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;"
+          class="btn btn-neon primary"
         >
           ✓ Join Game
         </button>
-        <button 
+        <button
           onclick="window.rejectInvitation(${inv.id})"
-          style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon danger"
         >
           ✗ Decline
         </button>
