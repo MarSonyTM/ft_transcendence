@@ -107,9 +107,10 @@ export async function renderLeaderboardPage(): Promise<void> {
 
     // Show loading state
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card">
-                <h2 style="text-align: center">Leaderboard</h2>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="max-width: 1200px;">
+                <h2 class="title-neon" style="text-align: center">Leaderboard</h2>
                 <p style="text-align: center; color: rgb(156 163 175);">Loading...</p>
             </div>
         </div>
@@ -129,9 +130,10 @@ export async function renderLeaderboardPage(): Promise<void> {
     const leader = leaderboard[0];
 
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card">
-                <h2 style="text-align: center; margin-bottom: 1.5em;">Leaderboard</h2>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="max-width: 1200px;">
+                <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Leaderboard</h2>
                 
                 <div class="games-section">
                     <h3>Current Leader</h3>
@@ -287,6 +289,7 @@ export async function renderLeaderboardPage(): Promise<void> {
                     </div>
                 </div>
             </div>
+
             <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
         </div>
 
