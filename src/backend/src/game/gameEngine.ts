@@ -32,7 +32,7 @@ export class BaseGameEngine {
     private aiPlayerInstances: Map<number, AIPongPlayer> = new Map();
 
     private lastBroadcastTime: number = 0;
-    private readonly BROADCAST_INTERVAL = 33;
+    private readonly BROADCAST_INTERVAL = 16; // Changed from 33ms (30fps) to 16ms (60fps) for smoother updates
 
     private lastContact: number = 0;
 

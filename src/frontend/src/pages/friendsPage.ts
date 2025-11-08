@@ -9,6 +9,7 @@ let previousCounts = {
     requests: 0,
     invitations: 0
 };
+import { authService } from '../utils/auth';
 
 interface User {
     id: number;
@@ -25,50 +26,56 @@ export function renderFriendsPage(): void {
   presenceService.startHeartbeat();
 
   root.innerHTML = `
-    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <h1 style="color: white; font-size: 2rem;">Friends</h1>
-            
-      </div>
-
-      <!-- Search Users -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: white; margin-bottom: 15px;">Add Friends</h2>
-        <div style="display: flex; gap: 10px;">
-          <input 
-            type="text" 
-            id="friendSearch" 
-            placeholder="Search by username..." 
-            style="flex: 1; padding: 10px; background: #374151; border: 1px solid #4b5563; border-radius: 5px; color: white;"
-          >
-          <button 
-            id="searchBtn" 
-            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;"
-          >
-            Search
+    <div class="neon-grid">
+      <div class="grid-anim"></div>
+      <div class="glass-card" style="max-width: 1200px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+          <h1 class="title-neon" style="font-size: 2rem;">Friends</h1>
+          <button id="backBtn" class="btn btn-neon accent">
+            ← Back
           </button>
         </div>
-        <div id="searchResults" style="margin-top: 15px;"></div>
-      </div>
 
-      <!-- Pending Requests -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: white; margin-bottom: 15px;">Friend Requests (<span id="requestCount">0</span>)
+        <!-- Search Users -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Add Friends</h2>
+          <div style="display: flex; gap: 10px;">
+            <input
+              type="text"
+              id="friendSearch"
+              placeholder="Search by username..."
+              style="flex: 1; padding: 10px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 5px; color: white;"
+            >
+            <button
+              id="searchBtn"
+              class="btn btn-neon primary"
+            >
+              Search
+            </button>
+          </div>
+          <div id="searchResults" style="margin-top: 15px;"></div>
+        </div>
+
+        <!-- Pending Requests -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Friend Requests (<span id="requestCount">0</span>)
             <span id="requestBadge" style="display: none; color: #10b981; font-size: 0.8rem; margin-left: 10px;">
                 🔔 New!
             </span>
         </h2>
-        <div id="pendingRequests"></div>
-      </div>
+          <div id="pendingRequests"></div>
+        </div>
 
-      <!-- Friends List -->
-      <div style="background: #1f2937; padding: 20px; border-radius: 10px;">
-        <h2 style="color: white; margin-bottom: 15px;">Your Friends (<span id="friendCount">0</span>)</h2>
-        <div id="friendsList"></div>
-      </div>
+        <!-- Friends List -->
+        <div class="glass-card" style="margin-bottom: 20px; padding: 20px;">
+          <h2 style="color: white; margin-bottom: 15px;">Your Friends (<span id="friendCount">0</span>)</h2>
+          <div id="friendsList"></div>
+        </div>
         <button id="backBtn" class="btn-back" style="margin-left:auto;margin-right:auto;display:block;margin-top:22%;margin-bottom:0%">
           ← Back
         </button>
+        
+      </div>
     </div>
   `;
 
@@ -162,13 +169,11 @@ function showNewBadge(type: 'request' | 'invitation'): void {
 }
 
 async function loadFriends() {
-    try {
-        const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-        const response = await fetch(`${apiEndpoint}/api/friends/list`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
+  try {
+    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+    const response = await fetch(`${apiEndpoint}/api/friends/list`, {
+      credentials: 'include',
+    });
 
         const data = await response.json();
     
@@ -195,13 +200,11 @@ async function loadFriends() {
 }
 
 async function loadPendingRequests() {
-    try {
-        const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-        const response = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
+  try {
+    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+    const response = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
+      credentials: 'include',
+    });
 
         const data = await response.json();
     
@@ -235,9 +238,7 @@ async function searchUsers(query: string) {
   try {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/search?q=${encodeURIComponent(query)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -258,9 +259,9 @@ async function sendFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/request`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
       },
       body: JSON.stringify({ friendId })
     });
@@ -287,9 +288,7 @@ async function acceptFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/accept/${friendId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -310,9 +309,7 @@ async function rejectFriendRequest(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/reject/${friendId}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -336,9 +333,7 @@ async function removeFriend(friendId: number) {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/${friendId}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-      }
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -373,7 +368,7 @@ async function displayFriends(friends: User[]) {
     const statusText = isOnline ? 'Online' : 'Offline';
 
     return `
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
         <div style="display: flex; align-items: center; gap: 15px;">
           ${friend.avatar ? 
             `<img 
@@ -388,7 +383,6 @@ async function displayFriends(friends: User[]) {
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <strong style="color: white;">${friend.username}</strong>
-              <!-- ADD THIS: Online status indicator -->
               <div style="display: flex; align-items: center; gap: 5px;">
                 <div style="
                   width: 8px; 
@@ -430,11 +424,11 @@ function displayPendingRequests(requests: User[]) {
   }
 
   container.innerHTML = requests.map(user => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${user.avatar ? 
-          `<img 
-            src="${user.avatar}" 
+        ${user.avatar ?
+          `<img
+            src="${user.avatar}"
             alt="${user.username}"
             style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -448,15 +442,15 @@ function displayPendingRequests(requests: User[]) {
         </div>
       </div>
       <div style="display: flex; gap: 10px;">
-        <button 
+        <button
           onclick="window.acceptRequest(${user.id})"
-          style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon primary"
         >
           ✓ Accept
         </button>
-        <button 
+        <button
           onclick="window.rejectRequest(${user.id})"
-          style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer;"
+          class="btn btn-neon accent"
         >
           ✗ Reject
         </button>
@@ -478,11 +472,11 @@ function displaySearchResults(results: User[]) {
   }
 
   container.innerHTML = results.map(user => `
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #374151; border-radius: 8px; margin-bottom: 10px;">
+    <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
       <div style="display: flex; align-items: center; gap: 15px;">
-        ${user.avatar ? 
-          `<img 
-            src="${user.avatar}" 
+        ${user.avatar ?
+          `<img
+            src="${user.avatar}"
             alt="${user.username}"
             style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"
           >` :
@@ -496,13 +490,13 @@ function displaySearchResults(results: User[]) {
         </div>
       </div>
       <div>
-        ${user.friendshipStatus === 'accepted' ? 
+        ${user.friendshipStatus === 'accepted' ?
           '<span style="color: #10b981;">✓ Friends</span>' :
-          user.friendshipStatus === 'pending' ? 
+          user.friendshipStatus === 'pending' ?
           '<span style="color: #f59e0b;">⏳ Request Sent</span>' :
-          `<button 
+          `<button
             onclick="window.sendRequest(${user.id})"
-            style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;"
+            class="btn btn-neon primary"
           >
             + Add Friend
           </button>`
