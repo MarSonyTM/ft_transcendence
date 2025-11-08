@@ -38,7 +38,7 @@ export async function renderProfilePage(): Promise<void> {
         const backBtn = document.getElementById('backToLandingBtn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
-                history.pushState({ page: 'landing' }, '', '/landing');
+                history.pushState({ page: 'landing' }, '', '/');
                 setCurrentPage('landing');
                 renderApp();
             });
@@ -136,8 +136,8 @@ export async function renderProfilePage(): Promise<void> {
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
-            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-            setCurrentPage('gameSelect');
+            history.pushState({ page: 'landing' }, '', '/');
+            setCurrentPage('landing');
             renderApp();
         });
     }
