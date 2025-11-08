@@ -37,8 +37,8 @@ async function handleRouting(): Promise<void> {
     
     if (!user) {
       console.log('User not authenticated, redirecting to login');
-      if (path !== '/login') {
-        history.pushState({ page: 'login' }, '', '/login');
+      if (path !== '/ping-pong') {
+        history.pushState({ page: 'pingPong' }, '', '/ping-pong');
         window.dispatchEvent(new PopStateEvent('popstate'));
       }
       return;
