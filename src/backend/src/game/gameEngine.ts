@@ -503,14 +503,19 @@ export class BaseGameEngine {
     }
 
     private broadcastScoreUpdate(): void {
+        const maxPlayers = this.gameState.mode === '2P' ? 2 : 4;
+        const players = [];
+        for (let i = 0; i < maxPlayers; i++) {
+            players.push({
+                score: this.gameState.players[i]?.score || 0
+            });
+        }
+
         const scoreUpdate = {
             type: 'score',
             gameId: this.gameState.gameId,
             mode: this.gameState.mode,
-            scorePlayer1: this.gameState.players[0]?.score || 0,
-            scorePlayer2: this.gameState.players[1]?.score || 0,
-            scorePlayer3: this.gameState.players[2]?.score || 0,
-            scorePlayer4: this.gameState.players[3]?.score || 0,
+            players: players,
             timestamp: Date.now()
         };
 

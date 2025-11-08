@@ -1,6 +1,7 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
+import { createPingPongBalls } from '../utils/pingPongBalls';
 
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -50,6 +51,8 @@ export async function renderLandingPage(): Promise<void> {
                 renderApp();
             });
         }
+        // Add ping pong balls animation
+        createPingPongBalls();
         // Leaderboard is only available for authenticated users
         return;
     }
@@ -94,4 +97,7 @@ export async function renderLandingPage(): Promise<void> {
             renderApp();
         });
     }
+    
+    // Add ping pong balls animation
+    createPingPongBalls();
 }

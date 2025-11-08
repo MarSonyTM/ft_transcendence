@@ -20,6 +20,7 @@ import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
+import { removePingPongBalls } from './utils/pingPongBalls';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -175,9 +176,11 @@ export async function renderApp(): Promise<void> {
       renderChangeEmailPage();
       break;
     case '2PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render2PlayerGame();
       break;
     case '4PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render4PlayerGame();
       break;
     case 'friends':

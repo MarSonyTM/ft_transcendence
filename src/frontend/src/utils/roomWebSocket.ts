@@ -158,12 +158,23 @@ export class RoomWebSocketManager {
 
             case 'score':
                 if (this.config.onScore) {
-                    this.config.onScore({
-                        scorePlayer1: message.scorePlayer1,
-                        scorePlayer2: message.scorePlayer2,
-                        scorePlayer3: message.scorePlayer3,
-                        scorePlayer4: message.scorePlayer4
-                    });
+                    // Support both old format (scorePlayer1, etc.) and new format (players array)
+                    if (Array.isArray(message.players)) {
+                        this.config.onScore({
+                            scorePlayer1: message.players[0]?.score || 0,
+                            scorePlayer2: message.players[1]?.score || 0,
+                            scorePlayer3: message.players[2]?.score || 0,
+                            scorePlayer4: message.players[3]?.score || 0
+                        });
+                    } else {
+                        // Fallback to old format for backward compatibility
+                        this.config.onScore({
+                            scorePlayer1: message.scorePlayer1 || 0,
+                            scorePlayer2: message.scorePlayer2 || 0,
+                            scorePlayer3: message.scorePlayer3 || 0,
+                            scorePlayer4: message.scorePlayer4 || 0
+                        });
+                    }
                 }
                 break;
 
