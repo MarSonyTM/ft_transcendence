@@ -253,18 +253,17 @@ export class BaseGameEngine {
     private processPlayerInputs(): void {
         this.playerKeyStates.forEach((keys, playerId) => {
             const is2P = this.gameState.mode === '2P';
-            if ((playerId === 1 || (!is2P && playerId === 3)) && this.gameState.players[playerId - 1].pos !== undefined) {
-                let newPos = this.gameState.players[playerId - 1].pos;
-                const maxYPos = this.maxY - this.paddleHeight;
-                if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-                if (newPos !== this.gameState.players[playerId - 1].pos) {
-                    this.gameState.players[playerId - 1].pos = newPos;
-                }
-            }
-
             if (this.gameState.players[playerId - 1].pos !== undefined) {
-                if (is2P && playerId === 2) {
+                if ((playerId === 1 || (!is2P && playerId === 3))) {
+                    let newPos = this.gameState.players[playerId - 1].pos;
+                    const maxYPos = this.maxY - this.paddleHeight;
+                    if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                    if (newPos !== this.gameState.players[playerId - 1].pos) {
+                        this.gameState.players[playerId - 1].pos = newPos;
+                    }
+                }
+                else if (is2P && playerId === 2) {
                     let newPos = this.gameState.players[playerId - 1].pos;
                     const maxYPos = this.maxY - this.paddleHeight;
                     if (keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
@@ -280,15 +279,15 @@ export class BaseGameEngine {
                     if (newPos !== this.gameState.players[playerId - 1].pos) {
                         this.gameState.players[playerId - 1].pos = newPos;
                     }
-                } else if (!is2P && playerId === 3) {
-                    let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxYPos = this.maxY - this.paddleHeight;
-                    if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-                    if (newPos !== this.gameState.players[playerId - 1].pos) {
-                        this.gameState.players[playerId - 1].pos = newPos;
-                    }
-                }
+                } //lse if (!is2P && playerId === 3) {
+                //     let newPos = this.gameState.players[playerId - 1].pos;
+                //     const maxYPos = this.maxY - this.paddleHeight;
+                //     if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                //     if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                //     if (newPos !== this.gameState.players[playerId - 1].pos) {
+                //         this.gameState.players[playerId - 1].pos = newPos;
+                //     }
+                // }
             }
         });
     }

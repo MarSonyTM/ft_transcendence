@@ -22,7 +22,7 @@ import { GameState } from '../../../shared/gameTypes';
 
 let activeTournamentGame: PongGame | undefined = undefined;
 let isGameActive = false;
-let tournamentWS: any = null;
+let tournamentWS: RoomWebSocketManager | undefined = undefined;
 let tournamentControlsCleanup: (() => void) | undefined = undefined;
 
 function getApiEndpoint(): string {
@@ -624,15 +624,11 @@ async function showTournamentGame(match: TournamentMatch, gameId: number): Promi
 	gameContainer.style.display = 'block';
 	isGameActive = true;
 
-	if (activeTournamentGame) {
-		cleanupGame(activeTournamentGame);
-		await activeTournamentGame.endGame();
-		activeTournamentGame = undefined;
-	}
-
-	activeTournamentGame = new PongGame();
+	if (!activeTournamentGame)
+		activeTournamentGame = new PongGame();
 	activeTournamentGame.gameId = gameId;
 	const room = getCurrentRoom();
+	if (!room) return;
 	const p1Name = match.p1?.name || room?.players?.[0]?.name || 'Player 1';
 	const p2Name = match.p2?.name || room?.players?.[1]?.name || 'Player 2';
 	(document.getElementById('player1Name') || { textContent: '' }).textContent = p1Name;
@@ -783,7 +779,7 @@ function cleanupActiveGame(): void {
 	}
 	if (tournamentWS) {
 		try { tournamentWS.disconnect(); } catch {}
-		tournamentWS = null;
+		tournamentWS = undefined;
 	}
 	isGameActive = false;
 }

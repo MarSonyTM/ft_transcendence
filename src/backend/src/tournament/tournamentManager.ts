@@ -222,7 +222,7 @@ export class TournamentManager {
 
 	public startMatch(tId: number, matchId: number): void {
 		const state = this.loadTournamentState(tId);
-		if (!state || !state.matches) return;
+		if (!state) throw new Error('Unable to load Tournament.');
 
 		let match = database.tournaments.getMatchById(tId, matchId);
 		if (!match || match.status !== 'ready') return;
@@ -237,8 +237,8 @@ export class TournamentManager {
 			startedAt: nowISO()
 		});
 
-		const p1 = state.players?.find(p => p.id === match?.p1?.id)!;
-		const p2 = state.players?.find(p => p.id === match?.p2?.id)!;
+		const p1 = state.players?.find(p => p.id === state.curMatch?.p1?.id)!;
+		const p2 = state.players?.find(p => p.id === state.curMatch?.p2?.id)!;
 
 		const runtimeGameState = {
 			gameId: game.id,
@@ -247,7 +247,7 @@ export class TournamentManager {
 					id: p1.id,
 					gameId: game.id,
 					name: p1.name,
-					pos: p1.pos || undefined,
+					pos: p1.pos !== undefined ? p1.pos : 70,
 					score: p1.score || 0,
 					connectionStatus: 'connected',
 					lastActivity: nowISO()
@@ -256,7 +256,7 @@ export class TournamentManager {
 					id: p2.id,
 					gameId: game.id,
 					name: p2.name,
-					pos: p2.pos || undefined,
+					pos: p2.pos !== undefined ? p2.pos : 70,
 					score: p2.score || 0,
 					connectionStatus: 'connected',
 					lastActivity: nowISO()

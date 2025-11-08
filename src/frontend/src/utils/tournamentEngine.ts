@@ -62,8 +62,12 @@ export function createTournament(): Tournament {
     return state;
 }
 
-export function getTournament(): Tournament | undefined {
-	return state;
+export function getTournament(): Tournament {
+    if (state === undefined)
+        state = createTournament();
+    if (state === undefined)
+        throw new Error('Unable to get/create Tournament.');
+    return state;
 }
 
 function createUniqueId(idx: number, type: TPT) : string {
@@ -155,24 +159,6 @@ export function buildBracket(): TournamentMatch[] {
     return state.matches;
 }
 
-// export function updateHistory(): void {//TODO:MERGE use this?
-//     if (!state || !state.matches) return;
-//     if (!state.matchHistory) state.matchHistory = [];
-//     for (const m of state.matches) {
-//         if (m.status !== 'completed') continue;
-//         state.matchHistory.push({
-//             matchId: m.matchId,
-//             p1: m.p1!,
-//             p2: m.p2!,
-//             winner: m.winner,
-//             loser: m.loser,
-//             createdAt: m.createdAt!,
-//             startedAt: m.startedAt,
-//             finishedAt: m.finishedAt,
-//         });
-//     }
-// }
-
 export function getCurrentMatch(): TournamentMatch | undefined {
 	if (!state) return undefined;
 	if (state.curMatch === undefined ||
@@ -223,7 +209,6 @@ export function advanceAfterResult(matchId: number, winnerId: number, p1Score: n
         state.curMatch = undefined;
         state.finishedAt = new Date().toISOString();
         state.updatedAt = new Date().toISOString();
-        // updateHistory();
         persistArchive();
     }
     state.updatedAt = new Date().toISOString();
@@ -238,14 +223,14 @@ export function setMatchLiveInfo(matchId: number, info: Partial<Pick<TournamentM
 		m.startedAt = new Date().toISOString();
         state.updatedAt = new Date().toISOString();
 	}
-    // if (info.gameId) {
-    //     m.gameId = info.gameId;
-    //     state.updatedAt = new Date().toISOString();
-    // }
-    // if (info.roomId) {
-    //     m.roomId = info.roomId;
-    //     state.updatedAt = new Date().toISOString();
-    // }
+    if (info.gameId) {
+        m.gameId = info.gameId;
+        state.updatedAt = new Date().toISOString();
+    }
+    if (info.roomId) {
+        m.roomId = info.roomId;
+        state.updatedAt = new Date().toISOString();
+    }
 }
 
 function persistArchive(): void {
@@ -342,7 +327,7 @@ function relevelRoundsByDependencies(): void {
 export function startTournamentIfReady(): boolean {
     if (!state) createTournament();
     if (!state) return false;
-    if ((state.players?.length || 0) < 3) return false;
+    if (!state.players || state.players?.length < 3) return false;
     state.status = 'in_progress';
     state.startedAt = new Date().toISOString();
     state.updatedAt = new Date().toISOString();
