@@ -20,9 +20,7 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
 
   console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
 
-  const currentUser = authService.getCurrentUser();
-  
-  let user = currentUser;
+  let user = await authService.getCurrentUser();
   if (!user && authService.isAuthenticated()) {
     user = await authService.fetchUserProfile();
   }
