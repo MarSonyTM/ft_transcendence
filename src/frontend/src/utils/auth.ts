@@ -62,6 +62,13 @@ export class AuthService {
    * Initialize authentication by checking for stored token
    */
   private async initializeAuth(): Promise<void> {
+    const path = window.location.pathname;
+    console.log('🔧 initializeAuth called, path:', path);
+    // Skip auto-fetch on auth callback page - it will handle auth explicitly
+    if (path.includes('/auth/callback')) {
+      console.log('⏭️ Skipping init on auth callback page');
+      return;
+    }
     await this.fetchUserProfile();
   }
 
@@ -96,6 +103,8 @@ export class AuthService {
 
   // Fetch user profile from backend
   async fetchUserProfile(): Promise<UserProfile | null> {
+    console.log('🔍 fetchUserProfile called from:', window.location.pathname);
+    
     if (localStorage.getItem("isGuest")) {
       // Guest mode: read cached user directly to avoid recursion
       try {
@@ -109,10 +118,14 @@ export class AuthService {
     }
 
     const path = window.location.pathname;
-    if (publicPages.includes(path)) {
+    // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
+    // (Auth callback will call this after setting the token cookie)
+    if (publicPages.includes(path) && !path.includes('/auth/callback')) {
+      console.log('⏭️ Skipping profile fetch on public page:', path);
       return null;
     }
 
+    console.log('📡 Fetching user profile from backend...');
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
       credentials: "include",

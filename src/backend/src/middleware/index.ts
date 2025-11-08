@@ -36,6 +36,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/api/auth/google',
         '/api/auth/google/callback',
         '/api/auth/google/verify',
+        '/api/auth/set-token',
         
         // Static assets
         '/favicon.ico',

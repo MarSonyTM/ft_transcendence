@@ -645,6 +645,51 @@ async function userRoutes(
     }
   });
 
+  // Set token as cookie (for OAuth callback)
+  fastify.post("/set-token", async (request, reply) => {
+    try {
+      const { token } = request.body as { token: string };
+
+      if (!token) {
+        reply.code(400).send({
+          success: false,
+          message: "Token is required",
+        });
+        return;
+      }
+
+      // Verify the JWT token
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET!) as { id: number; email: string; username: string };
+        
+        // Set the cookie
+        reply.setCookie("token", token, {
+          httpOnly: true,
+          secure: false,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60, // 1 week
+        });
+
+        reply.code(200).send({
+          success: true,
+          message: "Token set successfully",
+        });
+      } catch (error) {
+        reply.code(401).send({
+          success: false,
+          message: "Invalid token",
+        });
+      }
+    } catch (error) {
+      fastify.log.error(error);
+      reply.code(500).send({
+        success: false,
+        message: "Failed to set token",
+      });
+    }
+  });
+
   fastify.post("/guest", async (request, reply) => {
     try {
       const { username } = request.body as GuestUserInput;

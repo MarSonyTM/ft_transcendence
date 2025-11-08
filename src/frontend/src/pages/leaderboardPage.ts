@@ -130,9 +130,9 @@ export async function renderLeaderboardPage(): Promise<void> {
     const leader = leaderboard[0];
 
     root.innerHTML = `
-        <div class="neon-grid">
+        <div class="neon-grid" style="display: flex; flex-direction: column; align-items: center; gap: 2em;">
             <div class="grid-anim"></div>
-            <div class="glass-card" style="max-width: 1200px;">
+            <div class="glass-card" style="max-width: 1200px; width: 100%;">
                 <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Leaderboard</h2>
                 
                 <div class="games-section">
@@ -166,31 +166,62 @@ export async function renderLeaderboardPage(): Promise<void> {
                                         let winnerName = 'Unknown';
                                         let loserName = 'Unknown';
                                         
-                                        if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
-                                            // Find winner by winnerId or by highest score
-                                            let winner, loser;
-                                            
-                                            if (game.winner) {
-                                                winner = game.players.find((p: any) => p.id === game.winner);
-                                                loser = game.players.find((p: any) => p.id !== game.winner);
-                                            } else {
-                                                // Sort by score to find winner
-                                                const sortedPlayers = [...game.players].sort((a: any, b: any) => 
-                                                    (b.score || 0) - (a.score || 0)
-                                                );
-                                                winner = sortedPlayers[0];
-                                                loser = sortedPlayers[1];
-                                            }
-                                            // Get winner name and AI status
-                                            if (winner) {
-                                                winnerName = winner.username || `Player ${winner.id}`;
-                                            }
-                                            
-                                            // Get loser name and AI status
-                                            if (loser) {
-                                                loserName = loser.username || `Player ${loser.id}`;
+                                        // Parse players if it's a string
+                                        let players = game.players;
+                                        if (typeof players === 'string') {
+                                            try {
+                                                players = JSON.parse(players);
+                                            } catch (e) {
+                                                console.error('Failed to parse players:', e);
+                                                players = [];
                                             }
                                         }
+                                        
+                                        if (players && Array.isArray(players) && players.length >= 2) {
+                                            // Sort players by score to determine winner/loser
+                                            const sortedPlayers = [...players].sort((a: any, b: any) => 
+                                                (b.score || 0) - (a.score || 0)
+                                            );
+                                            
+                                            const winner = sortedPlayers[0];
+                                            const loser = sortedPlayers[1];
+                                            
+                                            // Get winner name - try multiple fields
+                                            if (winner) {
+                                                winnerName = winner.username || winner.name || 
+                                                    (typeof game.winner === 'string' ? game.winner : null) ||
+                                                    `Player ${winner.id || winner.playerId || '?'}`;
+                                            } else if (game.winner) {
+                                                // Fallback to game.winner if it's a string
+                                                winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
+                                            }
+                                            
+                                            // Get loser name - try multiple fields
+                                            if (loser) {
+                                                loserName = loser.username || loser.name || 
+                                                    `Player ${loser.id || loser.playerId || '?'}`;
+                                            } else if (players.length > 0) {
+                                                // If we found winner but not loser, get the other player
+                                                const otherPlayer = players.find((p: any) => {
+                                                    const pName = p.username || p.name;
+                                                    const wName = winnerName;
+                                                    return pName && pName !== wName;
+                                                });
+                                                if (otherPlayer) {
+                                                    loserName = otherPlayer.username || otherPlayer.name || 
+                                                        `Player ${otherPlayer.id || otherPlayer.playerId || '?'}`;
+                                                }
+                                            }
+                                        } else if (game.winner) {
+                                            // Fallback: use game.winner if players array is missing
+                                            winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
+                                        }
+                                        
+                                        console.log(`[LEADERBOARD] Game #${sortedGames.length - index} - Winner: ${winnerName}, Loser: ${loserName}`, {
+                                            players: players,
+                                            winner: game.winner,
+                                            winnerId: game.winnerId
+                                        });
 
                                         return `
                                             <div style="background: rgba(255, 255, 255, 0.05); padding: 1em; border-radius: 6px; border-left: 3px solid rgb(59 130 246);">
@@ -222,37 +253,53 @@ export async function renderLeaderboardPage(): Promise<void> {
                                         let loserNames: string[] = ['Unknown', 'Unknown', 'Unknown', 'Unknown'];
                                         
                                         if (game.players && Array.isArray(game.players) && game.players.length >= 2) {
-                                            // Find winner by winnerId or by highest score
+                                            // Find winner by winner username, winnerId, or by highest score
                                             let winner;
                                             let losers = new Array<Player>();
                                             
                                             if (game.winner) {
-                                                winner = game.players.find((p: any) => p.id === game.winner);
-                                                let i = 0;
-                                                for (i; game.players[i]; i++) {
-                                                    if (game.players[i].username !== game.winner.username)
-                                                        losers.push(game.players[i]);
-                                                }
+                                                // game.winner is a username string, not an ID
+                                                winner = game.players.find((p: any) => 
+                                                    p.username === game.winner || 
+                                                    p.id === game.winnerId || 
+                                                    p.id?.toString() === game.winnerId?.toString()
+                                                );
+                                                losers = game.players.filter((p: any) => 
+                                                    p.username !== game.winner && 
+                                                    p.id !== game.winnerId && 
+                                                    p.id?.toString() !== game.winnerId?.toString()
+                                                );
+                                            } else if (game.winnerId) {
+                                                // Try to find by winnerId
+                                                winner = game.players.find((p: any) => 
+                                                    p.id === game.winnerId || 
+                                                    p.id?.toString() === game.winnerId?.toString()
+                                                );
+                                                losers = game.players.filter((p: any) => 
+                                                    p.id !== game.winnerId && 
+                                                    p.id?.toString() !== game.winnerId?.toString()
+                                                );
                                             } else {
                                                 // Sort by score to find winner
                                                 const sortedPlayers = [...game.players].sort((a: any, b: any) => 
                                                     (b.score || 0) - (a.score || 0)
                                                 );
                                                 winner = sortedPlayers[0];
-                                                losers[0] = sortedPlayers[1];
-                                                losers[1] = sortedPlayers[2];
-                                                losers[2] = sortedPlayers[3];
+                                                losers = sortedPlayers.slice(1);
                                             }
-                                            // Get winner name and AI status
+                                            // Get winner name
                                             if (winner) {
-                                                winnerName = winner.username || `Player ${winner.id}`;
+                                                winnerName = winner.username || winner.name || `Player ${winner.id}`;
+                                            } else if (game.winner) {
+                                                // Fallback to game.winner if it's a string
+                                                winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
                                             }
                                             
-                                            // Get loser name and AI status
-                                            if (losers) {
-                                                let i = 0;
-                                                for (i; losers[i]; i++)
-                                                    loserNames[i] = losers[i].username || `Player ${losers[i].id}`;
+                                            // Get loser names
+                                            if (losers && losers.length > 0) {
+                                                for (let i = 0; i < Math.min(losers.length, 3); i++) {
+                                                    loserNames[i] = losers[i].username || losers[i].name || `Player ${losers[i].id}`;
+                                                }
                                             }
                                         }
 
@@ -289,8 +336,8 @@ export async function renderLeaderboardPage(): Promise<void> {
                     </div>
                 </div>
             </div>
-
-            <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
+            
+            <button id="backToLandingBtn" class="btn btn-back glass-card" style="position: relative; z-index: 10; padding: 0.9em 1.6em; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04)); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">Back to Home</button>
         </div>
 
         <style>

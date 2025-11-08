@@ -9,13 +9,24 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
     const success = urlParams.get('success');
     const error = urlParams.get('error');
     const email = urlParams.get('email');
+    const token = urlParams.get('token');
     const needEmailVerification = urlParams.get('needEmailVerification');
+
+    console.log('🔍 Auth Callback - URL params:', {
+        success,
+        hasToken: !!token,
+        tokenPreview: token ? token.substring(0, 30) + '...' : 'NO TOKEN',
+        email,
+        needEmailVerification,
+        fullURL: window.location.href
+    });
 
     if (success === 'true') {
         authService.setPendingEmailVerification(email || '');
         if (needEmailVerification === 'true') {
             authService.setNeededEmailVerification(true);
         }
+        
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
                 <h2 style="color: #4ade80; margin-bottom: 1em;">Authentication Successful!</h2>
@@ -30,7 +41,33 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
             </style>
         `;
 
-        await authService.fetchUserProfile();
+        // Send the token to backend to set it as a cookie
+        if (token) {
+            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+            try {
+                console.log('🔄 Setting token cookie via backend...');
+                const response = await fetch(`${apiEndpoint}/api/auth/set-token`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+                
+                if (response.ok) {
+                    console.log('✅ Token cookie set by backend');
+                    // Now fetch user profile with the cookie set
+                    await authService.fetchUserProfile();
+                } else {
+                    console.error('❌ Failed to set token cookie:', response.status);
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Error details:', errorData);
+                }
+            } catch (error) {
+                console.error('❌ Error setting token cookie:', error);
+            }
+        } else {
+            console.error('❌ No token found in URL parameters');
+        }
 
         
         // Redirect to dashboard after short delay
