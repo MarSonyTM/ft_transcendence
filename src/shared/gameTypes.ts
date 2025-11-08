@@ -12,7 +12,7 @@ export interface Player {
 export interface GameState {
   id?: number;
   gameId?: number;
-  players: Player[];//players: any[];//
+  players: any[];//Player[];
   ballPosX: number;
   ballPosY: number;
   ballVelX?: number;

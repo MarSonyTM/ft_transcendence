@@ -1,6 +1,6 @@
 import { PongGame } from "../game/PongGame";
 import { GameRoom, getCurrentRoom } from "./roomState";
-import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from "./auth";
 import { baby3D } from "../game/game3D";
 
@@ -259,44 +259,44 @@ export async function setEffectiveRoom(): Promise<GameRoom | null> {
     return effectiveRoom || null;
 }
 
-// export function setupRoomKeyboardControls(ws: RoomWebSocketManager, hasLocal: boolean): () => void {
-//     const keys: { [key: string]: boolean } = {};
-//     const movementKeys = new Set<string>(['w', 's', 'o', 'l']);
+export function setupRoomKeyboardControls(ws: RoomWebSocketManager, hasLocal: boolean): () => void {
+    const keys: { [key: string]: boolean } = {};
+    const movementKeys = new Set<string>(['w', 's', 'o', 'l']);
 
-//     const handleKeyDown = (e: KeyboardEvent) => {
-//         const key = e.key.toLowerCase();
-//         const wasPressed = keys[key];
-//         keys[key] = true;
-//         if (!wasPressed && movementKeys.has(key)) {
-//             e.preventDefault();
-//             const isGuestKey = key === 'o' || key === 'l';
-//             if (isGuestKey && hasLocal) {
-//                 ws.sendKeyState(key, true, true);
-//             } else if (!isGuestKey) {
-//                 ws.sendKeyState(key, true, false);
-//             }
-//         }
-//     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        const wasPressed = keys[key];
+        keys[key] = true;
+        if (!wasPressed && movementKeys.has(key)) {
+            e.preventDefault();
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, true, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, true, false);
+            }
+        }
+    };
 
-//     const handleKeyUp = (e: KeyboardEvent) => {
-//         const key = e.key.toLowerCase();
-//         keys[key] = false;
-//         if (movementKeys.has(key)) {
-//             const isGuestKey = key === 'o' || key === 'l';
-//             if (isGuestKey && hasLocal) {
-//                 ws.sendKeyState(key, false, true);
-//             } else if (!isGuestKey) {
-//                 ws.sendKeyState(key, false, false);
-//             }
-//         }
-//     };
+    const handleKeyUp = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase();
+        keys[key] = false;
+        if (movementKeys.has(key)) {
+            const isGuestKey = key === 'o' || key === 'l';
+            if (isGuestKey && hasLocal) {
+                ws.sendKeyState(key, false, true);
+            } else if (!isGuestKey) {
+                ws.sendKeyState(key, false, false);
+            }
+        }
+    };
 
-//     document.addEventListener('keydown', handleKeyDown);
-//     document.addEventListener('keyup', handleKeyUp);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
-//     return () => {
-//         document.removeEventListener('keydown', handleKeyDown);
-//         document.removeEventListener('keyup', handleKeyUp);
-//     };
-// }
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+    };
+}
 

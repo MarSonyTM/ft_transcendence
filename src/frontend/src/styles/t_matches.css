@@ -52,11 +52,6 @@
 	background: rgba(234, 179, 8, 0.05);
 }
 
-.t-bracket-disputed {
-	border-color: rgba(239, 68, 68, 0.5);
-	background: rgba(239, 68, 68, 0.1);
-}
-
 .t-bracket-player {
 	padding: 0.25rem 0.5rem;
 	font-size: 0.9em;
@@ -99,16 +94,6 @@
 	color: rgb(156, 163, 175);
 	text-transform: uppercase;
 	letter-spacing: 0.1em;
-	margin-top: 0.25rem;
-}
-
-.t-bracket-disputed-badge {
-	text-align: center;
-	font-size: 0.7em;
-	color: rgb(239, 68, 68);
-	text-transform: uppercase;
-	letter-spacing: 0.1em;
-	font-weight: bold;
 	margin-top: 0.25rem;
 }
 

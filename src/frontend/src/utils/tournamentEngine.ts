@@ -1,94 +1,77 @@
-import { User, Tournament, TournamentPlayer, TournamentMatch, MatchSummary, TournamentArchive } from '../../../shared/tournamentTypes';
+import { User, Tournament, TournamentPlayer, TournamentMatch, MatchSummary, TournamentArchive, TPT } from '../../../shared/tournamentTypes';
 import { authService } from './auth';
 
-// Simple in-memory tournament store with localStorage archive//TODO:MERGE change
 let state: Tournament | undefined = undefined;
 
 const LS_ARCHIVE_KEY = 'tournamentArchive';
 const BYE_PREFIX = '__BYE__-';
 const isByeId = (identityCheck?: string) => !!identityCheck && identityCheck.startsWith(BYE_PREFIX);
 
+let nextPlayerId = 1;
+let nextMatchId = 1;
+
 export function createTournament(): Tournament {
-	state = {
-		tournamentId: 0,
-		status: 'setup',
-        format: 'single_elimination',
+    state = {
+        tId: Date.now(),
+        status: 'idle',
         players: [],
-		createdAt: new Date().toISOString(),
+        queue: [],
+        matches: [],
+        curMatch: undefined,
+        nextMatches: [],
+        matchHistory: [],
+        createdAt: new Date().toISOString(),
         startedAt: '',
         finishedAt: '',
         updatedAt: new Date().toISOString(),
+        champion: undefined,
         matchDelay: 3
-	};
+    } as Tournament;
 
-    let user: User | undefined = undefined;
-    const isUser = authService.getCurrentUser();
-    if (isUser) {
-        user = {
-            id: parseInt(isUser.id),
-            username: isUser.username,
-            email: isUser.email,
-            avatar: isUser.avatar,
-            gamesWon: isUser.gamesWon,
-            gamesLost: isUser.gamesLost
+    try {
+        const usr = authService.getCurrentUser();
+        if (usr) {
+            const user: User = {
+                id: parseInt(usr.id),
+                username: usr.username,
+                email: usr.email,
+                avatar: usr.avatar,
+                gamesWon: usr.gamesWon,
+                gamesLost: usr.gamesLost
+            };
+            const p: TournamentPlayer = {
+                id: nextPlayerId++,
+                name: user.username,
+                tId: state.tId,
+                identity: '',
+                user,
+                tpt: 'host',
+                isReady: false,
+                pos: undefined,
+                score: 0,
+                eliminated: false,
+                wins: 0,
+                losses: 0,
+                connectionStatus: 'connected',
+                lastActivity: new Date().toISOString()
+            } as TournamentPlayer;
+            p.identity = createUniqueId(p.id, 'host');
+            state.players = [p];
         }
-    }
-    if (user) {
-        const hostPlayer: TournamentPlayer = {
-            id: 0,
-            name: user.username,
-            tournamentId: state.tournamentId,
-            user,
-            isAI: false,
-            isLocalGuest: false,
-            isRemote: false,
-            isHost: true,
-            isReady: false,
-            score: 0,
-            wins: 0,
-            losses: 0,
-            totalScore: 0,
-            averageScore: 0,
-            connectionStatus: 'connected',
-            lastActivity: new Date().toISOString()
-        } as TournamentPlayer;
-        state.players.push(hostPlayer);
-    }
-	return state;
+    } catch {/* ignore auth errors */}
+    return state;
 }
 
 export function getTournament(): Tournament | undefined {
 	return state;
 }
 
-export function addPlayer(name: string, opts?: { isAI?: boolean; isLocalGuest?: boolean; isRemote?: boolean; isHost?: boolean, isReady?: boolean, user?: User }): TournamentPlayer {
-	if (!state) createTournament();
-    const nextIdx = (state?.players?.length ?? 0) + 1;
-    const uniqueId = `p-${state!.tournamentId}-${nextIdx}-${Math.random().toString(36).slice(2,6)}`;
-	const player: TournamentPlayer = {
-        id: nextIdx,
-		name: opts?.user ? opts.user.username : name,
-        tournamentId: state!.tournamentId,
-        identity: uniqueId,
-        user: opts?.isLocalGuest ? undefined : opts?.user,
-		isAI: opts?.isAI,
-		isLocalGuest: opts?.isLocalGuest,
-		isRemote: opts?.isRemote,
-        isHost: opts?.isHost,
-        isReady: opts?.isAI ? true : false,
-        score: 0,
-        wins: 0,
-        losses: 0,
-        connectionStatus: 'connected',
-        lastActivity: new Date().toISOString(),
-	};
-	state?.players.push(player);
-	return player;
-}
-
-export function removePlayer(id: number): void {
-	if (!state) return;
-	state.players = state.players?.filter(p => p.id !== id);
+function createUniqueId(idx: number, type: TPT) : string {
+    if (!state) {
+        console.log('Unable to create unique ID, missing state');
+        return ``;
+    }
+    return `${type}-${state!.tId}-${idx}-${Math.random().toString(36).slice(2,6)}`;
 }
 
 // Build a single-elimination bracket with random first-round pairing.
@@ -97,6 +80,10 @@ export function buildBracket(): TournamentMatch[] {
     if (!state) throw new Error('No tournament');
     const players = [...(state.players as TournamentPlayer[])];
 
+    for (const p of players) {
+        if (!p.identity) p.identity = createUniqueId(p.id, (p.tpt || 'local') as TPT);
+    }
+
     // Shuffle players for random pairing
     for (let i = players.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -104,16 +91,15 @@ export function buildBracket(): TournamentMatch[] {
     }
 
     const rounds: TournamentMatch[][] = [];
-    let matchId = 1;
 
     // Round 1: pair sequentially; if odd, last player gets implicit BYE (p2 undefined)
     const r1: TournamentMatch[] = [];
     for (let i = 0; i < players.length; i += 2) {
         const p1 = players[i];
         const p2 = players[i + 1];
-        r1.push({
-            matchId: matchId++,
-            tournamentId: state.tournamentId!,
+        let x: Partial<TournamentMatch> = {
+            tId: state.tId!,
+            roomId: '',
             status: 'pending',
             p1,
             p2,
@@ -121,8 +107,10 @@ export function buildBracket(): TournamentMatch[] {
             startedAt: '',
             finishedAt: '',
             round: 1,
-            indexInRound: Math.floor(i / 2),
-        });
+            indexInRound: Math.floor(i / 2)
+        };
+        (x as any).matchId = nextMatchId++;
+        r1.push(x as TournamentMatch);
     }
     rounds.push(r1);
 
@@ -132,9 +120,9 @@ export function buildBracket(): TournamentMatch[] {
     while (prev.length > 1) {
         const cur: TournamentMatch[] = [];
         for (let i = 0; i < prev.length; i += 2) {
-            const m: TournamentMatch = {
-                matchId: matchId++,
-                tournamentId: state.tournamentId!,
+            let y: Partial<TournamentMatch> = {
+                tId: state.tId!,
+                roomId: '',
                 status: 'pending',
                 createdAt: new Date().toISOString(),
                 startedAt: '',
@@ -142,54 +130,55 @@ export function buildBracket(): TournamentMatch[] {
                 round: roundNum,
                 indexInRound: Math.floor(i / 2),
             };
-            prev[i].nextMatchId = m.matchId;
+            (y as any).matchId = nextMatchId++;
+            prev[i].nextMatchId = (y as any).matchId;
             prev[i].nextSlot = 'p1';
             if (i + 1 < prev.length) {
-                prev[i + 1].nextMatchId = m.matchId;
+                prev[i + 1].nextMatchId = (y as any).matchId;
                 prev[i + 1].nextSlot = 'p2';
             }
-            cur.push(m);
+            cur.push(y as TournamentMatch);
         }
         rounds.push(cur);
         prev = cur;
         roundNum++;
     }
 
-    state.matches = rounds.flat();
+    const flat = rounds.flat();
+    state.matches = flat;
     autoResolveByes();
     relevelRoundsByDependencies();
 
-    state.currentMatch = findNextPlayableMatch(state.matches);
+    state.curMatch = findNextPlayableMatch(state.matches);
     state.status = 'in_progress';
     state.updatedAt = new Date().toISOString();
     return state.matches;
 }
 
-export function updateHistory(): void {//TODO:MERGE use this?
-    if (!state || !state.matches) return;
-    if (!state.matchHistory) state.matchHistory = [];
-    for (const m of state.matches) {
-        if (m.status !== 'completed') continue;
-        state.matchHistory.push({
-            matchId: m.matchId,
-            p1: m.p1!,
-            p2: m.p2!,
-            winner: m.winner,
-            loser: m.loser,
-            createdAt: m.createdAt!,
-            startedAt: m.startedAt,
-            finishedAt: m.finishedAt,
-            disputeReason: m.disputeReason
-        });
-    }
-}
+// export function updateHistory(): void {//TODO:MERGE use this?
+//     if (!state || !state.matches) return;
+//     if (!state.matchHistory) state.matchHistory = [];
+//     for (const m of state.matches) {
+//         if (m.status !== 'completed') continue;
+//         state.matchHistory.push({
+//             matchId: m.matchId,
+//             p1: m.p1!,
+//             p2: m.p2!,
+//             winner: m.winner,
+//             loser: m.loser,
+//             createdAt: m.createdAt!,
+//             startedAt: m.startedAt,
+//             finishedAt: m.finishedAt,
+//         });
+//     }
+// }
 
 export function getCurrentMatch(): TournamentMatch | undefined {
 	if (!state) return undefined;
-	if (state.currentMatch === undefined ||
-        (state.matches && state.currentMatch && state.matches.find(m => m.matchId === state?.currentMatch?.matchId) === undefined))
+	if (state.curMatch === undefined ||
+        (state.matches && state.curMatch && state.matches.find(m => m.matchId === state?.curMatch?.matchId) === undefined))
         return undefined;
-	return state.currentMatch;
+	return state.curMatch;
 }
 
 export function getPlayerById(id: number): TournamentPlayer | undefined {
@@ -227,32 +216,42 @@ export function advanceAfterResult(matchId: number, winnerId: number, p1Score: n
         !isByeId(m.p1?.identity!) && !isByeId(m.p2?.identity!)
     );
     if (nextIdx && nextIdx >= 0) {
-        state.currentMatch = state.matches![nextIdx];
+        state.curMatch = state.matches![nextIdx];
     } else {
         state.status = 'completed';
         state.champion = getPlayerById(winnerId);
-        state.currentMatch = undefined;
-        updateHistory();
+        state.curMatch = undefined;
+        state.finishedAt = new Date().toISOString();
+        state.updatedAt = new Date().toISOString();
+        // updateHistory();
         persistArchive();
     }
     state.updatedAt = new Date().toISOString();
 }
 
 export function setMatchLiveInfo(matchId: number, info: Partial<Pick<TournamentMatch, 'status' | 'roomId' | 'gameId'>>): void {
-	if (!state || !state.matches) return;
-	const m = state.matches.find(x => x.matchId === matchId);
+	if (!state) return;
+	const m = state.matches?.find(x => x.matchId === matchId);
 	if (!m) return;
 	Object.assign(m, info);
 	if (info.status === 'in_progress') {
 		m.startedAt = new Date().toISOString();
         state.updatedAt = new Date().toISOString();
 	}
+    // if (info.gameId) {
+    //     m.gameId = info.gameId;
+    //     state.updatedAt = new Date().toISOString();
+    // }
+    // if (info.roomId) {
+    //     m.roomId = info.roomId;
+    //     state.updatedAt = new Date().toISOString();
+    // }
 }
 
 function persistArchive(): void {
 	if (!state) return;
 	const item: TournamentArchive = {
-		tournamentId: state.tournamentId!,
+		tId: state.tId!,
 		createdAt: state.createdAt,
         startedAt: state.startedAt!,
         finishedAt: state.finishedAt!,
@@ -262,7 +261,7 @@ function persistArchive(): void {
 	};
 	const list = getArchive();
 	list.unshift(item);
-	localStorage.setItem(LS_ARCHIVE_KEY, JSON.stringify(list).toString());//TODO:MERGE only local storage?
+	localStorage.setItem(LS_ARCHIVE_KEY, JSON.stringify(list).toString());
 }
 
 export function getArchive(): TournamentArchive[] {
@@ -336,7 +335,7 @@ function relevelRoundsByDependencies(): void {
     );
 
     // Update pointer
-    state.currentMatch = findNextPlayableMatch(state.matches);
+    state.curMatch = findNextPlayableMatch(state.matches);
     state.updatedAt = new Date().toISOString();
 }
 
@@ -355,8 +354,10 @@ function findNextPlayableMatch(matches: TournamentMatch[]): TournamentMatch | un
         if (m.status !== 'pending') continue;
         const p1Id = m.p1?.identity;
         const p2Id = m.p2?.identity;
-        if (!p1Id || !p2Id) continue;
-        if (isByeId(p1Id) || isByeId(p2Id)) continue;
+        const p1Bye = p1Id ? isByeId(p1Id) : false;
+        const p2Bye = p2Id ? isByeId(p2Id) : false;
+        if (!m.p1 || !m.p2) continue;
+        if (p1Bye || p2Bye) continue;
         return m;
     }
     return undefined;

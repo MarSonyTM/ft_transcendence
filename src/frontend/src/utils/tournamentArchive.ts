@@ -72,8 +72,8 @@ async function populateArchiveList(): Promise<void> {//TODO:MERGE maybe delete f
 			const friendlyMap = new Map<number, number>();
 			byTimeAsc.forEach((a: any, i: number) => friendlyMap.set(a.tournamentId, i + 1));
 			list = local.map(a => ({
-				tournamentId: a.tournamentId,
-				displayId: friendlyMap.get(a.tournamentId) ?? a.tournamentId,
+				tournamentId: a.tId,
+				displayId: friendlyMap.get(a.tId) ?? a.tId,
 				status: 'completed',
 				createdAt: a.createdAt,
 				startedAt: a.startedAt,
@@ -144,7 +144,7 @@ async function showTournamentDetail(id: number): Promise<void> {
 		return;
 	}
 	const playersHtml = data.players.map((p: TournamentPlayer) => {
-		const stats = `${p.wins}W-${p.losses}L | Total: ${p.totalScore} | Avg: ${p.averageScore?.toFixed(1)}`;
+		const stats = `${p.wins}W-${p.losses}L`;
 		return `<li>${p.name} ${p.eliminated ? '✖' : '✓'} (${stats})</li>`;
 	}).join('');
 	const historyHtml = data.matchHistory?.length
@@ -164,7 +164,7 @@ async function showTournamentDetail(id: number): Promise<void> {
 
 	tDetailArchive.innerHTML = 
 		`<div class="t-archive-detail-inner">
-			<h4>Tournament #${selectedDisplayId ?? data.tournamentId}</h4>
+			<h4>Tournament #${selectedDisplayId ?? data.tId}</h4>
 			<p>Status: <strong>${data.status}</strong> ${champName ? ` | Champion: <strong>${champName}</strong>` : ''}</p>
 			<details open>
 				<summary><strong>Players (${data.players.length})</strong></summary>
@@ -182,7 +182,7 @@ async function showLocalTournamentDetail(id: number): Promise<void> {
 	if (!detailEl) return;
 	detailEl.innerHTML = `<p class="t-archive-loading">Loading tournament #${id}...</p>`;
 	const list = getArchive();
-	const data = list.find(a => a.tournamentId === id);
+	const data = list.find(a => a.tId === id);
 	if (!data) {
 		detailEl.innerHTML = `<p class="t-archive-error">Tournament not found in local archive.</p>`;
 		return;
@@ -192,7 +192,7 @@ async function showLocalTournamentDetail(id: number): Promise<void> {
 	const idx = byTimeAsc.findIndex((x: any) => x.tournamentId === id);
 	const localDisplayId = idx >= 0 ? (idx + 1) : id;
 	const playersHtml = (data.players || []).map((p: TournamentPlayer) => {
-		const stats = `${p.wins}W-${p.losses}L | Total: ${p.totalScore} | Avg: ${p.averageScore?.toFixed(1)}`;
+		const stats = `${p.wins}W-${p.losses}L`;
 		return `<li>${p.name} ${p.eliminated ? '✖' : '✓'} (${stats})</li>`;
 	}).join('');
 	const historyHtml = (data.matches || []).length

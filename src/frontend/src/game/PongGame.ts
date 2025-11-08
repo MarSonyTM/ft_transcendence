@@ -39,6 +39,7 @@ export class PongGame {
     private stateListeners: Array<(state: GameState, game: PongGame) => void> = [];
     hasLocal: boolean = false;
     isGuest: boolean = false;
+    private didHandleGameEnd: boolean = false;
 
     private interpolatedState = {
         ballPosX: 200,
@@ -120,7 +121,6 @@ export class PongGame {
         this.stateListeners.push(cb);
     }
 
-    /** Remove a previously registered callback */
     removeStateListener(cb: (state: GameState, game: PongGame) => void): void {
         this.stateListeners = this.stateListeners.filter(l => l !== cb);
     }
@@ -170,15 +170,14 @@ export class PongGame {
                 return; // Don't initialize yet
             }
             
-            // Connect to WebSocket only after gameId is confirmed
             if (this.gameId) {
                 await this.connectWebSocket();
                 this.updateStatus("Connected - Click Start to begin");
                 
-                // Initialize 3D AFTER WebSocket is connected
                 await this.init3DGame();
                 
-                this.startRenderLoop(); // Start the game loop for input/state updates
+                this.startRenderLoop();
+                this.didHandleGameEnd = false;
             } else {
                 throw new Error("Failed to establish game ID");
             }
@@ -372,7 +371,9 @@ export class PongGame {
                 break;
 
             case 'gameEnd':
-                // Update scores from finalScores if available
+                if (this.didHandleGameEnd)
+                    break;
+                this.didHandleGameEnd = true;
                 if (Array.isArray(message.finalScores)) {
                     message.finalScores.forEach((scoreData: any) => {
                         const playerIndex = scoreData.playerId - 1;
@@ -380,15 +381,12 @@ export class PongGame {
                             this.gameState.players[playerIndex].score = scoreData.score || 0;
                         }
                     });
-                    // Update the score display with final scores
                     this.updateScoreDisplay();
                 }
-                
+
                 if (message.mode === '4P') {
                     this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
                     console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
-                    
-                    // Trigger callback for 4-player mode
                     if (this.onGameEnd) {
                         const winnerId = message.winnerName ? this.parseWinnerIdFromName(message.winnerName) : 1;
                         this.onGameEnd(winnerId);
@@ -396,8 +394,6 @@ export class PongGame {
                 } else {
                     this.updateStatus(`Game Over! ${message.winner} wins!`);
                     console.log(`Game Over! Winner: ${message.winner}`);
-                    
-                    // Trigger callback for 2-player mode
                     if (this.onGameEnd && message.winner !== undefined) {
                         this.onGameEnd(message.winner);
                     }
@@ -602,6 +598,7 @@ export class PongGame {
 
     async endGame(): Promise<void> {
         this.isActive = false;
+        this.didHandleGameEnd = true;
         
         this.stopRenderLoop();
         
@@ -634,6 +631,7 @@ export class PongGame {
             }
             
             this.gameId = undefined;
+            this.didHandleGameEnd = false;
         }
 
         const startBtn = document.getElementById('startBtn') as HTMLButtonElement;

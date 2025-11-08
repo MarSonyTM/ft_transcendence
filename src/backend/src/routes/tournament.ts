@@ -6,12 +6,12 @@ import {
 	TournamentPlayer,
 	TournamentMatch,
 	TournamentNextMatch,
-	MatchSummary
+	MatchSummary,
+	TPT
 } from '../../../shared/tournamentTypes';
 
-interface StartTournamentBody { 
-	aliases?: string[];
-	players?: Array<{alias: string, isAI?: boolean, isLocal?: boolean, isRemote?: boolean, isHost?: boolean}>;
+interface StartTournamentBody {
+	players: Array<{name: string, tpt: TPT, isReady?: boolean}>;
 }
 interface ResultBody { winnerAlias?: string; winnerId?: number; }
 
@@ -21,41 +21,34 @@ function serializeState(state: Tournament): Tournament {
 		playerMap.set(player.id, {
 			id: player.id!,
 			name: player.name,
-			gameId: player.gameId,
-			tournamentId: player.tournamentId,
+			tId: player.tId,
 			identity: player.identity,
 			user: player.user,
-			isAI: player.isAI,
-			isLocalGuest: player.isLocalGuest,
-			isRemote: player.isRemote,
-			isHost: player.isHost,
+			tpt: player.tpt,
 			isReady: player.isReady,
 			pos: player.pos,
 			score: player.score!,
 			eliminated: player.eliminated,
 			wins: player.wins,
 			losses: player.losses,
-			totalScore: player.totalScore,
-			averageScore: player.averageScore,
-			championTimes: player.championTimes,
 			connectionStatus: player.connectionStatus!,
 			lastActivity: player.lastActivity!
 		});
 	});
 
-	const currentMatch: TournamentMatch | undefined = state.currentMatch ? {
-		matchId: state.currentMatch.matchId,
-		tournamentId: state.currentMatch.tournamentId,
-		p1: state.currentMatch.p1,
-		p2: state.currentMatch.p2,
-		gameId: state.currentMatch.gameId,
-		roomId: state.currentMatch.roomId,
-		status: state.currentMatch.status,
-		createdAt: state.currentMatch.createdAt,
-		finishedAt: state.currentMatch.finishedAt,
-		winner: state.currentMatch.winner,
-		loser: state.currentMatch.loser,
-		startedAt: state.currentMatch.startedAt
+	const currentMatch: TournamentMatch | undefined = state.curMatch ? {
+		matchId: state.curMatch.matchId,
+		tId: state.curMatch.tId,
+		p1: state.curMatch.p1,
+		p2: state.curMatch.p2,
+		gameId: state.curMatch.gameId,
+		roomId: state.curMatch.roomId,
+		status: state.curMatch.status,
+		createdAt: state.curMatch.createdAt,
+		finishedAt: state.curMatch.finishedAt,
+		winner: state.curMatch.winner,
+		loser: state.curMatch.loser,
+		startedAt: state.curMatch.startedAt
 	} : undefined;
 
 	const queuePlayers = state.queue?.map((id: number) => playerMap.get(id));
@@ -83,18 +76,15 @@ function serializeState(state: Tournament): Tournament {
 		createdAt: match.createdAt,
 		startedAt: match.startedAt,
 		finishedAt: match.finishedAt,
-		disputeReason: match.disputeReason
 	})) || [];
 
 	return {
-		tournamentId: state.tournamentId,
+		tId: state.tId,
 		status: state.status,
-		format: state.format,
-		gameStates: state.gameStates,
 		players: Array.from(playerMap.values()),
 		queue: queuePlayers?.map(p => p?.id!),
 		matches: state.matches,
-		currentMatch,
+		curMatch: currentMatch,
 		nextMatches,
 		matchHistory,
 		createdAt: state.createdAt,
@@ -110,13 +100,11 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	fastify.post('/start', async (request, reply) => {
 		try {
 			const body = request.body as StartTournamentBody;
-			if (!body || (!Array.isArray(body.aliases) && !Array.isArray(body.players))) {
+			if (!body || !Array.isArray(body.players)) {
 				reply.code(400);
-				return { success: false, message: 'Body must include an aliases array or players array.' };
+				return { success: false, message: 'Body must include a players array.' };
 			}
-
-			const playersData = body.players ? body.players : (body.aliases ? body.aliases.map((a: string) => ({ alias: a })) : []);
-			const state = await TManager.startTournament(playersData);
+			const state = await TManager.startTournament(body.players);
 			return { success: true, data: serializeState(state) };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to start tournament.';
@@ -126,7 +114,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	});
 
 	fastify.get('/state', async (_request, reply) => {
-	const state = TManager.getActive();
+	const state = TManager.getActiveTournament();
 		if (!state) {
 			reply.code(404);
 			return { success: false, message: 'No active tournament.' };
@@ -137,11 +125,11 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	fastify.get('/list', async () => {
 		const live = TManager.list();
 		const summaries = live.map((t: Tournament, idx: number) => {
-			const dbRow = database.tournaments.getTournamentById(t.tournamentId as any);
+			const dbRow = database.tournaments.getTournamentById(t.tId as any);
 			const friendly = (dbRow as any)?.friendlyId ?? (idx + 1);
 			const championAlias = t.champion?.id ? (t.players?.find((p: TournamentPlayer) => p.id === t.champion?.id)?.name || null) : null;
 			return {
-				tournamentId: t.tournamentId,
+				tournamentId: t.tId,
 				displayId: friendly,
 				status: t.status,
 				championId: t.champion?.id,
@@ -150,37 +138,65 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				updatedAt: t.updatedAt,
 				players: t.players,
 				matches: t.matchHistory,
-				format: t.format
 			};
 		}).reverse();
 		return { success: true, data: summaries };
 	});
 
-	fastify.get('/:id', async (req, reply) => {
-		const id = Number((req.params as any).id);
-		if (Number.isNaN(id))
-			return reply.code(400).send({ success: false, message: 'Invalid id' });
-		const t = TManager.getById ? TManager.getById(id) : null;
-		if (!t)
-			return reply.code(404).send({ success: false, message: 'Not found' });
-		return { success: true, data: serializeState(t) };
+	fastify.get('/match/:matchId', async (req, reply) => {
+		const body = req.params as { matchId: string };
+		const matchId = Number(body.matchId);
+		if (Number.isNaN(matchId)) {
+			return reply.code(400).send({ success: false, message: 'Invalid match ID.' });
+		}
+		const matches = TManager.getActiveTournament()?.matches || [];
+		const match = matches.find(m => m.matchId === matchId);
+		if (!match) {
+			return reply.code(404).send({ success: false, message: 'Match not found.' });
+		}
+		return { success: true, data: match };
+	});
+
+	fastify.get('/player/:id', async (req, reply) => {
+		const body = req.params as { id: string };
+		const playerId = Number(body.id);
+		if (Number.isNaN(playerId)) {
+			return reply.code(400).send({ success: false, message: 'Invalid player ID.' });
+		}
+		const players = TManager.getActiveTournament()?.players || [];
+		const player = players.find(p => p.id === playerId);
+		if (!player) {
+			return reply.code(404).send({ success: false, message: 'Player not found.' });
+		}
+		return { success: true, data: player };
+	});
+
+	fastify.get('/tournament/:tId', async (req, reply) => {
+		const body = req.params as { tId: string };
+		const tournamentId = Number(body.tId);
+		if (Number.isNaN(tournamentId)) {
+			return reply.code(400).send({ success: false, message: 'Invalid tournament ID.' });
+		}
+		const tournament = TManager.getTournamentById(tournamentId);
+		if (!tournament) {
+			return reply.code(404).send({ success: false, message: 'Tournament not found.' });
+		}
+		return { success: true, data: tournament };
 	});
 
 	fastify.post('/new', async () => {
-	const t = TManager.newTournament();
+	const t = TManager.getActiveTournament();
 		return { success: true, data: t };
 	});
 
-	// Toggle player ready state
 	fastify.post('/ready/:playerId', async (request, reply) => {
 		try {
-			const params = request.params as { playerId: string };
-			const playerId = Number(params.playerId);
-			if (isNaN(playerId)) {
+			const body = request.body as { playerId: number, ready: boolean };
+			if (isNaN(body.playerId)) {
 				reply.code(400);
 				return { success: false, message: 'Invalid player ID.' };
 			}
-			const state = TManager.togglePlayerReady(playerId);
+			const state = TManager.togglePlayerReady(body.playerId, body.ready);
 			return { success: true, data: serializeState(state) };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to toggle ready state.';
@@ -189,7 +205,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		}
 	});
 
-	// Manual result recording (fallback, primarily for testing)
 	fastify.post('/result', async (request, reply) => {
 		try {
 			const body = request.body as ResultBody & { player1Score?: number; player2Score?: number };
@@ -198,7 +213,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				return { success: false, message: 'Winner alias or winnerId is required.' };
 			}
 			const state = TManager.recordResult(
-				{ name: body.winnerAlias, id: body.winnerId },
+				{ name: body.winnerAlias, winnerId: body.winnerId },
 				body.player1Score,
 				body.player2Score
 			);
@@ -208,52 +223,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			reply.code(400);
 			return { success: false, message };
 		}
-	});
-
-	// Request rematch/dispute
-	fastify.post('/dispute/:matchId', async (request, reply) => {
-		try {
-			const params = request.params as { matchId: string };
-			const body = request.body as { reason: string };
-			const matchId = Number(params.matchId);
-			if (isNaN(matchId)) {
-				reply.code(400);
-				return { success: false, message: 'Invalid match ID.' };
-			}
-			if (!body || !body.reason) {
-				reply.code(400);
-				return { success: false, message: 'Dispute reason is required.' };
-			}
-			const state = TManager.requestRematch(matchId, body.reason);
-			return { success: true, data: serializeState(state) };
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to dispute match.';
-			reply.code(400);
-			return { success: false, message };
-		}
-	});
-
-	// Resolve dispute and allow rematch
-	fastify.post('/dispute/:matchId/resolve', async (request, reply) => {
-		try {
-			const params = request.params as { matchId: string };
-			const matchId = Number(params.matchId);
-			if (isNaN(matchId)) {
-				reply.code(400);
-				return { success: false, message: 'Invalid match ID.' };
-			}
-			const state = TManager.resolveDispute(matchId);
-			return { success: true, data: serializeState(state) };
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to resolve dispute.';
-			reply.code(400);
-			return { success: false, message };
-		}
-	});
-
-	fastify.post('/reset', async () => {
-	TManager.resetActive();
-		return { success: true, message: 'Tournament reset.' };
 	});
 }
 

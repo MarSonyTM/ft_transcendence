@@ -1,48 +1,39 @@
-import { GameState } from "./gameTypes";
-
 export type TStatus = 'setup' | 'idle' | 'in_progress' | 'paused' | 'completed';
-export type MatchStatus = 'pending' | 'ready' | 'countdown' | 'in_progress' | 'completed' | 'disputed';
-export type TFormat = 'single_elimination' | 'double_elimination' | 'round_robin';//TODO: implement or delete
+export type MatchStatus = 'pending' | 'ready' | 'countdown' | 'in_progress' | 'completed';
+export type TPT = 'host' | 'ai' | 'local' | 'remote' | '__BYE__';//TournamentPlayerType
 
 export interface User {
-	id: number;
-	username: string;
+	id: number | undefined;
+	username: string | undefined;
 	avatar?: string;
 	email?: string;
-	gamesWon: number;
-	gamesLost: number;
+	gamesWon: number | undefined;
+	gamesLost: number | undefined;
 }
 
 export interface TournamentPlayer {
-	id: number;
+	id: number;//tournament internal player-id
 	name?: string;
-	gameId?: number;
-	tournamentId?: number;
-	identity?: string;
+	tId: number;
+	identity?: string;//has prefix (ai, local, remote, host)
 	user?: User;
-	isAI?: boolean;
-	isLocalGuest?: boolean;
-	isRemote?: boolean;
-	isHost?: boolean;
+	tpt: TPT;
 	isReady?: boolean;
 	pos?: number;
 	score?: number;
 	eliminated?: boolean;
 	wins?: number;
 	losses?: number;
-	totalScore?: number;
-	averageScore?: number;
-	championTimes?: number;//TODO:MERGE use?
 	connectionStatus?: string;
 	lastActivity?: string;
 }
 
 export interface TournamentMatch {
 	matchId: number;
-	tournamentId: number;
-	gameId?: number;
-	roomId?: string;
+	tId: number;
+	roomId: string;
 	status: MatchStatus;
+	gameId?: number;
 	p1?: TournamentPlayer;
 	p2?: TournamentPlayer;
 	winner?: TournamentPlayer;
@@ -50,7 +41,6 @@ export interface TournamentMatch {
 	createdAt: string;
 	startedAt: string;
   	finishedAt: string;
-	disputeReason?: string;
 	round?: number;
 	indexInRound?: number;
 	nextMatchId?: number;
@@ -64,14 +54,12 @@ export interface TournamentNextMatch {
 }
 
 export interface Tournament {
-	tournamentId: number;
+	tId: number;
 	status: TStatus;
-	format: TFormat;
-	gameStates?: GameState[];
-	players: TournamentPlayer[];
+	players: TournamentPlayer[] | [];
 	queue?: number[];
 	matches?: TournamentMatch[];
-	currentMatch?: TournamentMatch;
+	curMatch?: TournamentMatch;
 	nextMatches?: TournamentNextMatch[];
 	matchHistory?: MatchSummary[];
 	createdAt: string;
@@ -79,7 +67,7 @@ export interface Tournament {
 	finishedAt: string;
 	updatedAt: string;
 	champion?: TournamentPlayer;
-	matchDelay: number;
+	matchDelay?: number;
 }
 
 export interface MatchSummary {
@@ -91,11 +79,10 @@ export interface MatchSummary {
 	createdAt: string;
 	startedAt: string;
   	finishedAt: string;
-	disputeReason?: string;
 }
 
 export interface TournamentArchive {
-	tournamentId: number;
+	tId: number;
 	createdAt: string;
 	startedAt: string;
 	finishedAt: string;

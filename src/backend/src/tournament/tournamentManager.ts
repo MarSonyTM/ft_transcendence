@@ -4,13 +4,13 @@ import {
 	TournamentMatch,
 	MatchStatus,
 	MatchSummary,
-	TFormat,
 	TStatus
 } from '../../../shared/tournamentTypes';
 import { database } from '../database';
 import { activeGames } from '../routes/game';
 import { createGameEngine } from '../game/gameEngine';
 import { broadcastTournamentUpdate } from '../websocket/websocketHandler';
+import { GameState } from '../../../shared/gameTypes';
 
 function nowISO(): string {
 	return new Date().toISOString();
@@ -19,41 +19,16 @@ function nowISO(): string {
 let activeTournamentId: number | undefined = undefined;
 
 export class TournamentManager {
-	private nextPlayerIdGlobal = 1;
 	private gameMonitors = new Map<number, NodeJS.Timeout>();
 
-	private loadTournamentState(tournamentId: number): Tournament | undefined {
-		const dbTournament = database.tournaments.getTournamentById(tournamentId);
-		if (!dbTournament) return undefined;
+	private loadTournamentState(tId: number): Tournament | undefined {
+		const t = database.tournaments.getTournamentById(tId);
+		if (!t) return undefined;
 
-		const dbPlayers = database.tournaments.getPlayers(tournamentId);
-		const dbMatches = database.tournaments.getMatches(tournamentId);
+		const players = database.tournaments.getAllPlayers(tId);
+		const matches = database.tournaments.getAllMatches(tId);
 
-		const players: TournamentPlayer[] = dbPlayers.map(p => ({
-			id: p.id,
-			name: p.name,
-			gameId: p.gameId,
-			tournamentId: p.tournamentId,
-			identity: p.identity,
-			user: p.user,
-			isAI: p.isAI,
-			isLocalGuest: p.isLocalGuest,
-			isRemote: p.isRemote,
-			isHost: p.isHost,
-			isReady: p.isReady,
-			pos: p.pos,
-			score: p.score,
-			eliminated: p.eliminated,
-			wins: p.wins,
-			losses: p.losses,
-			totalScore: p.totalScore,
-			averageScore: p.averageScore,
-			championTimes: p.championTimes,
-			connectionStatus: p.connectionStatus,
-			lastActivity: p.lastActivity
-		}));
-
-		const matchHistory: MatchSummary[] = dbMatches.filter(m => m.status === 'completed' || m.status === 'disputed').map(m => ({
+		const matchHistory: MatchSummary[] | undefined = matches?.filter(m => m.status === 'completed').map(m => ({
 			matchId: m.matchId,
 			p1: m.p1!,
 			p2: m.p2!,
@@ -62,301 +37,208 @@ export class TournamentManager {
 			createdAt: m.createdAt,
 			startedAt: m.startedAt,
 			finishedAt: m.finishedAt,
-			disputeReason: m.disputeReason
 		}));
 
-		const currentMatchDb = dbMatches.find(m => m.status === 'in_progress' || m.status === 'ready' || m.status === 'pending');
+		const inCurrentMatch = t.curMatch ? [t.curMatch.p1, t.curMatch.p2] : [];
+		const queue: number[] = players.filter(p => !p.eliminated && !inCurrentMatch.includes(p)).map(p => p.id);
 
-		const currentMatch: TournamentMatch | undefined = currentMatchDb ? {
-			matchId: currentMatchDb.matchId,
-			tournamentId: currentMatchDb.tournamentId,
-			p1: currentMatchDb.p1,
-			p2: currentMatchDb.p2,
-			gameId: currentMatchDb.gameId,
-			roomId: currentMatchDb.roomId,
-			status: currentMatchDb.status as MatchStatus,
-			createdAt: currentMatchDb.createdAt,
-			startedAt: currentMatchDb.startedAt,
-			finishedAt: currentMatchDb.finishedAt,
-			winner: currentMatchDb.winner,
-			loser: currentMatchDb.loser
-		} : undefined;
-
-		const inCurrentMatch = currentMatch ? [currentMatch.p1, currentMatch.p2] : [];
-		const queue = players.filter(p => !p.eliminated && !inCurrentMatch.includes(p)).map(p => p.id);
-
-		return {
-			tournamentId: dbTournament.tournamentId,
-			status: dbTournament.status,
-			gameStates: dbTournament.gameStates,
-			createdAt: dbTournament.createdAt,
-			startedAt: dbTournament.startedAt,
-			finishedAt: dbTournament.finishedAt,
-			updatedAt: dbTournament.updatedAt,
+		const data = {
+			tId: t.tId,
+			status: t.status,
 			players,
 			queue,
-			matches: dbTournament.matches,
-			nextMatches: dbTournament.nextMatches,
-			currentMatch,
+			matches: t.matches,
+			curMatch: t.curMatch,
+			nextMatches: t.nextMatches,
 			matchHistory,
-			champion: dbTournament.champion,
-			format: dbTournament.format,
-			matchDelay: dbTournament.matchDelay,
-			};
+			createdAt: t.createdAt,
+			startedAt: t.startedAt,
+			finishedAt: t.finishedAt,
+			updatedAt: t.updatedAt,
+			champion: t.champion,
+			matchDelay: t.matchDelay,
+		};
+
+		return database.tournaments.updateTournament(tId, data);
 	}
 
 	public list(): Tournament[] {
-		const dbTournaments = database.tournaments.getAllTournaments();
-		return dbTournaments.map(t => this.loadTournamentState(t.tournamentId!)).filter(t => t !== undefined) as Tournament[];
+		return database.tournaments.getAllTournaments();
 	}
 
-	public getActive(): Tournament | undefined {
-		if (activeTournamentId === undefined) return undefined;
-		return this.loadTournamentState(activeTournamentId);
+	public getActiveTournament(): Tournament | undefined {
+		let t: Tournament | undefined;
+		if (activeTournamentId === undefined)
+			t = database.tournaments.createTournament();
+		else
+			t = this.loadTournamentState(activeTournamentId);
+		activeTournamentId = t?.tId;
+		return t;
 	}
 
-	public getById(id: number): Tournament | undefined {
-		return this.loadTournamentState(id);
+	public getTournamentById(tId: number): Tournament | undefined {
+		return this.loadTournamentState(tId);
 	}
 
-	public newTournament(format: TFormat = 'single_elimination'): Tournament {
-		const dbTournament = database.tournaments.createTournament(format);
-		activeTournamentId = dbTournament.tournamentId;
-
-		const state: Tournament = {
-			tournamentId: dbTournament.tournamentId,
-			status: 'idle',
-			format: dbTournament.format || format,
-			gameStates: [],
-			players: [],
-			queue: [],
-			matches: [],
-			currentMatch: undefined,
-			nextMatches: [],
-			matchHistory: [],
-			createdAt: dbTournament.createdAt,
-			startedAt: '',
-			finishedAt: '',
-			updatedAt: dbTournament.updatedAt,
-			champion: dbTournament.champion,
-			matchDelay: dbTournament.matchDelay,
-		};
-
-		return state;
-	}
-
-	public async startTournament(players: Array<{alias: string, isAI?: boolean, isLocalGuest?: boolean, isRemote?: boolean, isHost?: boolean, isReady?: boolean}> ): Promise<Tournament> {
+	public async startTournament(players: Array<{name: string, isHost?: boolean, isAI?: boolean, isLocal?: boolean, isRemote?: boolean, isReady?: boolean}> ): Promise<Tournament> {
 		if (players.length < 3) throw new Error('At least three players required.');
-
 		const seen = new Set<string>();
 		players.forEach(p => {
-			const k = p.alias.toLowerCase();
-			if (seen.has(k)) throw new Error(`Duplicate alias: ${p.alias}`);
+			const k = p.name.toLowerCase();
+			if (seen.has(k)) throw new Error(`Duplicate name: ${p.name}`);
 			seen.add(k);
 		});
 
-		if (!activeTournamentId) this.newTournament();
-
-		const tournamentId = activeTournamentId!;
-
-		for (const player of players) {
-			const user = await database.users.getUserByUsername(player.alias) || undefined;
-
-			const playerId = this.nextPlayerIdGlobal++;
-			database.tournaments.addPlayer(playerId, tournamentId, player.isAI, player.isLocalGuest, player.isRemote, player.isHost, player.isReady);
-			
-			// Auto-ready AI players
-			if (player.isAI) {
-				const dbPlayers = database.tournaments.getPlayers(tournamentId);
-				const dbPlayer = dbPlayers.find(p => p.id === playerId);
-				if (dbPlayer) {
-					database.tournaments.updatePlayer(dbPlayer.id, { isReady: true });
-					console.log(`🤖 AI player ${player.alias} automatically set to ready`);
-				}
-			}
+		if (!this.getActiveTournament())
+			throw new Error('Failed to get/create active tournament.');
+		const tId = activeTournamentId!;
+		for (const p of players) {
+			p.isReady = p.isAI === true ? true : p.isReady;
+			database.tournaments.addPlayer(tId, { ...p });
 		}
-
-		const state = this.loadTournamentState(tournamentId)!;
-
+		const state = this.loadTournamentState(tId)!;
 		state.queue = state.players?.map(p => p.id);
-		const match = this.createNextMatch(tournamentId, state.queue ? state.queue : []);
-
+		const match = this.createNextMatch(tId, state.queue ? state.queue : []);
 		if (match) {
-			state.currentMatch = {
-				matchId: match.matchId,
-				tournamentId: match.tournamentId,
-				gameId: match.gameId,
-				roomId: match.roomId,
-				status: match.status,
-				p1: match.p1,
-				p2: match.p2,
-				winner: match.winner,
-				loser: match.loser,
-				createdAt: match.createdAt,
-				startedAt: match.startedAt,
-				finishedAt: match.finishedAt,
-				disputeReason: match.disputeReason,
-				round: match.round,
-				indexInRound: match.indexInRound,
-				nextMatchId: match.nextMatchId,
-				nextSlot: match.nextSlot
-			};
+			state.curMatch = match;
 			state.status = 'in_progress';
+			let canStartMatch = false;
 
-			// Auto-ready AI players in the match
-			const p1 = state.players?.find(p => p.id === match.p1?.id);
-			const p2 = state.players?.find(p => p.id === match.p2?.id);
-
-			const dbMatches = database.tournaments.getMatches(tournamentId);
-			const matchDb = dbMatches.find(m => m.matchId === match.matchId);
-		
-			if (matchDb) {
-				let autoStartMatch = false;
-
-				if (p1?.isAI && match.p1) {
-					p1.isReady = true;
-					match.p1.isReady = true;
-					state.currentMatch!.p1!.isReady = true;
-					database.tournaments.updateMatch(matchDb.matchId, { p1 });
-					console.log(`🤖 AI player ${p1.name} auto-ready for match ${match.matchId}`);
-				}
-				
-				if (p2?.isAI && match.p2) {
-					p2.isReady = true;
-					match.p2.isReady = true;
-					state.currentMatch!.p2!.isReady = true;
-					database.tournaments.updateMatch(matchDb.matchId, { p2 });
-					console.log(`🤖 AI player ${p2.name} auto-ready for match ${match.matchId}`);
-				}
-				
-				// Auto-start if both players are ready
-				if (match.p1?.isReady && match.p2?.isReady) {
-					console.log(`🎮 Both players ready, auto-starting match ${match.matchId}`);
-					autoStartMatch = true;
-
-					database.tournaments.updateMatch(matchDb.matchId, { status: 'ready' });
-
-					broadcastTournamentUpdate({
-						type: 'match_ready',
-						tournamentId,
-						matchId: match.matchId
-					});
-				}
-				
-				if (autoStartMatch) {
-					setTimeout(() => {
-						this.startMatch(tournamentId, match.matchId);
-					}, state.matchDelay ? state.matchDelay * 1000 : 0);
-				}
+			this.checkAndSetReady(tId, match.matchId);
+			if (match.p1?.isReady && match.p2?.isReady) {
+				console.log(`🎮 Both players ready, ready to start match ${match.matchId}`);
+				canStartMatch = true;
+				database.tournaments.updateMatch(tId, match.matchId, { status: 'ready' });
+				broadcastTournamentUpdate({
+					type: 'match_ready',
+					tId: tId,
+					matchId: match.matchId
+				});
+			}
+			if (canStartMatch) {
+				setTimeout(() => {
+					this.startMatch(tId, match.matchId);
+				}, state.matchDelay ? state.matchDelay * 1000 : 0);
 			}
 		} else {
 			state.status = 'completed';
 			state.champion = state.players?.[0];
 		}
 
-		database.tournaments.updateTournament(tournamentId, {
-			status: state.status as TStatus,
+		database.tournaments.updateTournament(tId, {
+			status: state.status,
 			champion: state.champion
 		});
 		
-		// Broadcast tournament start
 		broadcastTournamentUpdate({
 			type: 'tournament_started',
-			tournamentId,
+			tId: tId,
 			playerCount: state.players?.length
 		});
-
-		return this.loadTournamentState(tournamentId)!;
+		return this.loadTournamentState(tId)!;
 	}
 
-	public togglePlayerReady(playerId: number): Tournament {
-		const state = this.getActive();
+	public checkAndSetReady(tId: number, matchId: number): Tournament {
+		let state = this.loadTournamentState(tId);
+		if (!state) throw new Error('Tournament not found.');
+
+		const match = database.tournaments.getMatchById(tId, matchId);
+		if (!match) throw new Error('Match not found.');
+
+		if (match.p1 && (match.p1?.tpt === 'ai' || match.p1.isReady)) {
+			match.p1.isReady = true;
+			state = this.togglePlayerReady(match.p1.id, match.p1.isReady);
+		}
+		if (match.p2 && (match.p2?.tpt === 'ai' || match.p2.isReady)) {
+			match.p2.isReady = true;
+			state = this.togglePlayerReady(match.p2.id, match.p2.isReady);
+		}
+		return state;
+	}
+
+	public togglePlayerReady(tPlayerId: number, ready: boolean): Tournament {
+		const state = this.getActiveTournament();
 		if (!state) throw new Error('No active tournament.');
-		if (!state.currentMatch) throw new Error('No active match.');
+		if (!state.curMatch || !state.matches) throw new Error('No active match.');
 
-		const { p1: player1, p2: player2 } = state.currentMatch;
-		if (playerId !== player1?.id && playerId !== player2?.id) throw new Error('Player not in current match.');
+		const p1 = state.curMatch.p1;
+		const p2 = state.curMatch.p2;
+		if (!p1 || !p2 || (tPlayerId !== p1?.id && tPlayerId !== p2?.id))
+			throw new Error('Player not in current match.');
+		let mStatus = state.curMatch.status;
+		let updated: TournamentMatch | undefined = undefined;
 
-		const dbMatches = database.tournaments.getMatches(state.tournamentId);
-		const currentMatchDb = dbMatches.find(m => m.matchId === state.currentMatch!.matchId);
-		if (!currentMatchDb) throw new Error('Match not found in database.');
-
-		if (playerId === player1?.id) {
-			database.tournaments.updateMatch(currentMatchDb.matchId, {
+		if (tPlayerId === p1.id) {
+			if (p2 && p2.isReady && ready)
+				mStatus = 'ready';
+			updated = database.tournaments.updateMatch(state.curMatch.tId, state.curMatch.matchId, {
 				p1: {
-					id: currentMatchDb.p1?.id!,
-					isReady: currentMatchDb.p1?.isReady,
+					tId: state.curMatch.tId,
+					id: state.curMatch.p1!.id,
+					tpt: state.curMatch.p1!.tpt,
+					isReady: ready,
 					lastActivity: nowISO()
-				}
+				},
+				status: mStatus
 			});
-		} else {
-			database.tournaments.updateMatch(currentMatchDb.matchId, {
+		} else if (tPlayerId === p2.id) {
+			if (p1 && p1.isReady && ready)
+				mStatus = 'ready';
+			updated = database.tournaments.updateMatch(state.curMatch.tId, state.curMatch.matchId, {
 				p2: {
-					id: currentMatchDb.p2?.id!,
-					isReady: !currentMatchDb.p2?.isReady,
+					tId: state.curMatch.tId,
+					id: state.curMatch.p2!.id,
+					tpt: state.curMatch.p2!.tpt,
+					isReady: ready,
 					lastActivity: nowISO()
-				}
+				},
+				status: mStatus
 			});
 		}
 
-		const dbPlayers = database.tournaments.getPlayers(state.tournamentId);
-		const dbPlayer = dbPlayers.find(p => p.id === playerId);
-		if (dbPlayer) {
-			database.tournaments.updatePlayer(dbPlayer.id, {
-				isReady: dbPlayer.isReady
-			});
-		}
+		if (!updated) throw new Error('Failed to update match.');
 
-		const updatedState = this.loadTournamentState(state.tournamentId)!;
-
-		if (updatedState.currentMatch?.p1?.isReady && updatedState.currentMatch?.p2?.isReady) {
+		if (updated.status === 'ready') {
 			setTimeout(() => {
-				this.startMatch(state.tournamentId, updatedState.currentMatch!.matchId);
+				this.startMatch(state.tId, updated.matchId);
 			}, state.matchDelay ? state.matchDelay * 1000 : 0);
-
-			database.tournaments.updateMatch(currentMatchDb.matchId, {
-				status: 'ready'
-			});
 			
-			// Broadcast ready state change
 			broadcastTournamentUpdate({
 				type: 'match_ready',
-				tournamentId: state.tournamentId,
-				matchId: updatedState.currentMatch.matchId
+				tId: state.tId,
+				matchId: updated.matchId
 			});
 		} else {
-			// Broadcast player ready toggle
 			broadcastTournamentUpdate({
 				type: 'player_ready_toggle',
-				tournamentId: state.tournamentId,
-				playerId,
-				matchId: updatedState.currentMatch!.matchId
+				tId: state.tId,
+				playerId: tPlayerId,
+				matchId: updated.matchId
 			});
 		}
 
-		return this.loadTournamentState(state.tournamentId)!;
+		return this.loadTournamentState(state.tId)!;
 	}
 
-	public startMatch(tournamentId: number, matchId: number): void {
-		const state = this.loadTournamentState(tournamentId);
-		if (!state || !state.currentMatch) return;
+	public startMatch(tId: number, matchId: number): void {
+		const state = this.loadTournamentState(tId);
+		if (!state || !state.matches) return;
 
-		const dbMatches = database.tournaments.getMatches(tournamentId);
-		const matchDb = dbMatches.find(m => m.matchId === matchId);
-		if (!matchDb) return;
+		let match = database.tournaments.getMatchById(tId, matchId);
+		if (!match || match.status !== 'ready') return;
+		state.curMatch = match;
 
 		const game = database.games.createGame({ mode: '2P', difficulty: 'normal' });
+		const gameState = database.gameState.createGameState({ gameId: game.id });
 
-		database.tournaments.updateMatch(matchDb.matchId, {
-			gameId: game.id,
+		state.curMatch = database.tournaments.updateMatch(state.curMatch.tId, state.curMatch.matchId, {
+			gameId: gameState.id,
 			status: 'in_progress',
 			startedAt: nowISO()
 		});
 
-		database.gameState.createGameState({ gameId: game.id });
-
-		const p1 = state.players?.find(p => p.id === state.currentMatch!.p1?.id)!;
-		const p2 = state.players?.find(p => p.id === state.currentMatch!.p2?.id)!;
+		const p1 = state.players?.find(p => p.id === match?.p1?.id)!;
+		const p2 = state.players?.find(p => p.id === match?.p2?.id)!;
 
 		const runtimeGameState = {
 			gameId: game.id,
@@ -365,7 +247,7 @@ export class TournamentManager {
 					id: p1.id,
 					gameId: game.id,
 					name: p1.name,
-					pos: p1.pos || 0,
+					pos: p1.pos || undefined,
 					score: p1.score || 0,
 					connectionStatus: 'connected',
 					lastActivity: nowISO()
@@ -374,7 +256,7 @@ export class TournamentManager {
 					id: p2.id,
 					gameId: game.id,
 					name: p2.name,
-					pos: p2.pos || 0,
+					pos: p2.pos || undefined,
 					score: p2.score || 0,
 					connectionStatus: 'connected',
 					lastActivity: nowISO()
@@ -386,37 +268,36 @@ export class TournamentManager {
 			ballVelY: 0,
 			mode: '2P',
 			lastActivity: nowISO()
-		} as any;
+		} as GameState;
 
 		const gameEngine = createGameEngine(runtimeGameState, '2P');
-		
-		// Set up AI players
-		if (p1.isAI) {
+
+		if (p1.tpt === 'ai') {
 			console.log(`🤖 Setting player 1 (${p1.name}) as AI`);
 			gameEngine.setPlayerAI(1, true, 'normal');
 		}
-		if (p2.isAI) {
+		if (p2.tpt === 'ai') {
 			console.log(`🤖 Setting player 2 (${p2.name}) as AI`);
 			gameEngine.setPlayerAI(2, true, 'normal');
 		}
 		
 		activeGames.set(game.id, gameEngine);
-		gameEngine.startGame();	console.log(`🎮 Tournament match ${matchId} started with game ${game.id}`);
+		gameEngine.startGame();
+		console.log(`🎮 Tournament match ${matchId} started with game ${game.id}`);
 		
-		// Broadcast match start
 		broadcastTournamentUpdate({
 			type: 'match_started',
-			tournamentId,
+			tId,
 			matchId,
 			gameId: game.id,
 			player1: p1.name,
 			player2: p2.name
 		});
 
-		this.monitorGame(tournamentId, matchId, game.id);
+		this.monitorGame(tId, matchId, game.id);
 	}
 
-	public monitorGame(tournamentId: number, matchId: number, gameId: number): void {
+	public monitorGame(tId: number, matchId: number, gameId: number): void {
 		const checkInterval = setInterval(() => {
 			const gameEngine = activeGames.get(gameId);
 			if (!gameEngine || !gameEngine.isRunning()) {
@@ -432,10 +313,10 @@ export class TournamentManager {
 
 					const winnerId = p1Score > p2Score ? 1 : 2;
 
-					const state = this.loadTournamentState(tournamentId);
-					if (state && state.currentMatch) {
-						const actualWinnerId = winnerId === 1 ? state.currentMatch.p1?.id : state.currentMatch.p2?.id;
-						this.recordResult({ id: actualWinnerId }, p1Score, p2Score);
+					const state = this.loadTournamentState(tId);
+					if (state && state.curMatch) {
+						const actualWinnerId = winnerId === 1 ? state.curMatch.p1?.id : state.curMatch.p2?.id;
+						this.recordResult({ winnerId: actualWinnerId }, p1Score, p2Score);
 					}
 				}
 			}
@@ -444,12 +325,12 @@ export class TournamentManager {
 		this.gameMonitors.set(gameId, checkInterval);
 	}
 
-	public recordResult(winner: { name?: string; id?: number }, player1Score?: number, player2Score?: number): Tournament {
-		const state = this.getActive();
+	public recordResult(winner: { name?: string; winnerId?: number }, player1Score?: number, player2Score?: number): Tournament {
+		const state = this.getActiveTournament();
 		if (!state) throw new Error('No active tournament.');
-		if (!state.currentMatch) throw new Error('No active match.');
+		if (!state.curMatch) throw new Error('No active match.');
 
-		const { p1: player1, p2: player2, matchId: matchId, gameId } = state.currentMatch;
+		const { p1: player1, p2: player2, matchId: matchId, gameId: gameId } = state.curMatch;
 		const p1 = state.players?.find(p => p.id === player1?.id)!;
 		const p2 = state.players?.find(p => p.id === player2?.id)!;
 		const winP = this.resolveWinner(winner, [p1, p2]);
@@ -458,90 +339,55 @@ export class TournamentManager {
 		const winnerScore = winP.id === p1.id ? player1Score : player2Score;
 		const loserScore = winP.id === p1.id ? player2Score : player1Score;
 
-		const dbPlayers = database.tournaments.getPlayers(state.tournamentId);
+		const dbPlayers = database.tournaments.getAllPlayers(state.tId);
 		const dbWinner = dbPlayers.find(p => p.id === winP.id);
 		const dbLoser = dbPlayers.find(p => p.id === loseP.id);
 
 		if (dbWinner && winnerScore !== undefined) {
-			const newTotalScore = dbWinner.totalScore ? dbWinner.totalScore + winnerScore : winnerScore;
 			const newWins = dbWinner.wins ? dbWinner.wins + 1 : 1;
-			database.tournaments.updatePlayer(dbWinner.id, {
-				wins: newWins,
-				totalScore: newTotalScore,
-				averageScore: newTotalScore / (newWins + (dbWinner.losses ? dbWinner.losses : 0))
+			database.tournaments.updatePlayer(state.tId, dbWinner.id, {
+				wins: newWins
 			});
 		}
 
 		if (dbLoser && loserScore !== undefined) {
-			const newTotalScore = dbLoser.totalScore ? dbLoser.totalScore + loserScore : loserScore;
 			const newLosses = dbLoser.losses ? dbLoser.losses + 1 : 1;
-			database.tournaments.updatePlayer(dbLoser.id, {
+			database.tournaments.updatePlayer(state.tId, dbLoser.id, {
 				losses: newLosses,
-				eliminated: true,
-				totalScore: newTotalScore,
-				averageScore: newTotalScore / (dbLoser.wins ? dbLoser.wins + newLosses : newLosses)
+				eliminated: true
 			});
 		}
 
-		const dbMatches = database.tournaments.getMatches(state.tournamentId);
-		const matchDb = dbMatches.find(m => m.matchId === matchId);
-		if (matchDb) {
-			database.tournaments.updateMatch(matchDb.matchId, {
+		if (state.curMatch) {
+			database.tournaments.updateMatch(state.tId, state.curMatch.matchId, {
 				winner: winP,
 				loser: loseP,
-				p1: {
-					id: p1.id!,
-					isReady: !p1.isReady,
-					pos: p1.pos,
-					score: p1.score!,
-					eliminated: p1.eliminated,
-					wins: p1.wins,
-					losses: p1.losses,
-					totalScore: p1.totalScore,
-					averageScore: p1.averageScore,
-					championTimes: p1.championTimes,
-					connectionStatus: p1.connectionStatus!,
-					lastActivity: p1.lastActivity!
-				},
-				p2: {
-					id: p2.id!,
-					isReady: !p2.isReady,
-					pos: p2.pos,
-					score: p2.score!,
-					eliminated: p2.eliminated,
-					wins: p2.wins,
-					losses: p2.losses,
-					totalScore: p2.totalScore,
-					averageScore: p2.averageScore,
-					championTimes: p2.championTimes,
-					connectionStatus: p2.connectionStatus!,
-					lastActivity: p2.lastActivity!
-				},
 				status: 'completed',
 				finishedAt: nowISO()
 			});
 		}
 
-		if (gameId) {
-			const gameEngine = activeGames.get(gameId);
+		if (state.curMatch.gameId) {
+			const gameEngine = activeGames.get(state.curMatch.gameId);
 			if (gameEngine) {
 				gameEngine.endGame();
-				activeGames.delete(gameId);
+				activeGames.delete(state.curMatch.gameId);
 			}
 
-			const monitor = this.gameMonitors.get(gameId);
+			const monitor = this.gameMonitors.get(state.curMatch.gameId);
 			if (monitor) {
 				clearInterval(monitor);
-				this.gameMonitors.delete(gameId);
+				this.gameMonitors.delete(state.curMatch.gameId);
 			}
 		}
 
-		const updatedState = this.loadTournamentState(state.tournamentId)!;
+		const updatedState = this.loadTournamentState(state.tId);
+		if (!updatedState) throw new Error('Failed to load updated tournament state.');
 		
 		// Broadcast match completion
 		broadcastTournamentUpdate({
 			type: 'match_completed',
-			tournamentId: state.tournamentId,
+			tId: state.tId,
 			matchId,
 			winnerId: winP.id,
 			winnerAlias: winP.name,
@@ -553,287 +399,59 @@ export class TournamentManager {
 			}
 		});
 
-		const alive = updatedState.players.filter(p => !p.eliminated);
+		return this.checkEndOrNextMatch(updatedState);
+	}
+
+	public checkEndOrNextMatch(state: Tournament): Tournament {
+		const alive = state.players.filter(p => !p.eliminated);
 		if (alive.length === 1) {
-			database.tournaments.updateTournament(state.tournamentId, {
+			database.tournaments.updateTournament(state.tId, {
 				status: 'completed',
-				champion: alive[0]
+				champion: alive[0],
+				finishedAt: nowISO(),
+				updatedAt: nowISO()
 			});
-			console.log(`🏆 Tournament ${state.tournamentId} completed! Champion: ${alive[0].name}`);
+			console.log(`🏆 Tournament ${state.tId} completed! Champion: ${alive[0].name}`);
 			
-			// Broadcast tournament completion
 			broadcastTournamentUpdate({
 				type: 'tournament_completed',
-				tournamentId: state.tournamentId,
+				tId: state.tId,
 				championId: alive[0].id,
 				championAlias: alive[0].name
 			});
 		} else {
 			const queue = alive.map(p => p.id);
-			this.createNextMatch(state.tournamentId, queue);
-			console.log(`📋 Next match created for tournament ${state.tournamentId}`);
-
-			// Auto-ready AI players in the newly created match
-			const dbPlayers = database.tournaments.getPlayers(state.tournamentId);
-			const dbMatches = database.tournaments.getMatches(state.tournamentId);
-			const newMatch = dbMatches[dbMatches.length - 1]; // Get the just-created match
-			
-			if (newMatch) {
-				const p1 = dbPlayers.find(p => p.id === newMatch.p1?.id);
-				const p2 = dbPlayers.find(p => p.id === newMatch.p2?.id);
-
-				if (p1?.isAI) {
-					database.tournaments.updateMatch(newMatch.matchId, {
-						p1: {
-							id: p1.id!,
-							isReady: true,
-							lastActivity: nowISO()
-						}
-					});
-					console.log(`🤖 Auto-readied AI player: ${p1.name}`);
-				}
-				if (p2?.isAI) {
-					database.tournaments.updateMatch(newMatch.matchId, {
-						p2: {
-							id: p2.id!,
-							isReady: true,
-							lastActivity: nowISO()
-						}
-					});
-					console.log(`🤖 Auto-readied AI player: ${p2.name}`);
-				}
-				
-				// Check if both are now ready and auto-start if needed
-				const updatedMatch = database.tournaments.getMatches(state.tournamentId).find(m => m.matchId === newMatch.matchId);
-				if (updatedMatch && updatedMatch.p1?.isReady && updatedMatch.p2?.isReady) {
-					database.tournaments.updateMatch(newMatch.matchId, { status: 'ready' });
-					console.log(`🎮 Both players ready, auto-starting match in ${state.matchDelay}s`);
-					
-					// Broadcast match ready
-					broadcastTournamentUpdate({
-						type: 'match_ready',
-						tournamentId: state.tournamentId,
-						matchId: updatedMatch.matchId
-					});
-					
-					// Auto-start the match after delay
-					setTimeout(() => {
-						this.startMatch(state.tournamentId, updatedMatch.matchId);
-					}, state.matchDelay ? state.matchDelay * 1000 : 0);
-				}
+			let nextMatch = this.createNextMatch(state.tId, queue);
+			if (nextMatch === undefined) {
+				console.log(`⚠️ No next match could be created for tournament ${state.tId}`);
+				return this.loadTournamentState(state.tId)!;
 			}
+			console.log(`📋 Next match created for tournament ${state.tId}`);
+			
+			this.checkAndSetReady(nextMatch.tId, nextMatch.matchId);
 			
 			// Broadcast next match created
 			broadcastTournamentUpdate({
 				type: 'next_match_created',
-				tournamentId: state.tournamentId
+				tId: state.tId,
+				matchId: nextMatch.matchId
 			});
 		}
 
-		return this.loadTournamentState(state.tournamentId)!;
+		return this.loadTournamentState(state.tId)!;
 	}
 
-	public requestRematch(matchId: number, reason: string): Tournament {
-		const state = this.getActive();
-		if (!state) throw new Error('No active tournament.');
-
-		const dbMatches = database.tournaments.getMatches(state.tournamentId);
-		const matchDb = dbMatches.find(m => m.matchId === matchId);
-		if (!matchDb) throw new Error('Match not found.');
-
-		if (matchDb.gameId) {
-			const gameEngine = activeGames.get(matchDb.gameId);
-			if (gameEngine) {
-				gameEngine.endGame();
-				activeGames.delete(matchDb.gameId);
-			}
-
-			const monitor = this.gameMonitors.get(matchDb.gameId);
-			if (monitor) {
-				clearInterval(monitor);
-				this.gameMonitors.delete(matchDb.gameId);
-			}
-		}
-
-		database.tournaments.updateMatch(matchDb.matchId, {
-			status: 'disputed',
-			disputeReason: reason,
-			gameId: undefined,
-			p1: {
-				id: matchDb.p1?.id!,
-				name: matchDb.p1?.name,
-				gameId: matchDb.p1?.gameId,
-				tournamentId: matchDb.p1?.tournamentId,
-				identity: matchDb.p1?.identity,
-				user: matchDb.p1?.user,
-				isAI: matchDb.p1?.isAI,
-				isLocalGuest: matchDb.p1?.isLocalGuest,
-				isRemote: matchDb.p1?.isRemote,
-				isHost: matchDb.p1?.isHost,
-				isReady: false,
-				pos: matchDb.p1?.pos,
-				score: matchDb.p1?.score!,
-				eliminated: matchDb.p1?.eliminated,
-				wins: matchDb.p1?.wins,
-				losses: matchDb.p1?.losses,
-				totalScore: matchDb.p1?.totalScore,
-				averageScore: matchDb.p1?.averageScore,
-				championTimes: matchDb.p1?.championTimes,
-				connectionStatus: matchDb.p1?.connectionStatus!,
-				lastActivity: matchDb.p1?.lastActivity!
-			},
-			p2: {
-				id: matchDb.p2?.id!,
-				name: matchDb.p2?.name,
-				gameId: matchDb.p2?.gameId,
-				tournamentId: matchDb.p2?.tournamentId,
-				identity: matchDb.p2?.identity,
-				user: matchDb.p2?.user,
-				isAI: matchDb.p2?.isAI,
-				isLocalGuest: matchDb.p2?.isLocalGuest,
-				isRemote: matchDb.p2?.isRemote,
-				isHost: matchDb.p2?.isHost,
-				isReady: false,
-				pos: matchDb.p2?.pos,
-				score: matchDb.p2?.score!,
-				eliminated: matchDb.p2?.eliminated,
-				wins: matchDb.p2?.wins,
-				losses: matchDb.p2?.losses,
-				totalScore: matchDb.p2?.totalScore,
-				averageScore: matchDb.p2?.averageScore,
-				championTimes: matchDb.p2?.championTimes,
-				connectionStatus: matchDb.p2?.connectionStatus!,
-				lastActivity: matchDb.p2?.lastActivity!
-			},
-			winner: undefined,
-			loser: undefined
-		});
-
-		const dbPlayers = database.tournaments.getPlayers(state.tournamentId);
-		const p1 = dbPlayers.find(p => p.id === matchDb.p1?.id);
-		const p2 = dbPlayers.find(p => p.id === matchDb.p2?.id);
-
-		if (p1) database.tournaments.updatePlayer(p1.id, { isReady: false, eliminated: false });
-		if (p2) database.tournaments.updatePlayer(p2.id, { isReady: false, eliminated: false });
-
-		console.log(`⚠️ Match ${matchId} disputed: ${reason}`);
-		
-		// Broadcast dispute
-		broadcastTournamentUpdate({
-			type: 'match_disputed',
-			tournamentId: state.tournamentId,
-			matchId,
-			reason
-		});
-
-		return this.loadTournamentState(state.tournamentId)!;
-	}
-
-	public resolveDispute(matchId: number): Tournament {
-		const state = this.getActive();
-		if (!state) throw new Error('No active tournament.');
-
-		const dbMatches = database.tournaments.getMatches(state.tournamentId);
-		const matchDb = dbMatches.find(m => m.matchId === matchId);
-		if (!matchDb || matchDb.status !== 'disputed') throw new Error('Match not found or not disputed.');
-
-		database.tournaments.updateMatch(matchDb.matchId, {
-			status: 'pending',
-			disputeReason: undefined,
-			p1: {
-				id: matchDb.p1?.id!,
-				name: matchDb.p1?.name,
-				gameId: matchDb.p1?.gameId,
-				tournamentId: matchDb.p1?.tournamentId,
-				identity: matchDb.p1?.identity,
-				user: matchDb.p1?.user,
-				isAI: matchDb.p1?.isAI,
-				isLocalGuest: matchDb.p1?.isLocalGuest,
-				isRemote: matchDb.p1?.isRemote,
-				isHost: matchDb.p1?.isHost,
-				isReady: false,
-				pos: matchDb.p1?.pos,
-				score: 0,
-				eliminated: matchDb.p1?.eliminated,
-				wins: matchDb.p1?.wins,
-				losses: matchDb.p1?.losses,
-				totalScore: matchDb.p1?.totalScore,
-				averageScore: matchDb.p1?.averageScore,
-				championTimes: matchDb.p1?.championTimes,
-				connectionStatus: matchDb.p1?.connectionStatus!,
-				lastActivity: matchDb.p1?.lastActivity!
-			},
-			p2: {
-				id: matchDb.p2?.id!,
-				name: matchDb.p2?.name,
-				gameId: matchDb.p2?.gameId,
-				tournamentId: matchDb.p2?.tournamentId,
-				identity: matchDb.p2?.identity,
-				user: matchDb.p2?.user,
-				isAI: matchDb.p2?.isAI,
-				isLocalGuest: matchDb.p2?.isLocalGuest,
-				isRemote: matchDb.p2?.isRemote,
-				isHost: matchDb.p2?.isHost,
-				isReady: false,
-				pos: matchDb.p2?.pos,
-				score: 0,
-				eliminated: matchDb.p2?.eliminated,
-				wins: matchDb.p2?.wins,
-				losses: matchDb.p2?.losses,
-				totalScore: matchDb.p2?.totalScore,
-				averageScore: matchDb.p2?.averageScore,
-				championTimes: matchDb.p2?.championTimes,
-				connectionStatus: matchDb.p2?.connectionStatus!,
-				lastActivity: matchDb.p2?.lastActivity!
-			},
-			winner: undefined,
-			loser: undefined,
-		});
-
-		console.log(`✅ Match ${matchId} dispute resolved, ready for rematch`);
-		
-		// Broadcast dispute resolution
-		broadcastTournamentUpdate({
-			type: 'dispute_resolved',
-			tournamentId: state.tournamentId,
-			matchId
-		});
-
-		return this.loadTournamentState(state.tournamentId)!;
-	}
-
-	public resetActive(): void {
-		if (activeTournamentId) {
-			const state = this.loadTournamentState(activeTournamentId);
-			if (state?.currentMatch?.gameId) {
-				const gameEngine = activeGames.get(state.currentMatch.gameId);
-				if (gameEngine) {
-					gameEngine.endGame();
-					activeGames.delete(state.currentMatch.gameId);
-				}
-			}
-		}
-
-		this.gameMonitors.forEach(monitor => clearInterval(monitor));
-		this.gameMonitors.clear();
-
-		activeTournamentId = undefined;
-	}
-
-	public createNextMatch(tournamentId: number, queue: number[]): TournamentMatch | undefined {
+	public createNextMatch(tId: number, queue: number[]): TournamentMatch | undefined {
 		if (queue.length < 2) return undefined;
 
 		const p1 = queue.shift();
 		const p2 = queue.shift();
 		if (p1 == undefined || p2 == undefined) return undefined;
-		const player1 = database.tournaments.getPlayers(tournamentId).find(p => p.id === p1);
-		const player2 = database.tournaments.getPlayers(tournamentId).find(p => p.id === p2);
+		const player1 = database.tournaments.getAllPlayers(tId).find(p => p.id === p1);
+		const player2 = database.tournaments.getAllPlayers(tId).find(p => p.id === p2);
 		if (!player1 || !player2) return undefined;
 
-		const dbMatches = database.tournaments.getMatches(tournamentId);
-		const matchNumber = dbMatches.length + 1;
-
-		const match = database.tournaments.createMatch(tournamentId, matchNumber, player1, player2);
+		const match = database.tournaments.createMatch(tId, player1, player2);
 		return match;
 	}
 
