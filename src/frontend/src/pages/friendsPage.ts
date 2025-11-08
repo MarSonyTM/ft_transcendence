@@ -71,9 +71,6 @@ export function renderFriendsPage(): void {
           <h2 style="color: white; margin-bottom: 15px;">Your Friends (<span id="friendCount">0</span>)</h2>
           <div id="friendsList"></div>
         </div>
-        <button id="backBtn" class="btn-back" style="margin-left:auto;margin-right:auto;display:block;margin-top:22%;margin-bottom:0%">
-          ← Back
-        </button>
         
       </div>
     </div>
@@ -93,9 +90,9 @@ function initFriendsPage(): void {
   const backBtn = document.getElementById('backBtn');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      stopAutoRefresh(); // Important: cleanup interval!
-      history.pushState({ page: 'landing' }, '', '/landing');
-      setCurrentPage('landing');
+      stopAutoRefresh();
+      history.pushState({ page: 'profile' }, '', '/profile');
+      setCurrentPage('profile');
       renderApp();
     });
   }
@@ -136,7 +133,7 @@ function stopAutoRefresh(): void {
 }
 
 async function refreshAllData(): Promise<void> {
-  if (isRefreshing) return; // Prevent overlapping refreshes
+  if (isRefreshing) return; 
   
   isRefreshing = true;
   

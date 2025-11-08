@@ -2,7 +2,9 @@ import { FastifyInstance } from 'fastify';
 import { activeGames } from '../routes/game';
 import { gameRoomManager } from '../game/gameRoom';
 import { presenceManager } from '../presence/presenceManager';
-import { authService } from '../../../frontend/src/utils/auth'
+import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config';
+import { database } from '../database';
 
 const DEBUG = true;
 
@@ -12,10 +14,28 @@ const roomConnections = new Map<string, Map<string, any>>();
 // Store player to room mapping
 const playerRoomMap = new Map<string, string>();
 
+// Helper function to get user from JWT cookie
+function getUserFromRequest(req: any): any {
+    try {
+        const token = req.cookies?.token;
+        if (!token) return null;
+        
+        const decoded = jwt.verify(token, JWT_SECRET || '') as any;
+        if (decoded?.id) {
+            // Optionally fetch full user from database
+            const user = database.users.getUserById(decoded.id);
+            return user;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error decoding JWT:', error);
+        return null;
+    }
+}
+
 // Register room-based WebSocket routes
 async function roomWebSocketRoutes(fastify: FastifyInstance) {
   
-  // Room-based WebSocket endpoint - registered directly on fastify instance
     fastify.get('/room/:roomId/ws', { websocket: true }, (connection: any, req: any) => {
         const { roomId } = req.params;
         const queryParams = new URLSearchParams(req.url.split('?')[1] || '');
@@ -48,12 +68,11 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 
         // Associate socket with player in room manager
         gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
-        const tempuser = `localhost:3000/api/user/${playerId}`;
-        const tempuser = authService.fetchUserProfile();
-        if (!tempuser)
-            return;
-        const user = JSON.parse(tempuser);
-        if (user && user?.id) {
+        
+        // Get user from JWT token in cookies
+        const user = getUserFromRequest(req);
+        
+        if (user && user.id) {
             presenceManager.updateHeartbeat(user.id, user.username || 'Unknown');
         }
 
@@ -87,10 +106,12 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 
         socket.on('close', () => {
             console.log(`🔌 Player ${playerId} disconnected from room ${roomId}`);
-            const token = localStorage.getItem('authToken');
-            if (!token) return null;
-            const decoded = JSON.parse(atob(token.split('.')[1]));
-            if (decoded?.id) presenceManager.setUserOffline(decoded.id);
+            
+            // Get user from request to update presence
+            if (user?.id) {
+                presenceManager.setUserOffline(user.id);
+            }
+            
             removePlayerFromRoom(roomId, playerId);
         });
 

@@ -766,7 +766,7 @@ async function userRoutes(
 
   fastify.post('/presence/heartbeat', async (request: FastifyRequest, reply: FastifyReply) => {
         try {
-            const token = request.headers.authorization?.replace('Bearer ', '');
+            const token = request.cookies.token;
             if (!token) {
                 return reply.code(401).send({ success: false });
             }
@@ -784,7 +784,7 @@ async function userRoutes(
     // Get specific user presence
     fastify.get('/presence/user/:userId', async (request: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
         try {
-            const token = request.headers.authorization?.replace('Bearer ', '');
+            const token = request.cookies.token;
             if (!token) return reply.code(401).send({ success: false });
             jwt.verify(token, JWT_SECRET!);
             
@@ -800,7 +800,7 @@ async function userRoutes(
     // Get batch presence
     fastify.post('/presence/batch', async (request: FastifyRequest<{ Body: { userIds: number[] } }>, reply: FastifyReply) => {
         try {
-            const token = request.headers.authorization?.replace('Bearer ', '');
+            const token = request.cookies.token;
             if (!token) return reply.code(401).send({ success: false });
             jwt.verify(token, JWT_SECRET!);
 

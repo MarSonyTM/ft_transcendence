@@ -1,8 +1,8 @@
 import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
-import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { presenceService } from '../utils/presenceService';
+import { authService, UserProfile } from '../utils/auth';
 import { 
   Player, 
   GameRoom, 
@@ -16,17 +16,19 @@ let pollInterval: number | null = null;
 let lobbyWebSocket: any = null;
 
 export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
-  const root = document.getElementById('app-root');
-  if (!root) return;
+    const root = document.getElementById('app-root');
+    if (!root) return;
 
-  console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
-
-  const currentUser = authService.getCurrentUser();
-  
-  let user = currentUser;
-  if (!user && authService.isAuthenticated()) {
-    user = await authService.fetchUserProfile();
-  }
+    console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
+    
+    let user: UserProfile | null = null;
+    try {
+        user = await authService.fetchUserProfile();
+    } catch {
+      return;
+    }
+    
+  currentUserId = user?.id?.toString() || `guest-${Date.now()}`;
 
   currentUserId = user?.id?.toString() || `guest-${Date.now()}`;
 

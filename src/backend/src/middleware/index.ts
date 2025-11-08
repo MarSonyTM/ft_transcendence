@@ -27,6 +27,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/api/auth/verify-email',
         '/api/auth/logout',
         '/api/auth/resend-verification',
+        '/api/auth/presence/heartbeat',
         
         // Auth endpoints
         '/api/auth/create',
