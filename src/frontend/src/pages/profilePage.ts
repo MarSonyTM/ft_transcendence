@@ -60,11 +60,14 @@ export async function renderProfilePage(): Promise<void> {
         email: user!.email,
         firstName: user!.firstName,
         lastName: user!.lastName,
-        avatar: user!.avatar,
+        avatar: user!.avatar || undefined,
         gamesPlayed: (user!.gamesWon || 0) + (user!.gamesLost || 0),
         gamesWon: user!.gamesWon || 0,
         gamesLost: user!.gamesLost || 0
     };
+    
+    console.log('[PROFILE] User data:', userData);
+    console.log('[PROFILE] Avatar URL:', userData.avatar);
     
     const winRate = userData.gamesPlayed > 0 
         ? ((userData.gamesWon / userData.gamesPlayed) * 100).toFixed(1) : 0;
@@ -75,18 +78,27 @@ export async function renderProfilePage(): Promise<void> {
             <div class="glass-card" style="padding: 2em; width:100%;">
                 <h2 class="title-neon" style="text-align: center">Profile</h2>
                 
-                ${userData.avatar ? `
-                    <div style="text-align: center; margin-bottom: 1.5em;">
+                <div style="text-align: center; margin-bottom: 1.5em;">
+                    ${userData.avatar ? `
                         <img 
+                            id="profileAvatar"
                             src="${(userData.avatar || '').trim()}" 
                             alt="Avatar" 
                             referrerpolicy="no-referrer" 
                             loading="lazy"
-                            style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6;"
-                            onerror="this.style.display='none';"
+                            style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6; object-fit: cover;"
+                            onerror="this.style.display='none'; document.getElementById('avatarError')?.style.display='block';"
                         >
-                    </div>
-                ` : ''}
+                        <div id="avatarError" style="display: none; color: #ef4444; font-size: 0.85em; margin-top: 0.5em;">
+                            ⚠️ Avatar image failed to load
+                        </div>
+                    ` : `
+                        <div style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6; background: rgba(59, 130, 246, 0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto; color: #9ca3af; font-size: 2em;">
+                            👤
+                        </div>
+                        <p style="color: #9ca3af; font-size: 0.85em; margin-top: 0.5em;">No avatar set</p>
+                    `}
+                </div>
                 
                 <div class="username-section" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
                     <h3>Username</h3>
