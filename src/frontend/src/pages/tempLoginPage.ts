@@ -1,39 +1,54 @@
 import { setCurrentUser } from '../utils/globalState';
 import { createGuestUser } from '../_api/auth';
 import { updateUserProfile } from '../_api/user';
+import { authService } from '../utils/auth';
 
 export function renderTempLoginPage(): void {
   const root = document.getElementById('app-root');
   if (!root) return;
 
   root.innerHTML = `
-    <div class="login-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
-        <div style="background: rgba(255,255,255,0.05); padding: 2em; border-radius: 15px; max-width: 400px; width: 100%; backdrop-filter: blur(10px);">
-            <p style="color: rgba(255,255,255,0.9); text-align: center; margin-bottom: 1em; font-size: 0.9em;">
-                Jump right into the game as a guest!
-            </p>
-        <div style="display: flex; gap: 0.5em; margin-bottom: 1em;">
-			<input 
-                id="usernameInput" 
-                type="text" 
-                placeholder="Guest" 
-                style="padding: 0.8em; font-size: 1em; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: white; width: 100%;"
-            />
-		</div>
-        <button id="addGuestBtn" class="btn btn-primary" style="width: 100%; font-size: 1.2em; padding: 0.8em; background: white; color: #667eea; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s;">
-          Play as Guest
-        </button>
-        <div id="guestError" style="color: #ffe0e0; margin-top: 0.5em; text-align: center; font-size: 0.9em;"></div>
-      </div>
+    <div class="neon-grid">
+      <div class="grid-anim"></div>
+      <div class="glass-card" style="max-width: 450px; width: 100%;">
 
-      <!-- Back Button -->
-      <button 
-        id="backLandingBtn" 
-        class="btn btn-back" 
-        style="margin-top: 2em; padding: 0.6em 1.5em; background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 8px; cursor: pointer; transition: all 0.3s;"
-      >
-        ← Back to Landing
-      </button>
+        <div style="text-align: center; margin-bottom: 2em;">
+          <h1 class="title-neon" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Welcome Guest!</h1>
+          <p style="color: #9ca3af; font-size: 1rem;">Jump right into Pong without creating an account</p>
+        </div>
+
+        <div class="glass-card" style="padding: 2em; margin-bottom: 1.5em;">
+          <p style="color: rgba(255,255,255,0.9); text-align: center; margin-bottom: 1.5em; font-size: 1rem;">
+            🎮 Quick guest access to start playing immediately!
+          </p>
+
+          <div style="margin-bottom: 1.5em;">
+            <label for="usernameInput" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Choose a Guest Name (optional)</label>
+            <input
+              id="usernameInput"
+              type="text"
+              placeholder="Enter guest name or leave blank for random"
+              maxlength="20"
+              style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+              onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
+              onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
+            />
+          </div>
+
+          <button id="addGuestBtn" class="btn btn-neon primary" style="width: 100%; font-size: 1.2em; padding: 0.8em;">
+            🎮 Play as Guest
+          </button>
+
+          <div id="guestError" style="margin-top: 1em; text-align: center; font-size: 0.9em; min-height: 1.2em;"></div>
+        </div>
+
+        <div style="text-align: center;">
+          <button id="backLandingBtn" class="btn btn-neon accent" style="padding: 0.6em 1.5em;">
+            ← Back to Landing
+          </button>
+        </div>
+
+      </div>
     </div>
   `;
 
@@ -55,10 +70,7 @@ export function renderTempLoginPage(): void {
       const username = usernameInput.value.trim() || undefined;
       const result = await createGuestUser(username);
 
-      if (result.success && result.token) {
-        // Store the token
-        localStorage.setItem('authToken', result.token);
-        
+      if (result.success && result.token) {        
         // Mark as guest user
         localStorage.setItem('isGuest', 'true');
 
@@ -80,8 +92,8 @@ export function renderTempLoginPage(): void {
         
         // Show success message
         if (guestErrorEl) {
-          guestErrorEl.style.color = '#90EE90';
-          guestErrorEl.textContent = '✓ Welcome! Redirecting...';
+          guestErrorEl.style.color = '#10b981';
+          guestErrorEl.innerHTML = '<span style="color: #10b981;">✓ Welcome! Redirecting...</span>';
         }
         
         // Redirect to landing page
@@ -91,9 +103,9 @@ export function renderTempLoginPage(): void {
         }, 800);
       } else {
         if (guestErrorEl) {
-          guestErrorEl.textContent = result.error || 'Failed to create guest user';
+          guestErrorEl.innerHTML = `<span style="color: #ef4444;">❌ ${result.error || 'Failed to create guest user'}</span>`;
         }
-        addGuestBtn.textContent = 'Play as Guest';
+        addGuestBtn.textContent = '🎮 Play as Guest';
         (addGuestBtn as HTMLButtonElement).disabled = false;
       }
     });
@@ -107,20 +119,4 @@ export function renderTempLoginPage(): void {
     });
   }
 
-  // Add hover effects
-  addHoverEffects();
-}
-
-function addHoverEffects() {
-  const addGuestBtn = document.getElementById('addGuestBtn');
-  if (addGuestBtn) {
-    addGuestBtn.addEventListener('mouseenter', () => {
-      addGuestBtn.style.transform = 'scale(1.05)';
-      addGuestBtn.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-    });
-    addGuestBtn.addEventListener('mouseleave', () => {
-      addGuestBtn.style.transform = 'scale(1)';
-      addGuestBtn.style.boxShadow = 'none';
-    });
-  }
 }

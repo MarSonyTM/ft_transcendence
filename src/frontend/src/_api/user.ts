@@ -1,4 +1,4 @@
-import { getAccessToken } from '../utils/api';
+import { authService } from '../utils/auth';
 import { API_BASE } from '../config';
 
 export interface UpdateUserProfileData {
@@ -6,8 +6,6 @@ export interface UpdateUserProfileData {
     lastName?: string;
     email?: string;
     avatar?: string;
-    gamesWon?: number;
-    gamesLost?: number;
 }
 
 export interface UpdateUserProfileResult {
@@ -45,19 +43,19 @@ export interface UsernameAvailabilityResult {
 // Update user profile
 export async function updateUserProfile(updateData: UpdateUserProfileData): Promise<UpdateUserProfileResult> {
     try {
-        const token = getAccessToken();
-        if (!token) {
+        const user = await authService.getCurrentUser();
+        if (!user) {
             return {
                 success: false,
-                error: 'No authentication token found'
+                error: 'No authenticated user found'
             };
         }
 
         const response = await fetch(`${API_BASE}/api/users/me`, {
             method: 'PUT',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(updateData)
         });
@@ -87,19 +85,17 @@ export async function updateUserProfile(updateData: UpdateUserProfileData): Prom
 // Delete user account
 export async function deleteUserAccount(): Promise<DeleteAccountResult> {
     try {
-        const token = getAccessToken();
-        if (!token) {
+        const user = await authService.getCurrentUser();
+        if (!user) {
             return {
                 success: false,
-                error: 'No authentication token found'
+                error: 'No authenticated user found'
             };
         }
 
         const response = await fetch(`${API_BASE}/api/users/me`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'include',
         });
 
         const data = await response.json();
@@ -126,19 +122,19 @@ export async function deleteUserAccount(): Promise<DeleteAccountResult> {
 // Request email change
 export async function requestEmailChange(email: string): Promise<EmailChangeResult> {
     try {
-        const token = getAccessToken();
-        if (!token) {
+        const user = await authService.getCurrentUser();
+        if (!user) {
             return {
                 success: false,
-                error: 'No authentication token found'
+                error: 'No authenticated user found'
             };
         }
 
         const response = await fetch(`${API_BASE}/api/users/request-email-change`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ email })
         });
@@ -168,19 +164,19 @@ export async function requestEmailChange(email: string): Promise<EmailChangeResu
 // Verify email change
 export async function verifyEmailChange(verificationCode: string): Promise<EmailChangeResult> {
     try {
-        const token = getAccessToken();
-        if (!token) {
+        const user = await authService.getCurrentUser();
+        if (!user) {
             return {
                 success: false,
-                error: 'No authentication token found'
+                error: 'No authenticated user found'
             };
         }
 
         const response = await fetch(`${API_BASE}/api/users/verify-email-change`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ verificationCode })
         });
@@ -210,18 +206,18 @@ export async function verifyEmailChange(verificationCode: string): Promise<Email
 // Check username availability
 export async function checkUsernameAvailability(username: string): Promise<UsernameAvailabilityResult> {
     try {
-		const token = getAccessToken();
-		if (!token) {
+		const user = await authService.getCurrentUser();
+		if (!user) {
 			return {
 				success: false,
-				error: 'No authentication token found'
+				error: 'No authenticated user found'
 			};
 		}
         const response = await fetch(`${API_BASE}/api/users/check-username/${encodeURIComponent(username)}`, {
             method: 'GET',
+            credentials: 'include',
             headers: {
-                'Content-Type': 'application/json',
-				'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             }
         });
 
@@ -250,19 +246,19 @@ export async function checkUsernameAvailability(username: string): Promise<Usern
 // Change username
 export async function changeUsername(newUsername: string): Promise<UsernameChangeResult> {
     try {
-        const token = getAccessToken();
-        if (!token) {
+        const user = await authService.getCurrentUser();
+        if (!user) {
             return {
                 success: false,
-                error: 'No authentication token found'
+                error: 'No authenticated user found'
             };
         }
 
         const response = await fetch(`${API_BASE}/api/users/change-username`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ newUsername })
         });

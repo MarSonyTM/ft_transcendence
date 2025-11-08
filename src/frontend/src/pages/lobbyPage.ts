@@ -2,7 +2,6 @@ import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
-import { presenceService } from '../utils/presenceService';
 import { 
   Player, 
   GameRoom, 
@@ -48,12 +47,15 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
   if (!currentRoom) {
     console.error('❌ [LOBBY] No room after setup!');
     root.innerHTML = `
-    <div style="text-align: center; padding: 2em;">
-    <h2 style="color: #f87171;">Failed to setup room</h2>
-    <p>Please try again</p>
-    <button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
-    Back to Home
-    </button>
+    <div class="neon-grid">
+      <div class="grid-anim"></div>
+      <div class="glass-card" style="max-width: 600px;">
+        <h2 class="title-neon" style="text-align: center; color: #f87171;">Failed to setup room</h2>
+        <p style="text-align: center; color: rgb(156 163 175);">Please try again</p>
+        <button onclick="window.location.href='/'" class="btn btn-neon primary">
+          Back to Home
+        </button>
+      </div>
     </div>
     `;
     return;
@@ -76,12 +78,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   const gameMode = getCurrentGameMode();
   const maxPlayers = gameMode === '2P' ? 2 : 4;
 
-  const token = authService.getToken();
   const response = await fetch('/api/room/create', {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       hostId: userId,
@@ -117,12 +118,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
   console.log('[JOIN] Joining room:', roomId);
   
-  const token = authService.getToken();
   const response = await fetch(`/api/room/${roomId}/join`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       playerId: userId,
@@ -183,12 +183,11 @@ async function startGame(): Promise<void> {
   console.log('Starting game for room:', currentRoom.roomId);
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ 
         hostId: currentUserId
@@ -404,7 +403,14 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
 function renderLobby(root: HTMLElement): void {
 	const currentRoom = getCurrentRoom();
 	if (!currentRoom) {
-	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
+	  root.innerHTML = `
+	    <div class="neon-grid">
+	      <div class="grid-anim"></div>
+	      <div class="glass-card">
+	        <p style="text-align: center; color: rgb(156 163 175);">Loading room...</p>
+	      </div>
+	    </div>
+	  `;
 	  return;
 	}
 
@@ -438,10 +444,11 @@ function renderLobby(root: HTMLElement): void {
   let hasLocal = players.some(p => p.id === 'local');
   
 	root.innerHTML = `
-	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
-		<div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">
+	  <div class="neon-grid">
+		<div class="grid-anim"></div>
+		<div class="glass-card" style="max-width: 800px;">
 		  
-		  <h2 style="font-size: 2.5em; margin: 0 0 1em 0; color: rgb(209 213 219); text-align: center;">Game Lobby</h2>
+		  <h2 class="title-neon" style="font-size: 2.5em; margin: 0 0 1em 0; text-align: center;">Game Lobby</h2>
 		  
 		  <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
 			<div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Room ID</div>
@@ -458,9 +465,9 @@ function renderLobby(root: HTMLElement): void {
 				autocomplete="off"
 				value="${preservedValue}"
 				style="flex: 1; background: rgb(17 24 39); color: rgb(229 231 235); border: 1px solid rgb(75 85 99); border-radius: 4px; padding: 0.5em; font-family: monospace; font-size: 0.9em; outline: none;">
-			  <button 
-				id="joinRoomBtn" 
-				style="background: rgb(99 102 241); color: white; border: none; border-radius: 4px; padding: 0.5em 1em; cursor: pointer; white-space: nowrap;">
+			  <button
+				id="joinRoomBtn"
+				class="btn btn-neon primary">
 				Join
 			  </button>
 			</div>
@@ -493,9 +500,8 @@ function renderLobby(root: HTMLElement): void {
 		  </div>
   
 		  ${currentPlayer && !currentPlayer.isAI ? `
-			<button id="toggleReadyBtn" 
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-						   background: ${currentPlayer.isReady ? 'rgb(107 114 128)' : 'rgb(34 197 94)'}; color: white;">
+			<button id="toggleReadyBtn"
+					class="btn ${currentPlayer.isReady ? 'btn-secondary' : 'btn-neon primary'}" style="width: 100%; margin-bottom: 0.75em;">
 			  ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
 			</button>
 		  ` : ''}
@@ -504,7 +510,7 @@ function renderLobby(root: HTMLElement): void {
             <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1em;">
                 <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em;">Add Player</div>
                 
-                ${!hasLocal ? '<button id="addLocalBtn" style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em; background: rgb(34 197 94); color: white;"> 🎮 Add Local Player (O/L keys)</button>' : ''}
+                ${!hasLocal ? '<button id="addLocalBtn" class="btn btn-neon primary" style="width: 100%; margin-bottom: 0.75em;"> 🎮 Add Local Player (O/L keys)</button>' : ''}
                 <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em; margin-top: 1em;">AI Opponent Settings</div>
                 <select id="aiDifficulty" 
                     style="width: 100%; padding: 0.75em; border: 1px solid rgb(75 85 99); border-radius: 8px; font-size: 1em; margin-bottom: 0.75em; background: rgb(31 41 55); color: white;">
@@ -519,9 +525,8 @@ function renderLobby(root: HTMLElement): void {
                         '🟡 Moderate speed and accuracy - Good for regular practice' : 
                         '🔴 Lightning-fast reactions, perfect accuracy - Ultimate challenge'}
                 </div>
-                <button id="addAIBtn" 
-                    style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
-                        background: rgb(99 102 241); color: white;">
+                <button id="addAIBtn"
+                    class="btn btn-neon accent" style="width: 100%;">
                     🤖 Add AI Opponent
                 </button>
             </div>
@@ -529,9 +534,8 @@ function renderLobby(root: HTMLElement): void {
 		  
 		  ${isHost ? `
       <button id="startGameBtn"
-              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
-                    background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
-                    cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
+              class="btn ${canStart ? 'btn-neon primary' : 'btn-secondary'}"
+              style="width: 100%; margin-bottom: 0.75em; ${canStart ? '' : 'cursor: not-allowed; opacity: 0.5;'}">
         ${canStart ? '🎮 Start Game' : `⏳ Need ${minPlayersRequired - players.length} more player(s)...`}
       </button>
     ` : `
@@ -540,9 +544,8 @@ function renderLobby(root: HTMLElement): void {
       </div>
     `}
 		  
-		  <button id="leaveBtn" 
-				  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
-						 background: rgb(220 38 38); color: white;">
+		  <button id="leaveBtn"
+				  class="btn" style="width: 100%; background: rgb(220 38 38); color: white; border: none;">
 			Leave Lobby
 		  </button>
 		  
@@ -629,12 +632,11 @@ async function toggleReady(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/ready`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });
@@ -666,12 +668,11 @@ async function addAIOpponent(): Promise<void> {
   console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: aiId,
@@ -717,12 +718,11 @@ async function addLocalPlayer(): Promise<void> {
   }
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: localId,
@@ -751,12 +751,11 @@ async function removePlayer(playerId: string): Promise<void> {
   if (!currentRoom) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId })
     });
@@ -774,12 +773,11 @@ async function leaveRoom(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });

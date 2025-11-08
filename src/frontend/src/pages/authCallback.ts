@@ -1,21 +1,20 @@
-export default function renderAuthCallbackPage(): void {
+import { authService } from "../utils/auth";
+
+export default  async function renderAuthCallbackPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
     const success = urlParams.get('success');
     const error = urlParams.get('error');
     const email = urlParams.get('email');
     const needEmailVerification = urlParams.get('needEmailVerification');
 
-    if (success === 'true' && token) {
-        // Store the token and redirect to dashboard
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('pendingEmailVerification', email || '');
+    if (success === 'true') {
+        authService.setPendingEmailVerification(email || '');
         if (needEmailVerification === 'true') {
-            localStorage.setItem('needEmailVerification', 'true');
+            authService.setNeededEmailVerification(true);
         }
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
@@ -30,6 +29,9 @@ export default function renderAuthCallbackPage(): void {
                 }
             </style>
         `;
+
+        await authService.fetchUserProfile();
+
         
         // Redirect to dashboard after short delay
         console.log("it logged in")
