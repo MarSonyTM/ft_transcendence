@@ -52,6 +52,7 @@ function serializeState(state: Tournament): Tournament {
 	} : undefined;
 
 	const queuePlayers = state.queue?.map((id: number) => playerMap.get(id));
+	if (queuePlayers === undefined || queuePlayers.length === 0) throw new Error('No Players in queue.');
 
 	const nextMatches: TournamentNextMatch[] = [];
 	const queueCopy = [...state.queue ?? []];
@@ -60,11 +61,10 @@ function serializeState(state: Tournament): Tournament {
 		const player1Id = queueCopy.shift();
 		const player2Id = queueCopy.shift();
 		nextMatches.push({
-			order,
+			order: order++,
 			p1: playerMap.get(player1Id!) || undefined,
 			p2: playerMap.get(player2Id!) || undefined
 		});
-		order += 1;
 	}
 
 	const matchHistory: MatchSummary[] = state.matchHistory?.map((match: MatchSummary) => ({

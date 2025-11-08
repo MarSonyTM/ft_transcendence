@@ -154,6 +154,12 @@ export function buildBracket(): TournamentMatch[] {
     relevelRoundsByDependencies();
 
     state.curMatch = findNextPlayableMatch(state.matches);
+    if (state.curMatch === undefined) {
+        state.status = 'completed';
+        state.updatedAt = new Date().toISOString();
+        state.finishedAt = new Date().toISOString();
+        return state.matches;
+    }
     state.status = 'in_progress';
     state.updatedAt = new Date().toISOString();
     return state.matches;

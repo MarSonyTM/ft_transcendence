@@ -237,6 +237,7 @@ export class TournamentManager {
 			startedAt: nowISO()
 		});
 
+		if (state.players === undefined) throw new Error('No Players present.');
 		const p1 = state.players?.find(p => p.id === state.curMatch?.p1?.id)!;
 		const p2 = state.players?.find(p => p.id === state.curMatch?.p2?.id)!;
 
@@ -328,11 +329,11 @@ export class TournamentManager {
 	public recordResult(winner: { name?: string; winnerId?: number }, player1Score?: number, player2Score?: number): Tournament {
 		const state = this.getActiveTournament();
 		if (!state) throw new Error('No active tournament.');
-		if (!state.curMatch) throw new Error('No active match.');
+		if (!state.curMatch || !state.matches) throw new Error('No current Match.');
 
 		const { p1: player1, p2: player2, matchId: matchId, gameId: gameId } = state.curMatch;
-		const p1 = state.players?.find(p => p.id === player1?.id)!;
-		const p2 = state.players?.find(p => p.id === player2?.id)!;
+		const p1 = state.players!.find(p => p.id === player1?.id)!;
+		const p2 = state.players!.find(p => p.id === player2?.id)!;
 		const winP = this.resolveWinner(winner, [p1, p2]);
 		const loseP = winP.id === p1.id ? p2 : p1;
 
