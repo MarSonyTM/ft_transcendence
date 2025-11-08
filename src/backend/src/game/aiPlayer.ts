@@ -70,7 +70,7 @@ export class AIPongPlayer {
                 };
             case 'hard':
                 return {
-                    updateInterval: 100,     // Moderate updates (10fps for smoother movement)
+                    updateInterval: 50,      // Fast updates (20fps for very responsive movement)
                     predictionError: 0,      // Perfect prediction
                     reactionDelay: 0,        // Instant reactions
                     centerOffset: 0          // Perfect positioning
@@ -186,10 +186,15 @@ export class AIPongPlayer {
                     this.values.paddleWidth : this.max - this.values.paddleWidth;
                 const timeToReach = Math.abs(paddle - ball) / Math.abs(ballVel);
                 
-                // Predict Y position with wall bounces
-                predicted = ball + (ballVel * timeToReach);
+                // Predict position with wall bounces
+                const perpVel = this.side === 'left' || this.side === 'right' ? 
+                    this.lastView.ballVelY : this.lastView.ballVelX;
+                const perpPos = this.side === 'left' || this.side === 'right' ?
+                    this.lastView.ballPosY : this.lastView.ballPosX;
                 
-                // Handle wall bounces
+                predicted = perpPos + (perpVel * timeToReach);
+                
+                // Handle multiple wall bounces accurately
                 while (predicted < 0 || predicted > this.max) {
                     if (predicted < 0) {
                         predicted = Math.abs(predicted);
@@ -201,8 +206,8 @@ export class AIPongPlayer {
                 // Target the center of the paddle to the predicted position
                 target = Math.max(0, Math.min(this.maxPaddle, predicted - this.values.paddleHeight / 2));
                 
-                // Larger deadzone to prevent jittery movement (8px threshold)
-                const deadzone = 8;
+                // Very small deadzone for precise movement (2px threshold)
+                const deadzone = 2;
                 if (Math.abs(paddle - target) > deadzone) {
                     this.currentKeys.up = target < paddle;
                     this.currentKeys.down = target > paddle;
@@ -212,9 +217,9 @@ export class AIPongPlayer {
                 }
             // }
         } else {
-            // Ball moving away - return to center smoothly
+            // Ball moving away - return to center aggressively
             const target = this.center;
-            const deadzone = 8;
+            const deadzone = 2;
             
             if (Math.abs(paddle - target) > deadzone) {
                 this.currentKeys.up = target < paddle;
