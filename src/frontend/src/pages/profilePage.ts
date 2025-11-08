@@ -37,7 +37,7 @@ export async function renderProfilePage(): Promise<void> {
         const backBtn = document.getElementById('backToLandingBtn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
-                history.pushState({ page: 'landing' }, '', '/landing');
+                history.pushState({ page: 'pingPong' }, '', '/ping-pong');
                 setCurrentPage('landing');
                 renderApp();
             });

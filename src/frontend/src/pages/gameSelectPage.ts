@@ -15,15 +15,7 @@ export function renderGameSelectPage(): void {
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                 </div>
-                <div style="display:flex; gap:0.8em; justify-content:center; margin-top:1.2em;">
-                    <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
-                    <button id="profileBtn" class="btn-neon accent">Profile</button>
-                </div>
-                <div style="display:flex; justify-content:center; margin-top:0.6em;">
-                    <button id="logoutBtn" class="btn" style="min-width: 140px; font-size: 1.1em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.6em 1.2em; cursor: pointer;">
-                        Logout
-                    </button>
-                </div>
+                <button id="backToLandingBtn" class="btn btn-back">Back</button>
             </div>
         </div>
     `;
@@ -64,20 +56,11 @@ export function renderGameSelectPage(): void {
         });
     }
 
-    const leaderboardBtn = document.getElementById('leaderboardBtn');
-    if (leaderboardBtn) {
-        leaderboardBtn.addEventListener('click', () => {
-            history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
-            setCurrentPage('leaderboard');
-            renderApp();
-        });
-    }
-
-    const profileBtn = document.getElementById('profileBtn');
-    if (profileBtn) {
-        profileBtn.addEventListener('click', () => {
-            history.pushState({ page: 'profile' }, '', '/profile');
-            setCurrentPage('profile');
+    const backBtn = document.getElementById('backToLandingBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'landing' }, '', '/');
+            setCurrentPage('landing');
             renderApp();
         });
     }

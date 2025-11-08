@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { activeGames } from '../routes/game';
 import { gameRoomManager } from '../game/gameRoom';
 import { presenceManager } from '../presence/presenceManager';
+import { authService } from '../../../frontend/src/utils/auth'
 
 const DEBUG = true;
 
@@ -47,7 +48,8 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 
         // Associate socket with player in room manager
         gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
-        const tempuser = localStorage.getItem('currentUser');
+        const tempuser = `localhost:3000/api/user/${playerId}`;
+        const tempuser = authService.fetchUserProfile();
         if (!tempuser)
             return;
         const user = JSON.parse(tempuser);
