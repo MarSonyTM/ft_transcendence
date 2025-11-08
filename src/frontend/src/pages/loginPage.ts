@@ -9,7 +9,7 @@ export function renderLoginPage(): void {
     root.innerHTML = `
         <div class="neon-grid">
             <div class="grid-anim"></div>
-            <div class="glass-card" style="max-width: 450px; width: 100%;">
+            <div class="glass-card" style="max-width: 520px; width: 100%; margin: 0 auto;">
 
                 <div style="text-align: center; margin-bottom: 2em;">
                     <h1 class="title-neon" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Welcome Back</h1>
@@ -17,29 +17,29 @@ export function renderLoginPage(): void {
                 </div>
 
                 <div class="glass-card" style="padding: 2em; margin-bottom: 1.5em;">
-                    <form id="loginForm" style="display: flex; flex-direction: column; gap: 1.5em;">
+                    <form id="loginForm" style="display: flex; flex-direction: column; gap: 1.5em; width: 100%;">
 
-                        <div style="margin-bottom: 1em;">
+                        <div style="margin-bottom: 1em; width: 100%;">
                             <label for="usernameInput" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Username</label>
                             <input
                                 id="usernameInput"
                                 type="text"
                                 placeholder="Enter your username"
                                 required
-                                style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+                                style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
                                 onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
                                 onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
                             />
                         </div>
 
-                        <div style="margin-bottom: 1em;">
+                        <div style="margin-bottom: 1em; width: 100%;">
                             <label for="passwordInput" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Password</label>
                             <input
                                 id="passwordInput"
                                 type="password"
                                 placeholder="Enter your password"
                                 required
-                                style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+                                style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
                                 onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
                                 onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
                             />

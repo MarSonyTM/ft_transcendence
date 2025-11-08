@@ -11,7 +11,7 @@ export default function renderRegisterPage(): void {
 	root.innerHTML = `
 		<div class="neon-grid">
 			<div class="grid-anim"></div>
-			<div class="glass-card" style="max-width: 500px; width: 100%;">
+			<div class="glass-card" style="max-width: 500px; width: 100%; margin: 0 auto;">
 
 				<div style="text-align: center; margin-bottom: 2em;">
 					<h1 class="title-neon" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Create Account</h1>
@@ -19,96 +19,96 @@ export default function renderRegisterPage(): void {
 				</div>
 
 				<div class="glass-card" style="padding: 2em; margin-bottom: 1.5em;">
-					<form id="registerForm" style="display: flex; flex-direction: column; gap: 1.5em;">
+					<form id="registerForm" style="display: flex; flex-direction: column; gap: 1.5em; width: 100%;">
 
-						<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em;">
-							<div>
+						<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; width: 100%;">
+							<div style="width: 100%;">
 								<label for="regFirstName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">First Name</label>
 								<input
 									id="regFirstName"
 									type="text"
 									placeholder="Enter first name"
 									required
-									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 									onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 									onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 								/>
 							</div>
 
-							<div>
+							<div style="width: 100%;">
 								<label for="regLastName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Last Name</label>
 								<input
 									id="regLastName"
 									type="text"
 									placeholder="Enter last name"
 									required
-									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 									onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 									onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 								/>
 							</div>
 						</div>
 
-						<div>
+						<div style="width: 100%;">
 							<label for="regUsername" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Username</label>
 							<input
 								id="regUsername"
 								type="text"
 								placeholder="Choose a unique username"
 								required
-								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 								onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 								onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 							/>
 						</div>
 
-						<div>
+						<div style="width: 100%;">
 							<label for="regEmail" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Email</label>
 							<input
 								id="regEmail"
 								type="email"
 								placeholder="Enter your email address"
 								required
-								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 								onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 								onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 							/>
 						</div>
 
-						<div>
+						<div style="width: 100%;">
 							<label for="regAvatar" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Avatar URL (optional)</label>
 							<input
 								id="regAvatar"
 								type="text"
 								placeholder="https://example.com/avatar.jpg"
-								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+								style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 								onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 								onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 							/>
 						</div>
 
-						<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em;">
-							<div>
+						<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; width: 100%;">
+							<div style="width: 100%;">
 								<label for="regPassword" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Password</label>
 								<input
 									id="regPassword"
 									type="password"
 									placeholder="Create password"
 									required
-									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 									onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 									onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 								/>
 							</div>
 
-							<div>
+							<div style="width: 100%;">
 								<label for="regPassword2" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Confirm Password</label>
 								<input
 									id="regPassword2"
 									type="password"
 									placeholder="Confirm password"
 									required
-									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+									style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; box-sizing: border-box;"
 									onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
 									onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
 								/>
@@ -139,14 +139,14 @@ export default function renderRegisterPage(): void {
 					</button>
 				</div>
 
-				<div style="text-align: center; margin-bottom: 1.5em;">
+				<div style="text-align: center; margin-bottom: 0.5em;">
 					<p style="color: #9ca3af; font-size: 0.9em; margin-bottom: 0.5em;">
 						Already have an account?
 						<button id="toLoginBtn" class="btn btn-neon accent" style="padding: 0.2em 0.5em; font-size: 0.9em;">Sign in</button>
 					</p>
 				</div>
 
-				<div style="text-align: center;">
+				<div style="text-align: center; margin-top: -0.5em;">
 					<button id="backLandingBtn" class="btn btn-neon primary" style="padding: 0.6em 1.5em;">
 						← Back to Home
 					</button>
