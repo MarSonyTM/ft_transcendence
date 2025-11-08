@@ -23,22 +23,6 @@ export class baby3D {
     private lastBallY?: number;
     private hasBallState: boolean = false;
 
-    // Interpolation state for smooth movement
-    // Ball: Use velocity-based prediction for constant speed (Pong physics)
-    private serverBallX: number = 200;  // Authoritative position from server
-    private serverBallY: number = 200;
-    private predictedBallX: number = 200;  // Client-predicted position (for display)
-    private predictedBallY: number = 200;
-    private ballVelX: number = 0;
-    private ballVelY: number = 0;
-    private lastServerUpdateTime: number = performance.now();
-    
-    // Paddles: Use smooth interpolation (they move discretely)
-    private targetPaddlePositions: { left?: number; top?: number; right?: number; bottom?: number } = {};
-    private currentPaddlePositions: { left?: number; top?: number; right?: number; bottom?: number } = {};
-    private lastUpdateTime: number = performance.now();
-    private readonly SMOOTHING_FACTOR = 0.2; // For paddles only
-
     private values: {
         min: number,
         tableX: number,
@@ -168,15 +152,6 @@ export class baby3D {
         this.lastBallX = this.values.tableX / 2;
         this.lastBallY = this.values.tableY / 2;
         this.hasBallState = false;
-        // Initialize ball state
-        this.serverBallX = this.values.tableX / 2;
-        this.serverBallY = this.values.tableY / 2;
-        this.predictedBallX = this.values.tableX / 2;
-        this.predictedBallY = this.values.tableY / 2;
-        this.ballVelX = 0;
-        this.ballVelY = 0;
-        this.lastServerUpdateTime = performance.now();
-        this.lastUpdateTime = performance.now();
         console.log('✅ [3D] Ball created');
 
         this.initialized = true;
@@ -333,17 +308,6 @@ export class baby3D {
             this.lastBallX = this.values.tableX / 2;
             this.lastBallY = this.values.tableY / 2;
             this.hasBallState = false;
-            // Reset ball state
-            this.serverBallX = this.values.tableX / 2;
-            this.serverBallY = this.values.tableY / 2;
-            this.predictedBallX = this.values.tableX / 2;
-            this.predictedBallY = this.values.tableY / 2;
-            this.ballVelX = 0;
-            this.ballVelY = 0;
-            this.lastServerUpdateTime = performance.now();
-            // Reset paddle interpolation state
-            this.currentPaddlePositions = {};
-            this.targetPaddlePositions = {};
         }
 
         const x = this.table.position.x;
@@ -356,72 +320,22 @@ export class baby3D {
 
         const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
-        // Helper function for linear interpolation (lerp)
-        const lerp = (current: number, target: number, factor: number): number => {
-            return current + (target - current) * factor;
-        };
-
-        // Calculate delta time for frame-rate independent interpolation
-        const now = performance.now();
-        const deltaTime = Math.min((now - this.lastUpdateTime) / 16.67, 2.0); // Cap at 2x normal frame time
-        this.lastUpdateTime = now;
-        
-        // Adaptive smoothing factor based on delta time
-        const smoothing = 1 - Math.pow(1 - this.SMOOTHING_FACTOR, deltaTime);
-
         if (this.ball) {
             const bxRaw = Number((state as any).ballPosX);
             const byRaw = Number((state as any).ballPosY);
-            const velX = Number((state as any).ballVelX);
-            const velY = Number((state as any).ballVelY);
             const maxX = this.values.tableX;
             const maxY = this.values.tableY;
             const validBx = Number.isFinite(bxRaw) && bxRaw >= 0 && bxRaw <= maxX;
             const validBy = Number.isFinite(byRaw) && byRaw >= 0 && byRaw <= maxY;
-            const validVelX = Number.isFinite(velX);
-            const validVelY = Number.isFinite(velY);
 
-            // When we receive new server state, update authoritative position and velocity
             if (validBx && validBy) {
-                const now = performance.now();
-                
-                // Update authoritative server position
-                this.serverBallX = bxRaw;
-                this.serverBallY = byRaw;
-                
-                // Reset predicted position to match server (start prediction from here)
-                this.predictedBallX = bxRaw;
-                this.predictedBallY = byRaw;
-                
-                // Always update velocity from server
-                if (validVelX) this.ballVelX = velX;
-                if (validVelY) this.ballVelY = velY;
-                
                 this.lastBallX = bxRaw;
                 this.lastBallY = byRaw;
-                this.lastServerUpdateTime = now;
                 this.hasBallState = true;
             }
 
-            // Initialize if not set
-            if (!this.hasBallState) {
-                this.serverBallX = maxX / 2;
-                this.serverBallY = maxY / 2;
-                this.predictedBallX = maxX / 2;
-                this.predictedBallY = maxY / 2;
-                this.ballVelX = 0;
-                this.ballVelY = 0;
-            }
-
-            // Client-side prediction: Continuously move ball by velocity each frame
-            // This maintains constant speed (proper Pong physics)
-            // deltaTime is normalized (1.0 = 16.67ms at 60fps), so multiply velocity by deltaTime
-            this.predictedBallX += this.ballVelX * deltaTime;
-            this.predictedBallY += this.ballVelY * deltaTime;
-
-            // Use current predicted position
-            const rx = validBx ? this.predictedBallX : (this.hasBallState ? (this.lastBallX as number) : maxX / 2);
-            const ry = validBy ? this.predictedBallY : (this.hasBallState ? (this.lastBallY as number) : maxY / 2);
+            const rx = (validBx ? bxRaw : (this.hasBallState ? (this.lastBallX as number) : maxX / 2));
+            const ry = (validBy ? byRaw : (this.hasBallState ? (this.lastBallY as number) : maxY / 2));
 
             this.ball.position.x = leftEdgeX + rx;
             this.ball.position.z = topEdgeZ - ry;
@@ -433,49 +347,18 @@ export class baby3D {
         const rightIdx = this.mode === '2P' ? 1 : 2;
         const bottomIdx = this.mode === '4P' ? 3 : undefined;
 
-        // Get target paddle positions from state
-        const targetLeft = Number.isFinite(Number(state.players?.[leftIdx]?.pos))
+        const left = Number.isFinite(Number(state.players?.[leftIdx]?.pos))
             ? Number(state.players?.[leftIdx]!.pos)
             : this.values.defaultPaddlePos;
-        const targetTop = (topIdx !== undefined && Number.isFinite(Number(state.players?.[topIdx]?.pos)))
+        const top = (topIdx !== undefined && Number.isFinite(Number(state.players?.[topIdx]?.pos)))
             ? Number(state.players?.[topIdx]!.pos)
             : this.values.defaultPaddlePos;
-        const targetRight = Number.isFinite(Number(state.players?.[rightIdx]?.pos))
+        const right = Number.isFinite(Number(state.players?.[rightIdx]?.pos))
             ? Number(state.players?.[rightIdx]!.pos)
             : this.values.defaultPaddlePos;
-        const targetBottom = (bottomIdx !== undefined && Number.isFinite(Number(state.players?.[bottomIdx]?.pos)))
+        const bottom = (bottomIdx !== undefined && Number.isFinite(Number(state.players?.[bottomIdx]?.pos)))
             ? Number(state.players?.[bottomIdx]!.pos)
             : this.values.defaultPaddlePos;
-
-        // Update target positions
-        this.targetPaddlePositions.left = targetLeft;
-        if (topIdx !== undefined) this.targetPaddlePositions.top = targetTop;
-        this.targetPaddlePositions.right = targetRight;
-        if (bottomIdx !== undefined) this.targetPaddlePositions.bottom = targetBottom;
-
-        // Initialize current positions if not set
-        if (this.currentPaddlePositions.left === undefined) {
-            this.currentPaddlePositions.left = this.values.defaultPaddlePos;
-        }
-        if (this.currentPaddlePositions.top === undefined && topIdx !== undefined) {
-            this.currentPaddlePositions.top = this.values.defaultPaddlePos;
-        }
-        if (this.currentPaddlePositions.right === undefined) {
-            this.currentPaddlePositions.right = this.values.defaultPaddlePos;
-        }
-        if (this.currentPaddlePositions.bottom === undefined && bottomIdx !== undefined) {
-            this.currentPaddlePositions.bottom = this.values.defaultPaddlePos;
-        }
-
-        // Interpolate paddle positions smoothly (using same smoothing factor calculated above)
-        this.currentPaddlePositions.left = lerp(this.currentPaddlePositions.left, targetLeft, smoothing);
-        if (topIdx !== undefined) {
-            this.currentPaddlePositions.top = lerp(this.currentPaddlePositions.top || this.values.defaultPaddlePos, targetTop, smoothing);
-        }
-        this.currentPaddlePositions.right = lerp(this.currentPaddlePositions.right, targetRight, smoothing);
-        if (bottomIdx !== undefined) {
-            this.currentPaddlePositions.bottom = lerp(this.currentPaddlePositions.bottom || this.values.defaultPaddlePos, targetBottom, smoothing);
-        }
 
         const paddleLen = this.values.paddleX;
         const paddleThick = this.values.paddleY;
@@ -486,24 +369,24 @@ export class baby3D {
 
         if (this.paddles.left != undefined) {
             this.paddles.left.position.x = leftEdgeX + paddleThick / 2;
-            const centerZ = topEdgeZ - (this.currentPaddlePositions.left + paddleLen / 2);
+            const centerZ = topEdgeZ - (left + paddleLen / 2);
             this.paddles.left.position.z = clamp(centerZ, lrMinZ, lrMaxZ);
             this.paddles.left.position.y = this.values.lift;
         }
-        if (this.paddles.top != undefined && topIdx !== undefined) {
-            const centerX = leftEdgeX + ((this.currentPaddlePositions.top || this.values.defaultPaddlePos) + paddleLen / 2);
+        if (this.paddles.top != undefined) {
+            const centerX = leftEdgeX + (top + paddleLen / 2);
             this.paddles.top.position.x = clamp(centerX, tbMinX, tbMaxX);
             this.paddles.top.position.z = topEdgeZ - paddleThick / 2;
             this.paddles.top.position.y = this.values.lift;
         }
         if (this.paddles.right != undefined) {
             this.paddles.right.position.x = rightEdgeX - paddleThick / 2;
-            const centerZ = topEdgeZ - (this.currentPaddlePositions.right + paddleLen / 2);
+            const centerZ = topEdgeZ - (right + paddleLen / 2);
             this.paddles.right.position.z = clamp(centerZ, lrMinZ, lrMaxZ);
             this.paddles.right.position.y = this.values.lift;
         }
-        if (this.paddles.bottom != undefined && bottomIdx !== undefined) {
-            const centerX = leftEdgeX + ((this.currentPaddlePositions.bottom || this.values.defaultPaddlePos) + paddleLen / 2);
+        if (this.paddles.bottom != undefined) {
+            const centerX = leftEdgeX + (bottom + paddleLen / 2);
             this.paddles.bottom.position.x = clamp(centerX, tbMinX, tbMaxX);
             this.paddles.bottom.position.z = bottomEdgeZ + paddleThick / 2;
             this.paddles.bottom.position.y = this.values.lift;

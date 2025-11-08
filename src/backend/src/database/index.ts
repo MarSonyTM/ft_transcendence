@@ -170,42 +170,36 @@ class UserDatabaseManager {
     }
 
     async createUser(userData: { firstName: string; lastName: string; email?: string; username?: string; password?: string; avatar?: string; googleId?: string; gamesWon?: number; gamesLost?: number; emailVerified?: boolean}): Promise<User> {
-        const stmt = this.db.prepare(`
-            INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId, gamesWon, gamesLost, emailVerified) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+    const stmt = this.db.prepare(`
+        INSERT INTO users (firstName, lastName, email, username, password, avatar, googleId, gamesWon, gamesLost, emailVerified) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-        // Handle Google OAuth users who don't have passwords
-        const password = userData.password || (userData.googleId ? '' : null);
-        // SQLite binding compatibility: convert undefined -> null, booleans -> 1/0
-        const email = userData.email ?? null;
-        const username = userData.username ?? null;
-        const avatar = userData.avatar ?? null;
-        const googleId = userData.googleId ?? null;
-        const gamesWon = userData.gamesWon ?? 0;
-        const gamesLost = userData.gamesLost ?? 0;
-        const emailVerified = userData.emailVerified === true ? 1 : (userData.emailVerified === false ? 0 : 0);
-
-        const result = stmt.run(
-            userData.firstName,
-            userData.lastName,
-            email,
-            username,
-            password,
-            avatar,
-            googleId,
-            gamesWon,
-            gamesLost,
-            emailVerified
-        );
-        const insertedUser = this.getUserById(result.lastInsertRowid as number);
-        
-        if (!insertedUser) {
-          throw new Error('Failed to retrieve created user');
-        }
-        
-        return insertedUser;
+    const password = userData.password || (userData.googleId ? '' : null);
+    
+    const emailVerified = userData.emailVerified ? 1 : 0;
+    
+    const result = stmt.run(
+        userData.firstName, 
+        userData.lastName, 
+        userData.email, 
+        userData.username, 
+        password, 
+        userData.avatar, 
+        userData.googleId, 
+        userData.gamesWon || 0, 
+        userData.gamesLost || 0, 
+        emailVerified
+    );
+    
+    const insertedUser = this.getUserById(result.lastInsertRowid as number);
+    
+    if (!insertedUser) {
+      throw new Error('Failed to retrieve created user');
     }
+    
+    return insertedUser;
+}
 
     updateUserStats(userId: number, won: boolean): User | undefined {
         const user = this.getUserById(userId);

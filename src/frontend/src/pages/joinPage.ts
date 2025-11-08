@@ -34,7 +34,6 @@ export async function renderJoinPage(roomId: string): Promise<void> {
 
   // Verify room exists
   try {
-    //TODO: check if room need to add the credentials option
     const response = await fetch(`/api/room/${roomId}`);
     const data = await response.json();
 

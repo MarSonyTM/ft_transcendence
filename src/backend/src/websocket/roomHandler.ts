@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { activeGames } from '../routes/game';
 import { gameRoomManager } from '../game/gameRoom';
+import { presenceManager } from '../presence/presenceManager';
 
 const DEBUG = true;
 
@@ -46,11 +47,23 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 
         // Associate socket with player in room manager
         gameRoomManager.setPlayerSocket(roomId, playerId, playerId);
+        const tempuser = localStorage.getItem('currentUser');
+        if (!tempuser)
+            return;
+        const user = JSON.parse(tempuser);
+        if (user && user?.id) {
+            presenceManager.updateHeartbeat(user.id, user.username || 'Unknown');
+        }
 
         // Handle incoming messages
         socket.on('message', (data: any) => {
             try {
                 const message = JSON.parse(data.toString());
+                if (message.type === 'heartbeat' && user?.id) {
+                    presenceManager.updateHeartbeat(user.id, user.username || 'Unknown');
+                    socket.send(JSON.stringify({ type: 'heartbeat_ack' }));
+                    return;
+                }
                 handleRoomMessage(roomId, playerId, message, socket);
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error);
@@ -72,6 +85,10 @@ async function roomWebSocketRoutes(fastify: FastifyInstance) {
 
         socket.on('close', () => {
             console.log(`🔌 Player ${playerId} disconnected from room ${roomId}`);
+            const token = localStorage.getItem('authToken');
+            if (!token) return null;
+            const decoded = JSON.parse(atob(token.split('.')[1]));
+            if (decoded?.id) presenceManager.setUserOffline(decoded.id);
             removePlayerFromRoom(roomId, playerId);
         });
 
@@ -102,6 +119,11 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
 
     switch (message.type) {
         case 'ping':
+            const token = localStorage.getItem('authToken');
+            if (!token) 
+                break;
+            const decoded = JSON.parse(atob(token.split('.')[1]));
+            if (decoded?.id) presenceManager.updateHeartbeat(decoded.id, decoded.username);
             socket.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
             break;
 

@@ -1,13 +1,6 @@
 import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
 
-// Determine .env file path: Docker uses /app/.env, local dev uses .env in backend folder
-const dockerEnvPath = '/app/.env';
-const localEnvPath = path.resolve(process.cwd(), '.env');
-const envPath = fs.existsSync(dockerEnvPath) ? dockerEnvPath : localEnvPath;
-
-dotenv.config({ path: envPath });
+dotenv.config();
 
 const JWT_SECRET: string = process.env.JWT_SECRET as string;
 const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID as string;

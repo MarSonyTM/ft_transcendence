@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, User } from '../database/index';
 import { sendVerificationEmail } from '../config/email';
 import crypto from 'crypto';
-import { JwtUser } from '../middleware';
 
 // Types
 export interface CreateUserInput {
@@ -25,37 +24,6 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 success: true,
                 count: users.length,
                 data: users
-            };
-        } catch (error) {
-            fastify.log.error(error);
-            reply.code(500).send({
-                success: false,
-                message: 'Failed to fetch users'
-            });
-        }
-    });
-
-    fastify.get('/current', async (request, reply) => {
-        try {
-            const user = request.user as JwtUser;
-            if (!user) {
-                reply.code(401).send({
-                    success: false,
-                    message: 'Unauthorized'
-                });
-                return;
-            }
-            const dbUser = database.users.getUserById(user.id);
-
-            // Don't send sensitive data
-            let responseData: Omit<User, 'password'> | undefined = undefined;
-            if (dbUser) {
-                const { password, ...userWithoutPassword } = dbUser as User;
-                responseData = userWithoutPassword as Omit<User, 'password'>;
-            }
-            return {
-                success: true,
-                data: responseData
             };
         } catch (error) {
             fastify.log.error(error);

@@ -8,7 +8,6 @@ const gameConnections = new Map<number, Set<any>>();
 
 // Register WebSocket routes
 async function webSocketRoutes(fastify: FastifyInstance) {
-    //TODO: Add authentication to WebSocket connections
 
   // WebSocket endpoint for game connections
     (fastify as any).register(async function (fastify: any) {

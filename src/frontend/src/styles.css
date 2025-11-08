@@ -1,17 +1,10 @@
-html, body { height: 100%; }
-body { overflow-x: hidden; }
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Layout and base styles */
 body {
-  /* Sleek glassmorphism background */
-  background:
-    radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.22), transparent 40%),
-    radial-gradient(900px 500px at 120% 20%, rgba(236,72,153,0.16), transparent 40%),
-    radial-gradient(900px 500px at -20% 60%, rgba(16,185,129,0.16), transparent 40%),
-    linear-gradient(180deg, #0d1226, #0b1020);
+  background-color: rgb(42, 51, 72); /* bg-black */
   color: rgb(255 255 255); /* text-white */
   font-family: ui-sans-serif, system-ui, sans-serif; /* font-sans */
   display: flex;
@@ -20,144 +13,6 @@ body {
   min-height: 100vh;
   padding: 1.25rem; /* p-5 */
 }
-
-/* Neon grid background overlay */
-/* Neon grid (enabled) */
-.neon-grid {
-  position: relative;
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  min-height: 100vh; /* make grid span full screen height */
-  overflow: visible; /* allow border to extend beyond all sides */
-}
-
-.neon-grid::before {
-  content: '';
-  position: absolute;
-  inset: -12px -24px; /* bring top/bottom closer; keep sides extended */
-  background:
-    linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06)) padding-box,
-    conic-gradient(from 180deg at 50% 50%, #60a5fa, #ec4899, #22c55e, #60a5fa) border-box;
-  -webkit-mask:
-    linear-gradient(#000 0 0) padding-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  border: 1px solid transparent;
-  border-radius: 16px;
-  pointer-events: none;
-  z-index: 1; /* above grid anim, below content */
-  box-shadow: 0 0 24px rgba(99,102,241,0.18), 0 0 36px rgba(236,72,153,0.14);
-}
-
-/* Landing page: tighten bottom a bit more to match visual top spacing */
-.neon-grid.landing-tight::before {
-  inset: -12px -24px -12px -24px; /* top right bottom left - symmetric top/bottom */
-}
-
-.neon-grid .grid-anim {
-  position: fixed; /* stretch across the entire viewport */
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px);
-  background-size: 36px 36px, 36px 36px;
-  transform: perspective(700px) rotateX(60deg) translateY(-20%);
-  transform-origin: top center;
-  filter: drop-shadow(0 0 12px rgba(99,102,241,0.25));
-  animation: scrollGrid 12s linear infinite;
-  opacity: .55;
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes scrollGrid {
-  0% { background-position: 0 0, 0 0; }
-  100% { background-position: 0 36px, 36px 0; }
-}
-
-/* Futuristic glowing title */
-.title-neon {
-  position: relative;
-  letter-spacing: 0.04em;
-  background: linear-gradient(90deg, #60a5fa, #a78bfa, #ec4899);
-  -webkit-background-clip: text;
-          background-clip: text;
-  color: transparent;
-  text-shadow:
-    0 0 15px rgba(96,165,250,0.35),
-    0 0 30px rgba(167,139,250,0.25),
-    0 0 45px rgba(236,72,153,0.2);
-  animation: titlePulse 5s ease-in-out infinite;
-}
-
-@keyframes titlePulse {
-  0%, 100% {
-    text-shadow:
-      0 0 12px rgba(96,165,250,0.28),
-      0 0 26px rgba(167,139,250,0.2),
-      0 0 36px rgba(236,72,153,0.18);
-  }
-  50% {
-    text-shadow:
-      0 0 20px rgba(96,165,250,0.5),
-      0 0 40px rgba(167,139,250,0.35),
-      0 0 60px rgba(236,72,153,0.3);
-  }
-}
-
-/* Neon buttons and cards */
-.btn-neon {
-  position: relative;
-  padding: 0.9em 1.6em;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.06);
-  color: #e5e7eb;
-  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 8px 20px rgba(0,0,0,0.35);
-}
-
-.btn-neon:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(59,130,246,0.35), 0 0 0 1px rgba(59,130,246,0.25) inset;
-  background: rgba(59,130,246,0.12);
-}
-
-.btn-neon.primary { color: #0b1020; background: #4ade80; }
-.btn-neon.accent  { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.35); }
-
-.glass-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  backdrop-filter: blur(10px);
-  position: relative;
-  z-index: 2; /* keep content above border and grid */
-}
-
-/* Glass buttons */
-.btn-glass {
-  padding: 0.9em 1.6em;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.14);
-  color: #e5e7eb;
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
-  backdrop-filter: blur(8px);
-  box-shadow: 0 8px 22px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.06);
-  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
-}
-
-.btn-glass:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.1) inset;
-}
-
-.btn-glass.primary { color: #0b1020; background: linear-gradient(180deg, #4ade80, #22c55e); border-color: rgba(34,197,94,0.6); }
-.btn-glass.accent  { background: linear-gradient(180deg, rgba(59,130,246,0.25), rgba(59,130,246,0.14)); border-color: rgba(59,130,246,0.35); }
 
 #renderCanvas {
   border: 2px solid #ffffff33;
@@ -459,20 +314,7 @@ h3 {
   margin: 0 1rem; /* mx-4 */
 }
 
-/* Game canvas */
-/* #gameScreen {
-  border: 2px solid rgb(255 255 255);
-  background-color: rgb(17 24 39);
-  margin-bottom: 1.5rem;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
-  will-change: transform;
-  transform: translateZ(0);
-} */
+
 
 /* Controls info */
 .controls-info {
@@ -842,27 +684,4 @@ button:disabled {
 #countdown-overlay {
   user-select: none;
   pointer-events: all;
-}
-
-/* Notification animations for game utils */
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideOut {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
 }

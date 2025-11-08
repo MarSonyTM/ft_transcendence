@@ -14,7 +14,6 @@ import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
 import invitationRoutes from './routes/invite';
-import cookie from '@fastify/cookie';
 import { database } from './database';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -76,13 +75,9 @@ const start = async (): Promise<void> => {
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
-        exposedHeaders: ['set-cookie'],
     });
 
     await server.register(websocket);
-    await server.register(cookie, {
-        secret: process.env.COOKIE_SECRET || 'supersecret',
-    });
     console.log('✅ WebSocket support registered');
     
     // Register WebSocket routes BEFORE authGuard

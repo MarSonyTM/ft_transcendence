@@ -31,63 +31,48 @@ export async function render2PlayerGame(): Promise<void> {
     const user = authService.getCurrentUser();
     
     root.innerHTML = `
-        <div class="neon-grid">
-            <div class="grid-anim"></div>
-            <div class="glass-card" style="max-width: 1200px; width: 100%;">
-
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 class="title-neon" style="font-size: 2.5rem;">Pong Game</h1>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div>Status: <span id="gameStatus" class="status-text" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
-                        <div>WebSocket: <span id="wsStatus" class="ws-status" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
-                        <div>FPS: <span id="fpsCounter" class="fps-text" style="color: #ff0; font-weight: bold;">0</span></div>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <button id="startBtn" class="btn btn-neon primary">Start Game</button>
-                        <button id="pauseBtn" class="btn btn-neon accent">Pause Game</button>
-                        <button id="endBtn" class="btn btn-neon danger">End Game</button>
-                        <button id="reconnectBtn" class="btn btn-neon primary">Reconnect WebSocket</button>
-                        <button id="tournamentsBtn" class="btn btn-neon accent">Tournaments</button>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
-                    <div class="player-names" style="margin-bottom: 10px;">
-                        <span id="player1Name" class="player1-name" style="color: #0ff; font-weight: bold; font-size: 1.2rem;">${players[0].username}</span>
-                        <span class="vs-text" style="color: #fff; margin: 0 15px; font-weight: bold;">VS</span>
-                        <span id="player2Name" class="player2-name" style="color: #ff0; font-weight: bold; font-size: 1.2rem;">${players[1].username}</span>
-                    </div>
-                    <div class="score-container" style="font-size: 3rem; font-weight: bold; color: #fff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
-                        <span id="player1score" class="player1-score">0</span>
-                        <span class="score-separator" style="margin: 0 20px;">-</span>
-                        <span id="player2score" class="player2-score">0</span>
-                    </div>
-                </div>
-
-                <div class="threeD-wrapper">
-                    <canvas id="renderCanvas"></canvas>
-                </div>
-
-                <div class="controls-info" style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 15px; margin-top: 20px; text-align: center;">
-                    <p style="color: #0ff; font-weight: bold; margin: 5px 0;">${players[0].username}: W / S keys</p>
-                    ${pongGame.hasLocal ? '<p style="color: #0ff; font-weight: bold; margin: 5px 0;">Local Player: O / L keys</p>' : ''}
-                    <p style="color: #ff6b00; font-style: italic; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
-                </div>
-
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
-                </div>
-
-                <hr style="border-color: rgba(255, 255, 255, 0.2); margin: 20px 0;">
-                <div id="tournamentRoot" class="t-section"></div>
+        <h1 class="main-title">Pong Game</h1>
+        <div class="game-status">
+            <div>
+                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+            </div>
+            <div>
+                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            </div>
+            <div>
+                FPS: <span id="fpsCounter" class="fps-text">0</span>
             </div>
         </div>
+        <div class="controls-container">
+            <button id="startBtn" class="btn btn-start">Start Game</button>
+            <button id="pauseBtn" class="btn btn-pause">Pause Game</button>
+            <button id="endBtn" class="btn btn-end">End Game</button>
+            <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
+            <button id="tournamentsBtn" class="btn btn-tournaments">Tournaments</button>
+        </div>
+        
+        <div class="player-info">
+            <div class="player-names">
+                <span id="player1Name" class="player1-name">${players[0].username}</span>
+                <span class="vs-text">vs</span> 
+                <span id="player2Name" class="player2-name">${players[1].username}</span>
+            </div>
+            <div class="score-container">
+                <span id="player1score" class="player1-score">0</span> 
+                <span class="score-separator">-</span> 
+                <span id="player2score" class="player2-score">0</span>
+            </div>
+        </div>
+        <div class="threeD-wrapper">
+            <canvas id="renderCanvas"></canvas>
+        </div>
+        <div class="controls-info">
+            <p style="color: #60a5fa; font-weight: bold;">${players[0].username} W / S</p>
+            ${pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Local PLayer - O/L</p>' : ''}
+        </div>
+        <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
+        <hr>
+        <div id="tournamentRoot" class="t-section"></div>
     `;
     
     await setupGameButtons(pongGame);

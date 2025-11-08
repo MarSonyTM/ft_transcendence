@@ -1,17 +1,14 @@
-import { authService } from "./auth";   
-
 export function isGuestUser(): boolean {
   return localStorage.getItem('isGuest') === 'true';
 }
 
 export function getGuestUsername(): string | null {
     if (!isGuestUser()) return null;
-
-    const user = authService.getCurrentUser();
-    if (!user) return null;
-
+  
+    const token = localStorage.getItem('authToken');
+    if (!token) return null;
+  
     try {
-        //TODO: fetch guest username differnently.
         // Decode JWT token (without verification, just to read the payload)
         const payload = JSON.parse(atob(token.split('.')[1]));
         return payload.username || null;
@@ -102,18 +99,17 @@ export function initGuestBanner(): void {
     }
 }
 
-export async function clearGuestSession(): Promise<void> {
+export function clearGuestSession(): void {
     localStorage.removeItem('isGuest');
-    await authService.logout();
+    localStorage.removeItem('authToken');
     sessionStorage.removeItem('guestBannerDismissed');
 }
 
-//TODO: improve expiration check for guest users
 export function isGuestSessionExpired(): boolean {
     if (!isGuestUser()) return false;
-
-    const user = authService.getCurrentUser();
-    if (!user) return true;
+  
+    const token = localStorage.getItem('authToken');
+    if (!token) return true;
   
     try {
         const payload = JSON.parse(atob(token.split('.')[1]));

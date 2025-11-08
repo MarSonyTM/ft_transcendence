@@ -311,7 +311,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                         ballVelY: 0,
                         players: [{
                             id: 0,
-                            name: `${userId}`, // Placeholder, replace with actual user name if available
+                            name: `${userId}`, 
                             gameId: newGame.id,
                             pos: 0,
                             score: 0,
@@ -749,31 +749,46 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                         console.log(`📝 Getting ${currentState.players.length} players from game engine`);
                         
                         gamePlayers = currentState.players.map((player: any, index: number) => {
-                            let actualUserId = index + 1; // Fallback
+                            let actualUserId: number | null = null;
+                            let displayName = player.username || player.name || `Player ${index + 1}`;
                             
-                            if (player.username) {
-                                const userByUsername = database.users.getAllUsers().find(
-                                    u => u.username === player.username
+                            console.log(`🔍 Looking up player: "${displayName}" (from player.username: "${player.username}", player.name: "${player.name}")`);
+                            
+                            // Try to find user in database
+                            const searchName = player.username || player.name;
+
+                        if (searchName) {
+                            const allUsers = database.users.getAllUsers();
+                            console.log(`🔍 Searching for "${searchName}" among ${allUsers.length} users`);
+                            
+                            const userByUsername = allUsers.find(u => 
+                                u.username === searchName || 
+                                u.username.toLowerCase() === searchName.toLowerCase()
                                 );
+                                
                                 if (userByUsername) {
                                     actualUserId = userByUsername.id;
-                                    console.log(`   ✅ Found ${player.username} = user ID ${actualUserId}`);
+                                    console.log(`   ✅ Found ${searchName} = user ID ${actualUserId}`);
+                                } else {
+                                    console.log(`   ⚠️ "${searchName}" NOT FOUND in database (might be local player)`);
                                 }
+                            } else {
+                                console.log(`   ⚠️ No username or name provided for player`);
                             }
                             
                             return {
-                                id: actualUserId,
+                                id: actualUserId || -(index + 1),
                                 gameId: gameId,
-                                playerId: actualUserId, // Use the REAL user ID from database
+                                playerId: actualUserId || -(index + 1),
                                 playerPosition: index === 0 ? 'left' : 'right',
                                 score: player.score || 0,
                                 connectionStatus: 'connected',
                                 lastActivity: new Date().toISOString(),
                                 pos: player.pos || 0,
                                 color: player.color || { r: 255, g: 255, b: 255 },
-                                name: player.name || player.username
+                                name: displayName
                             };
-                        });
+                        });                    
                     } else {
                         console.log(`❌ No players in game engine state`);
                     }
@@ -829,6 +844,33 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             database.games.updateGame(gameId, updateData);
+            console.log('🚨 STATS UPDATE CODE REACHED! 🚨');
+            console.log('🔍 winnerId:', winnerId);
+            console.log('🔍 gamePlayers:', gamePlayers.map(p => ({ playerId: p.id, name: p.name, position: p.pos })));
+            
+            for (let i = 0; i < gamePlayers.length; i++) {
+                const player = gamePlayers[i];
+                const playerNumber = i + 1; // Player 1, 2, 3, 4
+                
+                console.log(`🔍 Checking player ${playerNumber}: ID=${player.id}, winner=${winnerId}`);
+                
+                if (player.id > 0) {
+                    // Compare by player position (1, 2, 3, 4) not database ID
+                    const wasWinner = playerNumber === winnerId;
+                    const playerUser = database.users.getUserById(player.id);
+                    
+                    console.log(`🔍 Player ${playerNumber} (${player.name}): wasWinner=${wasWinner}`);
+                    
+                    if (playerUser) {
+                        const result = database.users.updateUserStats(player.id, wasWinner);
+                        console.log(`✅ Updated ${playerUser.username}'s stats: ${wasWinner ? 'WIN' : 'LOSS'}`);
+                        console.log(`   Before: W=${playerUser.gamesWon} L=${playerUser.gamesLost}`);
+                        console.log(`   After: W=${result?.gamesWon} L=${result?.gamesLost}`);
+                    }
+                } else {
+                    console.log(`⚠️ Skipping stats update for local player: ${player.name}`);
+                }
+            }
             
             return {
                 success: true,

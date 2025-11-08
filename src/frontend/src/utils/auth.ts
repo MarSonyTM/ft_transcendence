@@ -1,211 +1,220 @@
-import { publicPages, renderApp } from "../main";
-import { setCurrentPage } from "./globalState";
+import { presenceService } from './presenceService';
 
-const getApiUrl = () =>
-  window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
+const getApiUrl = () => window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 const API_URL = getApiUrl();
 
 interface DecodedToken {
-  id: string;
-  email: string;
-  username: string;
-  exp: number;
+    id: string;
+    email: string;
+    username: string;
+    exp: number;
 }
 
 interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  avatar?: string;
-  googleId?: string;
-  gamesWon: number;
-  gamesLost: number;
+    id: string;
+    username: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+    googleId?: string;
+    gamesWon: number;
+    gamesLost: number;
 }
 
 export class AuthService {
-  private static instance: AuthService;
-  private currentUser: UserProfile | null = null;
-  private token: string | null = null;
-  private neededEmailVerification: boolean = false;
-  private pendingEmailVerification: string | null = null;
-  private initPromise: Promise<void>;
+    private static instance: AuthService;
+    private currentUser: UserProfile | null = null;
 
-  private constructor() {
-    // Kick off initialization and keep a handle so callers can await readiness
-    this.initPromise = this.initializeAuth().catch(() => {});
-  }
-
-  static getInstance(): AuthService {
-    if (!AuthService.instance) {
-      AuthService.instance = new AuthService();
-    }
-    return AuthService.instance;
-  }
-
-  /**
-   * Expose a promise that resolves when initial auth check finishes.
-   * Callers can await this to avoid rendering unauthenticated UI briefly
-   * when a valid session exists.
-   */
-  public async whenReady(): Promise<void> {
-    try {
-      await this.initPromise;
-    } catch {
-      // Swallow to avoid bubbling init failures; consumers can still
-      // read isAuthenticated() which will be false on failure.
-    }
-  }
-
-  /**
-   * Initialize authentication by checking for stored token
-   */
-  private async initializeAuth(): Promise<void> {
-    await this.fetchUserProfile();
-  }
-
-  /**
-   * Decode JWT token (simple base64 decode, no verification)
-   */
-  private decodeToken(token: string): DecodedToken | null {
-    try {
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      return JSON.parse(jsonPayload);
-    } catch (error) {
-      console.error("Failed to decode token:", error);
-      return null;
-    }
-  }
-
-  // Check if token is expired
-  isTokenExpired(token: string): boolean {
-    const decoded = this.decodeToken(token);
-    if (!decoded) return true;
-
-    const currentTime = Date.now() / 1000;
-    return decoded.exp < currentTime;
-  }
-
-  // Fetch user profile from backend
-  async fetchUserProfile(): Promise<UserProfile | null> {
-    if (localStorage.getItem("isGuest")) {
-      // Guest mode: read cached user directly to avoid recursion
-      try {
-        const raw = localStorage.getItem("currentUser");
-        const guest = raw ? (JSON.parse(raw) as UserProfile) : null;
-        this.currentUser = guest;
-        return this.currentUser;
-      } catch {
-        return null;
-      }
+    private constructor() {
+        this.initializeAuth();
     }
 
-    const path = window.location.pathname;
-    if (publicPages.includes(path)) {
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-      credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          await this.logout();
-        } else if (response.status === 403) {
-          this.neededEmailVerification = true;
-          const data1 = await response.json();
-          console.log('Redirecting to verify email:', data1.redirectUrl);
-          window.location.href = data1.redirectUrl;
+    static getInstance(): AuthService {
+        if (!AuthService.instance) {
+            AuthService.instance = new AuthService();
         }
-        throw new Error("Failed to fetch user profile");
-      }
-
-      const data = await response.json();
-      this.currentUser = data.data;
-      return this.currentUser;
-    } catch (error) {
-      return null;
+        return AuthService.instance;
     }
-  }
 
-  // Get current user (from memory or localStorage)
-  async getCurrentUser(): Promise<UserProfile | null> {
-    if (this.currentUser) {
-      return this.currentUser;
+        /**
+        * Initialize authentication by checking for stored token
+        */
+    private async initializeAuth(): Promise<void> {
+        const token = this.getToken();
+        if (token && !this.isTokenExpired(token)) {
+            await this.fetchUserProfile();
+        } else if (token) {
+            // Token expired, clear it
+            this.logout();
+        }
     }
-    return await this.fetchUserProfile();
-  }
 
-  // Check if user is authenticated
-  isAuthenticated(): boolean {
-    return this.currentUser !== null;
-  }
-
-  // Logout user
-  async logout(): Promise<void> {
-    try {
-      await fetch(`${API_URL}/api/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (error) {
-      console.error("Error during logout:", error);
+    /**
+     * Get the stored auth token
+     */
+    getToken(): string | null {
+        return localStorage.getItem('authToken');
     }
-    this.currentUser = null;
-    setCurrentPage('pingPong');
-    await renderApp();
-    history.pushState({ page: 'pingPong' }, '', '/ping-pong');
-    localStorage.removeItem("isGuest");
-  }
 
-  // Update user stats after game
-  async updateGameStats(won: boolean): Promise<void> {
-    try {
-      await fetch(`${API_URL}/api/users/stats`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ won }),
-      });
-
-      // Refresh user profile to get updated stats
-      await this.fetchUserProfile();
-    } catch (error) {
-      console.error("Error updating game stats:", error);
+    /**
+     * Store auth token
+     */
+    setToken(token: string): void {
+        localStorage.setItem('authToken', token);
     }
-  }
 
-  setNeededEmailVerification(needed: boolean): void {
-    this.neededEmailVerification = needed;
-  }
+    /**
+     * Decode JWT token (simple base64 decode, no verification)
+     */
+    private decodeToken(token: string): DecodedToken | null {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(
+                atob(base64)
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+            );
+            return JSON.parse(jsonPayload);
+        } catch (error) {
+            console.error('Failed to decode token:', error);
+            return null;
+        }
+    }
 
-  isEmailVerificationNeeded(): boolean {
-    return this.neededEmailVerification;
-  }
+    // Check if token is expired
+    isTokenExpired(token: string): boolean {
+        const decoded = this.decodeToken(token);
+        if (!decoded) return true;
+      
+        const currentTime = Date.now() / 1000;
+        return decoded.exp < currentTime;
+    }
 
-  setPendingEmailVerification(email: string | null): void {
-    this.pendingEmailVerification = email;
-  }
+    
+    // Fetch user profile from backend
+    async fetchUserProfile(): Promise<UserProfile | null> {
+        const token = this.getToken();
+        if (!token) return null;
+    
+        try {
+            console.log('🔄 Fetching user profile from API...');
+            const response = await fetch(`${API_URL}/api/users/profile`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+    
+            if (!response.ok) {
+                if (response.status === 401) {
+                    await this.logout();
+                }
+                throw new Error('Failed to fetch user profile');
+            }
+    
+            const data = await response.json();
+            
+            this.currentUser = data.data;
+        
+            // Store in localStorage for quick access
+            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        
+            return this.currentUser;
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            return null;
+        }
+    }
 
-  getPendingEmailVerification(): string | null {
-    return this.pendingEmailVerification;
-  }
+    // Get current user (from memory or localStorage)
+    getCurrentUser(): UserProfile | null {
+        if (this.currentUser) {
+            return this.currentUser;
+        }
+
+        // Try to get from localStorage
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+            try {
+                this.currentUser = JSON.parse(stored);
+                return this.currentUser;
+            } catch {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    // Check if user is authenticated
+    isAuthenticated(): boolean {
+        const token = this.getToken();
+        return token !== null && !this.isTokenExpired(token);
+    }
+
+    // Logout user
+    async logout(): Promise<void> {
+        try {
+            const isGuest = localStorage.getItem('isGuest') === 'true';
+            
+            if (isGuest) {
+                const authHeader = this.getAuthHeader();
+                if (authHeader) {
+                    try {
+                        const apiUrl = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+                        const response = await fetch(`${apiUrl}/api/users/me`, {
+                            method: 'DELETE',
+                            headers: authHeader
+                        });
+                        
+                        if (response.ok) {
+                            console.log('✅ Guest user deleted from database');
+                        }
+                    } catch (error) {
+                        console.error('❌ Error deleting guest user:', error);
+                    }
+                }
+            }
+        } finally {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isGuest');
+            this.currentUser = null;
+            presenceService.stopHeartbeat();
+        }
+    }
+
+    // Helper: authorization header for authenticated requests
+    getAuthHeader(): Record<string, string> | null {
+        const token = this.getToken();
+        if (!token) return null;
+        return { 'Authorization': `Bearer ${token}` };
+    }
+
+    // Update user stats after game
+    async updateGameStats(won: boolean): Promise<void> {
+        const token = this.getToken();
+        if (!token) return;
+
+        try {
+            await fetch(`${API_URL}/api/users/stats`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ won })
+            });
+
+            // Refresh user profile to get updated stats
+            await this.fetchUserProfile();
+        } catch (error) {
+            console.error('Error updating game stats:', error);
+        }
+    }
 }
 
 // Export singleton instance

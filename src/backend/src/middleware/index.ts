@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { FRONTEND_URL, JWT_SECRET } from '../config';
 import { database } from '../database';
 
-export type JwtUser = { id: number; email: string; username: string };
+type JwtUser = { id: number; email: string; username: string };
 
 export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     const url = request.url;
@@ -25,7 +25,6 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/ping',
         '/api',
         '/api/auth/verify-email',
-        '/api/auth/logout',
         '/api/auth/resend-verification',
         
         // Auth endpoints
@@ -60,7 +59,6 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/room/',
         '/join/',
         '/verify-email',
-        '/logout',
         '/resend-verification',
     ];
 
@@ -69,7 +67,9 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     }
 
     // All other routes require authentication
-    const token = request.cookies.token;
+    const auth = request.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+
     if (!token) {
         reply.code(401).send({ 
             success: false, 
