@@ -1,12 +1,15 @@
 import { setCurrentPage, setCurrentUser, setCurrentGameMode, getCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
-export function renderGameSelectPage(): void {
+export async function renderGameSelectPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
+        ${userNavHTML}
         <div class="neon-grid landing-tight game-select-container" style="display:flex; flex-direction:column; align-items:center; min-height:70vh; width:100%; max-width:980px;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="padding:2em 2em; text-align:center; width:100%;">
@@ -19,14 +22,11 @@ export function renderGameSelectPage(): void {
                     <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
                     <button id="profileBtn" class="btn-neon accent">Profile</button>
                 </div>
-                <div style="display:flex; justify-content:center; margin-top:0.6em;">
-                    <button id="logoutBtn" class="btn" style="min-width: 140px; font-size: 1.1em; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 0.6em 1.2em; cursor: pointer;">
-                        Logout
-                    </button>
-                </div>
             </div>
         </div>
-    `;
+`;
+    
+    attachUserNavListeners();
     
     const oneVsOneBtn = document.getElementById('2PBtn');
     if (oneVsOneBtn) {
@@ -50,16 +50,6 @@ export function renderGameSelectPage(): void {
             setCurrentGameMode('4P');
             history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
-            renderApp();
-        });
-    }
-    
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            await authService.logout();
-            history.pushState({ page: 'landing' }, '', '/');
-            setCurrentPage('landing');
             renderApp();
         });
     }
