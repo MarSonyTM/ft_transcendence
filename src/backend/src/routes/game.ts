@@ -743,18 +743,26 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     if (currentState && currentState.players) {
                         
                         gamePlayers = currentState.players.map((player: any, index: number) => {
-                            let actualUserId: number | null = null;
-                            let displayName = player.username || player.name || `Player ${index + 1}`;
+                            const positionId = index + 1; // Position ID (1-based)
                             
-                            // Try to find user in database
-                            const searchName = player.username || player.name;
-
-                        if (searchName) {
-                            const allUsers = database.users.getAllUsers();
+                            // Check if this position is an AI player via the game engine
+                            const isAI = gameEngine.isPlayerAI(positionId) || player.isAI || (player.name && player.name.toLowerCase().includes('ai'));
                             
-                            const userByUsername = allUsers.find(u => 
-                                u.username === searchName || 
-                                u.username.toLowerCase() === searchName.toLowerCase()
+                            // Determine player name and user ID
+                            let actualUserId = positionId; // Default fallback
+                            let playerName = player.name || player.username;
+                            
+                            if (isAI) {
+                                // For AI players, use special ID and format name
+                                actualUserId = 9000 + positionId;
+                                const difficulty = player.difficulty || 'Normal';
+                                const difficultyCapitalized = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+                                playerName = `AI Bot (${difficultyCapitalized})`;
+                                console.log(`   🤖 AI Player detected at position ${positionId}`);
+                            } else if (player.username) {
+                                // Real player - find by username
+                                const userByUsername = database.users.getAllUsers().find(
+                                    u => u.username === player.username
                                 );
                                 
                                 if (userByUsername) {
@@ -763,21 +771,29 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                 } else {
                                     console.log(`   ⚠️ "${searchName}" NOT FOUND in database (might be local player)`);
                                 }
-                            } else {
-                                console.log(`   ⚠️ No username or name provided for player`);
+                            } else if (player.id && typeof player.id === 'number') {
+                                // Try using player.id for real players
+                                const userById = database.users.getUserById(player.id);
+                                if (userById) {
+                                    actualUserId = player.id;
+                                    console.log(`   ✅ Found user by ID ${player.id}`);
+                                }
                             }
                             
                             return {
                                 id: actualUserId || -(index + 1),
                                 gameId: gameId,
-                                playerId: actualUserId || -(index + 1),
+                                playerId: actualUserId,
                                 playerPosition: index === 0 ? 'left' : 'right',
                                 score: player.score || 0,
                                 connectionStatus: 'connected',
                                 lastActivity: new Date().toISOString(),
                                 pos: player.pos || 0,
                                 color: player.color || { r: 255, g: 255, b: 255 },
-                                name: displayName
+                                name: playerName,
+                                username: playerName,
+                                isAI: isAI,
+                                difficulty: player.difficulty || undefined
                             };
                         });                    
                     } else {
