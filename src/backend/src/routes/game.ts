@@ -749,9 +749,24 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                         console.log(`📝 Getting ${currentState.players.length} players from game engine`);
                         
                         gamePlayers = currentState.players.map((player: any, index: number) => {
-                            let actualUserId = index + 1; // Fallback
+                            const positionId = index + 1; // Position ID (1-based)
                             
-                            if (player.username) {
+                            // Check if this position is an AI player via the game engine
+                            const isAI = gameEngine.isPlayerAI(positionId) || player.isAI || (player.name && player.name.toLowerCase().includes('ai'));
+                            
+                            // Determine player name and user ID
+                            let actualUserId = positionId; // Default fallback
+                            let playerName = player.name || player.username;
+                            
+                            if (isAI) {
+                                // For AI players, use special ID and format name
+                                actualUserId = 9000 + positionId;
+                                const difficulty = player.difficulty || 'Normal';
+                                const difficultyCapitalized = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+                                playerName = `AI Bot (${difficultyCapitalized})`;
+                                console.log(`   🤖 AI Player detected at position ${positionId}`);
+                            } else if (player.username) {
+                                // Real player - find by username
                                 const userByUsername = database.users.getAllUsers().find(
                                     u => u.username === player.username
                                 );
@@ -759,19 +774,29 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                     actualUserId = userByUsername.id;
                                     console.log(`   ✅ Found ${player.username} = user ID ${actualUserId}`);
                                 }
+                            } else if (player.id && typeof player.id === 'number') {
+                                // Try using player.id for real players
+                                const userById = database.users.getUserById(player.id);
+                                if (userById) {
+                                    actualUserId = player.id;
+                                    console.log(`   ✅ Found user by ID ${player.id}`);
+                                }
                             }
                             
                             return {
                                 id: actualUserId,
                                 gameId: gameId,
-                                playerId: actualUserId, // Use the REAL user ID from database
+                                playerId: actualUserId,
                                 playerPosition: index === 0 ? 'left' : 'right',
                                 score: player.score || 0,
                                 connectionStatus: 'connected',
                                 lastActivity: new Date().toISOString(),
                                 pos: player.pos || 0,
                                 color: player.color || { r: 255, g: 255, b: 255 },
-                                name: player.name || player.username
+                                name: playerName,
+                                username: playerName,
+                                isAI: isAI,
+                                difficulty: player.difficulty || undefined
                             };
                         });
                     } else {

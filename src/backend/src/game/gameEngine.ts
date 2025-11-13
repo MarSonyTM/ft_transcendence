@@ -180,6 +180,7 @@ export class BaseGameEngine {
             const isAIFromEngine = this.isPlayerAI(positionId);
             
             let displayName = '';
+            let playerId = player.playerId;
             
             // Check if this player is an AI (check both game engine and player data)
             const playerIsAI = player.isAI !== undefined ? player.isAI : isAIFromEngine;
@@ -191,6 +192,8 @@ export class BaseGameEngine {
                 // Capitalize first letter
                 difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
                 displayName = `AI Bot (${difficulty})`;
+                // Use a special ID for AI players (9000 + positionId to avoid conflicts)
+                playerId = 9000 + positionId;
             } else {
                 // Regular player - check database first
                 const user = database.users.getUserById(player.playerId);
@@ -202,6 +205,8 @@ export class BaseGameEngine {
                     if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
                         const difficulty = player.difficulty || 'Normal';
                         displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                        // Use a special ID for AI players
+                        playerId = 9000 + positionId;
                     } else {
                         displayName = player.name;
                     }
@@ -211,17 +216,24 @@ export class BaseGameEngine {
             }
             
             return {
-                id: player.playerId.toString(),
+                id: playerId.toString(),
                 username: displayName,
                 score: player.score || 0,
                 position: player.playerPosition || 'unknown'
             };
         });
         
-        // Get actual winner user ID
+        // Get actual winner user ID and display name
         const winnerPlayer = gamePlayers[winnerIndex];
-        const actualWinnerId = winnerPlayer ? winnerPlayer.playerId : winnerId;
-        const winnerUser = database.users.getUserById(actualWinnerId);
+        const winnerPlayerData = playersData[winnerIndex];
+        
+        // For database storage, use the actual user ID (only for non-AI players)
+        const isWinnerAI = winnerPlayer ? winnerPlayer.isAI : false;
+        let actualWinnerId = winnerPlayer ? winnerPlayer.playerId : winnerId;
+        
+        // For AI winners, don't set a winnerId (it would violate foreign key constraint)
+        // Just set the winner name
+        const winnerUser = !isWinnerAI ? database.users.getUserById(actualWinnerId) : null;
         
         // Save game data with players and winner
         const updateData: any = {
@@ -230,12 +242,17 @@ export class BaseGameEngine {
             players: playersData
         };
         
+        // Set winner info based on player type
         if (winnerUser) {
+            // Real user won - set both winnerId and winner name
             updateData.winnerId = actualWinnerId;
             updateData.winner = winnerUser.username;
-        } else if (winnerPlayer) {
-            updateData.winner = winnerPlayer.name || `Player ${actualWinnerId}`;
+        } else if (winnerPlayerData) {
+            // AI or guest won - only set winner name (no winnerId to avoid FK constraint)
+            updateData.winner = winnerPlayerData.username;
+            // Don't set winnerId for AI/guest players
         } else {
+            // Fallback
             updateData.winner = winnerName;
         }
         

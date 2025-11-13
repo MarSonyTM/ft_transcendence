@@ -512,15 +512,18 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
         try {
              const users = database.users.getAllUsers();
              
-             const usersWithStats = users.map(user => ({
-                 id: user.id,
-                 username: user.username,
-                 firstName: user.firstName,
-                 lastName: user.lastName,
-                 gamesWon: user.gamesWon || 0,
-                 gamesLost: user.gamesLost || 0,
-                 avatar: user.avatar
-             }));
+             // Filter out users who haven't played any games
+             const usersWithStats = users
+                 .filter(user => (user.gamesWon || 0) > 0 || (user.gamesLost || 0) > 0)
+                 .map(user => ({
+                     id: user.id,
+                     username: user.username,
+                     firstName: user.firstName,
+                     lastName: user.lastName,
+                     gamesWon: user.gamesWon || 0,
+                     gamesLost: user.gamesLost || 0,
+                     avatar: user.avatar
+                 }));
              
              return {
                  success: true,
