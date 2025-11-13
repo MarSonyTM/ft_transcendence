@@ -12,7 +12,7 @@ export interface Player {
 export interface GameState {
   id?: number;
   gameId?: number;
-  players: any[];//Player[];
+  players: any[];
   ballPosX: number;
   ballPosY: number;
   ballVelX?: number;
@@ -33,7 +33,7 @@ export interface WebSocketMessage {
   winnerSeat?: string;
   winnerUiNumber?: number;
   mode?: string;
-  players?: Player[];//players?: any[];//
+  players?: Player[];
   finalScores?: Array<{
     playerId: number;
     score: number;

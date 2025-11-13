@@ -1,5 +1,6 @@
 import { setCurrentPage, setCurrentUser, setCurrentGameMode, getCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
+import { renderSetup } from './tournamentLobbyPage';
 
 export function renderGameSelectPage(): void {
     const root = document.getElementById('app-root');

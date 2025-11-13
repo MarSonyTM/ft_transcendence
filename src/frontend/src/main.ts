@@ -18,6 +18,7 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { renderSetup } from './pages/tournamentLobbyPage';
 import { renderTournamentPage, cleanupTournamentPage } from './pages/tournamentPage';
 
 // Store current room ID for join links
@@ -106,7 +107,7 @@ function handleRouting(): void {
       break;
     case '/leaderboard':
       setCurrentPage('leaderboard');
-      break; 
+      break;
     case '/tournament':
       setCurrentPage('tournament');
       break;

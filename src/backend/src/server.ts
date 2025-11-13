@@ -9,8 +9,9 @@ import playerRoutes from './routes/players';
 import ssrRoutes from './routes/ssr';
 import webSocketRoutes from './websocket/websocketHandler';
 import roomRoutes from './routes/room';
-import tournamentRoutes from './routes/tournament';
 import roomWebSocketRoutes from './websocket/roomHandler';
+import tournamentRoutes from './routes/tournaments';
+import tournamentWebSocketRoutes from './websocket/tournamentHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
 import invitationRoutes from './routes/invite';
@@ -83,6 +84,7 @@ const start = async (): Promise<void> => {
     // Register WebSocket routes BEFORE authGuard
     await server.register(webSocketRoutes);
     await server.register(roomWebSocketRoutes);
+    await server.register(tournamentWebSocketRoutes);
     console.log('✅ WebSocket routes registered');
     
     // NOW add the auth guard (it won't affect already-registered routes)
@@ -94,7 +96,7 @@ const start = async (): Promise<void> => {
     await server.register(gameRoutes, { prefix: '/api/game' });
     await server.register(gameStateRoutes, { prefix: '/api/gamestate' });
     await server.register(playerRoutes, { prefix: '/api/players' });
-    await server.register(tournamentRoutes, { prefix: '/api/tournament' });
+    await server.register(tournamentRoutes);
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
@@ -127,7 +129,14 @@ const start = async (): Promise<void> => {
             createRoom: '/api/room/create',
             ping: '/api/ping',
             health: '/health',
-            webSocket: '/game/:gameid/ws'
+            webSocket: '/game/:gameid/ws',
+            tournament: '/api/tournament',
+            joinTournament: '/api/tournament/join',
+            tournamentById: '/api/tournament/:tournamentId',
+            tournamentMatches: '/api/tournament/:tournamentId/matches',
+            tournamentPlayers: '/api/tournament/:tournamentId/players',
+            tournamentMatchById: '/api/tournament/match/:matchId',
+            tournamentPlayerById: '/api/tournament/player/:playerId',
           },
           pages: {
             landing: '/',
