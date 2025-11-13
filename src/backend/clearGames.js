@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'transcendence.db');
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'transcendence.db');
 
 console.log('Connecting to database at:', DATABASE_PATH);
 
@@ -10,12 +10,12 @@ const db = new Database(DATABASE_PATH);
 try {
     console.log('Clearing all game data...');
     
-    // Delete all game states
+    // Delete all game states first (foreign key constraint)
     const deleteGameStates = db.prepare('DELETE FROM gameState');
     const gameStatesDeleted = deleteGameStates.run();
     console.log(`✓ Deleted ${gameStatesDeleted.changes} game states`);
     
-    // Delete all players
+    // Delete all players (foreign key constraint)
     const deletePlayers = db.prepare('DELETE FROM players');
     const playersDeleted = deletePlayers.run();
     console.log(`✓ Deleted ${playersDeleted.changes} players`);
