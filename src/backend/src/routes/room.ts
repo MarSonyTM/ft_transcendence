@@ -324,7 +324,9 @@ async function roomRoutes(fastify: FastifyInstance) {
                             color: { r: 1, g: 1, b: 1 },
                             score: 0,
                             connectionStatus: 'connected',
-                            lastActivity: new Date().toISOString()
+                            lastActivity: new Date().toISOString(),
+                            isAI: roomPlayer.isAI || false,
+                            difficulty: roomPlayer.difficulty || undefined
                         };
                     });
 

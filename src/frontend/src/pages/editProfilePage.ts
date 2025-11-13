@@ -164,15 +164,29 @@ export async function renderEditProfilePage(): Promise<void> {
                         <div class="form-group">
                             <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Avatar URL (optional)</label>
                             <input
-                                type="url"
+                                type="text"
                                 id="avatar"
                                 name="avatar"
                                 value="${userData.avatar || ''}"
-                                placeholder="https://example.com/avatar.jpg"
+                                placeholder="https://example.com/avatar.jpg or https://robohash.org/..."
                                 style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
                                 onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
                                 onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
                             >
+                            ${userData.avatar ? `
+                                <div style="margin-top: 0.5em; text-align: center;">
+                                    <p style="color: #9ca3af; font-size: 0.85em; margin-bottom: 0.5em;">Preview:</p>
+                                    <img 
+                                        src="${userData.avatar.trim()}" 
+                                        alt="Avatar preview" 
+                                        referrerpolicy="no-referrer"
+                                        style="max-width: 100px; max-height: 100px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2);"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                                        onload="this.nextElementSibling.style.display='none';"
+                                    >
+                                    <p style="display: none; color: #ef4444; font-size: 0.85em; margin-top: 0.5em;">⚠️ Image failed to load. Please check the URL.</p>
+                                </div>
+                            ` : ''}
                         </div>
 
                         <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
@@ -223,16 +237,20 @@ export async function renderEditProfilePage(): Promise<void> {
             
             try {
                 const formData = new FormData(form);
+                const avatarValue = (formData.get('avatar') as string)?.trim();
                 const updateData = {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
-                    avatar: formData.get('avatar') as string || undefined
+                    avatar: avatarValue && avatarValue.length > 0 ? avatarValue : undefined
                 };
                 
                 const result = await updateUserProfile(updateData);
                 
                 if (result.success) {
+                    // Refresh user profile in auth service to get updated avatar
+                    await authService.fetchUserProfile();
+                    
                     successDiv.textContent = 'Profile updated successfully!';
                     successDiv.style.display = 'block';
                     
@@ -254,6 +272,45 @@ export async function renderEditProfilePage(): Promise<void> {
                 saveBtn.textContent = 'Save Changes';
             }
         });
+    }
+
+    // Avatar preview handler
+    const avatarInput = document.getElementById('avatar') as HTMLInputElement;
+    if (avatarInput) {
+        const previewContainer = avatarInput.parentElement?.querySelector('.avatar-preview-container') as HTMLElement;
+        const previewImg = previewContainer?.querySelector('img') as HTMLImageElement;
+        const errorMsg = previewContainer?.querySelector('.avatar-error') as HTMLElement;
+        
+        avatarInput.addEventListener('input', () => {
+            const url = avatarInput.value.trim();
+            if (previewContainer && previewImg && errorMsg) {
+                if (url.length > 0) {
+                    previewContainer.style.display = 'block';
+                    previewImg.src = url;
+                    previewImg.style.display = 'block';
+                    errorMsg.style.display = 'none';
+                } else {
+                    previewContainer.style.display = 'none';
+                }
+            }
+        });
+        
+        // Handle image load/error
+        if (previewImg) {
+            previewImg.addEventListener('error', () => {
+                if (previewImg && errorMsg) {
+                    previewImg.style.display = 'none';
+                    errorMsg.style.display = 'block';
+                }
+            });
+            
+            previewImg.addEventListener('load', () => {
+                if (previewImg && errorMsg) {
+                    previewImg.style.display = 'block';
+                    errorMsg.style.display = 'none';
+                }
+            });
+        }
     }
 
     // Cancel button handler

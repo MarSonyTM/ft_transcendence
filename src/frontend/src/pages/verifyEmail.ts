@@ -32,15 +32,15 @@ export async function renderVerifyEmailPage(): Promise<void> {
                 </div>
 
                 <form id="verifyEmailForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                    <div>
-                        <label for="verificationCode" style="display: block; color: #f9fafb; font-weight: 500; margin-bottom: 0.5em;">Verification Code</label>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <label for="verificationCode" style="display: block; color: #f9fafb; font-weight: 500; margin-bottom: 0.5em; width: 100%; text-align: center;">Verification Code</label>
                         <input 
                             id="verificationCode" 
                             type="text" 
                             placeholder="Enter 6-digit code" 
                             maxlength="6"
                             required 
-                            style="width: 100%; padding: 0.8em; font-size: 1.2em; text-align: center; letter-spacing: 0.2em; background: #374151; border: 2px solid #4b5563; border-radius: 8px; color: #f9fafb; outline: none; transition: border-color 0.2s;"
+                            style="width: 100%; max-width: 300px; padding: 0.8em; font-size: 1.2em; text-align: center; letter-spacing: 0.2em; background: #374151; border: 2px solid #4b5563; border-radius: 8px; color: #f9fafb; outline: none; transition: border-color 0.2s; margin: 0 auto;"
                         />
                     </div>
                     

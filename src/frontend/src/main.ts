@@ -20,18 +20,23 @@ import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
+import { removePingPongBalls } from './utils/pingPongBalls';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification'];
 
 // Centralized routing handler
 async function handleRouting(): Promise<void> {
   const path = window.location.pathname;
+  console.log('🔀 handleRouting called, path:', path);
 
+  // Skip auth check on public pages (including auth callback)
+  const isPublicPage = publicPages.some(publicPath => path.includes(publicPath.replace('//', '/')));
+  console.log('🔍 Is public page?', isPublicPage);
 
-  if (!publicPages.includes(path)) {
+  if (!isPublicPage) {
     await authService.whenReady(); 
     const user = await authService.getCurrentUser();
     
@@ -96,6 +101,7 @@ async function handleRouting(): Promise<void> {
         setCurrentPage('friends');
         break;
     case '/auth/callback':
+    case '//auth/callback':
       setCurrentPage('authCallback');
       break;
     case '/2PGame':
@@ -175,9 +181,11 @@ export async function renderApp(): Promise<void> {
       renderChangeEmailPage();
       break;
     case '2PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render2PlayerGame();
       break;
     case '4PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render4PlayerGame();
       break;
     case 'friends':

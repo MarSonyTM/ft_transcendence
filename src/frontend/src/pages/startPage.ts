@@ -1,5 +1,6 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { createPingPongBalls } from '../utils/pingPongBalls';
 
 
 export async function renderStartPage(): Promise<void> {
@@ -46,4 +47,7 @@ export async function renderStartPage(): Promise<void> {
       renderApp();
     });
   }
+  
+  // Add ping pong balls animation
+  createPingPongBalls();
 }

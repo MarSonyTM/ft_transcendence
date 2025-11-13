@@ -976,5 +976,52 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             });
         }
     });
+
+    // Clear all games (for testing/development)
+    fastify.delete('/clear-all', async (request, reply) => {
+        try {
+            // Delete all game states
+            const gameStates = database.gameState.getAllGameStates();
+            gameStates.forEach(gs => {
+                database.gameState.deleteGameState(gs.id);
+            });
+            
+            // Delete all players
+            const allGames = database.games.getAllGames();
+            allGames.forEach(game => {
+                const players = database.players.getPlayers(game.id);
+                players.forEach(player => {
+                    database.players.removePlayerFromGame(game.id, player.id);
+                });
+            });
+            
+            // Delete all games
+            allGames.forEach(game => {
+                database.games.deleteGame(game.id);
+            });
+            
+            // Reset user statistics
+            const users = database.users.getAllUsers();
+            users.forEach(user => {
+                database.users.updateUser(user.id, {
+                    gamesWon: 0,
+                    gamesLost: 0
+                } as any);
+            });
+            
+            return {
+                success: true,
+                message: 'All game data cleared successfully',
+                gamesDeleted: allGames.length,
+                gameStatesDeleted: gameStates.length
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to clear game data'
+            });
+        }
+    });
 }
 export default gameRoutes;

@@ -19,16 +19,12 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
-    console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
-    
-    let user: UserProfile | null = null;
-    try {
-        user = await authService.fetchUserProfile();
-    } catch {
-      return;
-    }
-    
-  currentUserId = user?.id?.toString() || `guest-${Date.now()}`;
+  console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
+
+  let user = await authService.getCurrentUser();
+  if (!user && authService.isAuthenticated()) {
+    user = await authService.fetchUserProfile();
+  }
 
   currentUserId = user?.id?.toString() || `guest-${Date.now()}`;
 

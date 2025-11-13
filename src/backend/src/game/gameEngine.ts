@@ -118,24 +118,155 @@ export class BaseGameEngine {
 
         const scoresArr = this.gameState.players.map(p => p.score || 0);
         const maxScore = Math.max(...scoresArr);
-        const winnerId = scoresArr.findIndex(score => score === maxScore) + 1;
-        const winnerName = `Player ${this.gameState.players[winnerId - 1]?.name || winnerId}`;
+        const winnerIndex = scoresArr.findIndex(score => score === maxScore);
+        const winnerId = winnerIndex + 1;
+        const winnerName = `Player ${this.gameState.players[winnerIndex]?.name || winnerId}`;
         const orientationToSeat: Record<number, string> = this.gameState.mode === '4P'
             ? { 1: 'left', 2: 'top', 3: 'right', 4: 'bottom' }
             : { 1: 'left', 2: 'right' };
         const winnerPos = orientationToSeat[winnerId] ?? 'unknown';
+
+        // Always use game state players (they have isAI and difficulty info)
+        // Database players don't have this information
+        let gamePlayers: any[] = [];
+        
+        if (this.gameState.players && this.gameState.players.length > 0) {
+            gamePlayers = this.gameState.players.map((player: any, index: number) => {
+                const positionId = index + 1; // 1-based position ID
+                let actualUserId = positionId;
+                
+                // Try to find user by username or name (only for non-AI players)
+                const playerName = player.username || player.name;
+                const isAI = player.isAI || this.isPlayerAI(positionId);
+                
+                if (!isAI && playerName) {
+                    const userByUsername = database.users.getAllUsers().find(
+                        u => u.username === playerName
+                    );
+                    if (userByUsername) {
+                        actualUserId = userByUsername.id;
+                    }
+                }
+                
+                // Also check if player.id is a valid user ID
+                if (!isAI && player.id && typeof player.id === 'number' && player.id > 0 && player.id < 1000) {
+                    const userById = database.users.getUserById(player.id);
+                    if (userById) {
+                        actualUserId = player.id;
+                    }
+                }
+                
+                return {
+                    id: actualUserId,
+                    gameId: this.gameState.gameId,
+                    playerId: actualUserId,
+                    positionId: positionId, // Store position for AI detection
+                    playerPosition: index === 0 ? 'left' : (index === 1 ? 'right' : (index === 2 ? 'top' : 'bottom')),
+                    score: player.score || 0,
+                    connectionStatus: 'connected',
+                    lastActivity: new Date().toISOString(),
+                    pos: player.pos || 0,
+                    name: playerName || `Player ${index + 1}`,
+                    username: playerName,
+                    isAI: isAI,
+                    difficulty: player.difficulty || undefined
+                };
+            });
+        }
+        
+        // Build players data for saving with usernames
+        const playersData = gamePlayers.map((player: any, index: number) => {
+            const positionId = player.positionId || (index + 1); // Use stored positionId or fallback
+            const isAIFromEngine = this.isPlayerAI(positionId);
+            
+            let displayName = '';
+            
+            // Check if this player is an AI (check both game engine and player data)
+            const playerIsAI = player.isAI !== undefined ? player.isAI : isAIFromEngine;
+            
+            if (playerIsAI) {
+                // Get difficulty from player data or default to Normal
+                let difficulty = player.difficulty || 'normal';
+                
+                // Capitalize first letter
+                difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+                displayName = `AI Bot (${difficulty})`;
+            } else {
+                // Regular player - check database first
+                const user = database.users.getUserById(player.playerId);
+                
+                if (user) {
+                    displayName = user.username;
+                } else if (player.name) {
+                    // Check if name suggests it's an AI (fallback)
+                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
+                        const difficulty = player.difficulty || 'Normal';
+                        displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                    } else {
+                        displayName = player.name;
+                    }
+                } else {
+                    displayName = `Player ${player.playerId}`;
+                }
+            }
+            
+            return {
+                id: player.playerId.toString(),
+                username: displayName,
+                score: player.score || 0,
+                position: player.playerPosition || 'unknown'
+            };
+        });
+        
+        // Get actual winner user ID
+        const winnerPlayer = gamePlayers[winnerIndex];
+        const actualWinnerId = winnerPlayer ? winnerPlayer.playerId : winnerId;
+        const winnerUser = database.users.getUserById(actualWinnerId);
+        
+        // Save game data with players and winner
+        const updateData: any = {
+            status: 'finished',
+            endedAt: new Date().toISOString(),
+            players: playersData
+        };
+        
+        if (winnerUser) {
+            updateData.winnerId = actualWinnerId;
+            updateData.winner = winnerUser.username;
+        } else if (winnerPlayer) {
+            updateData.winner = winnerPlayer.name || `Player ${actualWinnerId}`;
+        } else {
+            updateData.winner = winnerName;
+        }
+        
+        database.games.updateGame(this.gameState.gameId, updateData);
+        console.log(`✅ Game ${this.gameState.gameId} ended - Winner: ${updateData.winner}, Players saved: ${playersData.length}`);
+
+        // Update user statistics for all players
+        gamePlayers.forEach((player: any) => {
+            // Only update stats for registered users (not AI or local players)
+            if (!player.isAI && player.playerId && player.playerId > 0 && player.playerId < 1000) {
+                const user = database.users.getUserById(player.playerId);
+                if (user) {
+                    // Check if this player won
+                    const didWin = player.positionId === winnerId;
+                    database.users.updateUserStats(player.playerId, didWin);
+                    console.log(`📊 Updated stats for user ${user.username}: ${didWin ? 'WON' : 'LOST'}`);
+                }
+            }
+        });
 
         const gameEndMessage = {
             type: 'gameEnd',
             gameId: this.gameState.gameId,
             mode: this.gameState.mode,
             winner: winnerId,
-            winnerName,
+            winnerName: updateData.winner,
             finalScores: this.gameState.players.map((p, index) => ({
                 playerId: index + 1,
                 score: p.score || 0
             })),
-            message: `🏆 ${winnerName} (${winnerPos}) wins with ${maxScore} points!`
+            message: `🏆 ${updateData.winner} (${winnerPos}) wins with ${maxScore} points!`
         };
 
         this.updateDatabaseState();
@@ -503,14 +634,19 @@ export class BaseGameEngine {
     }
 
     private broadcastScoreUpdate(): void {
+        const maxPlayers = this.gameState.mode === '2P' ? 2 : 4;
+        const players = [];
+        for (let i = 0; i < maxPlayers; i++) {
+            players.push({
+                score: this.gameState.players[i]?.score || 0
+            });
+        }
+
         const scoreUpdate = {
             type: 'score',
             gameId: this.gameState.gameId,
             mode: this.gameState.mode,
-            scorePlayer1: this.gameState.players[0]?.score || 0,
-            scorePlayer2: this.gameState.players[1]?.score || 0,
-            scorePlayer3: this.gameState.players[2]?.score || 0,
-            scorePlayer4: this.gameState.players[3]?.score || 0,
+            players: players,
             timestamp: Date.now()
         };
 

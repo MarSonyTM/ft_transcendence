@@ -232,7 +232,7 @@ class UserDatabaseManager {
         return this.getUserById(userId);
     }
 
-    updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string; username?: string; emailVerified?: boolean }>): User | undefined {
+    updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string; username?: string; emailVerified?: boolean; avatar?: string }>): User | undefined {
         const fields: string[] = [];
         const values: any[] = [];
         
@@ -259,6 +259,11 @@ class UserDatabaseManager {
         if (userData.username) {
             fields.push('username = ?');
             values.push(userData.username);
+        }
+        
+        if (userData.avatar !== undefined) {
+            fields.push('avatar = ?');
+            values.push(userData.avatar || null);
         }
         
         if (fields.length === 0) {

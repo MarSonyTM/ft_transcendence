@@ -3,6 +3,7 @@ import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { registerUser } from '../_api/auth.ts';
 import { updateUserProfile } from '../_api/user';
+import { createPingPongBalls } from '../utils/pingPongBalls';
 
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -52,6 +53,8 @@ export async function renderLandingPage(): Promise<void> {
                 renderApp();
             });
         }
+        // Add ping pong balls animation
+        createPingPongBalls();
         // Leaderboard is only available for authenticated users
         return;
     }
@@ -104,36 +107,7 @@ export async function renderLandingPage(): Promise<void> {
             renderApp();
         });
     }
-
-    async function saveAccount() {
-        let email = prompt('Enter email address');
-        let emailConfirm = prompt('Confirm email address');
-        if (email == emailConfirm) {
-
-            let password = prompt('Enter password');
-            let passwordConfirm = prompt('Confirm password');
-            if (password == passwordConfirm) {
-                const user =  await authService.fetchUserProfile();
-                if (user && password) {
-                    user.gamesWon
-                    const result = await registerUser(
-	    			    user.username,
-		    		    password,
-			    	    user.firstName || 'Guest',
-				        user.lastName || 'User',
-				        email || undefined,
-				        user.avatar || undefined
-			        );              
-                    if (result.success) {
-                        updateUserProfile( {
-                            gamesWon: user.gamesWon,
-                            gamesLost: user.gamesLost
-                        });
-                        await authService.logout();
-                    }
-                }
-            }
-            alert('Account Created\nPlease verify email then update your details'); 
-        }
-    }
+    
+    // Add ping pong balls animation
+    createPingPongBalls();
 }
