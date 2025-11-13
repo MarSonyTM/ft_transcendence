@@ -1,12 +1,15 @@
 import { setCurrentPage, setCurrentUser, setCurrentGameMode, getCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
-export function renderGameSelectPage(): void {
+export async function renderGameSelectPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
+        ${userNavHTML}
         <div class="neon-grid landing-tight game-select-container" style="display:flex; flex-direction:column; align-items:center; min-height:70vh; width:100%; max-width:980px;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="padding:2em 2em; text-align:center; width:100%;">
@@ -15,10 +18,19 @@ export function renderGameSelectPage(): void {
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                 </div>
+<<<<<<< HEAD
                 <button id="backToLandingBtn" class="btn btn-back">Back</button>
+=======
+                <div style="display:flex; gap:0.8em; justify-content:center; margin-top:1.2em;">
+                    <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
+                    <button id="profileBtn" class="btn-neon accent">Profile</button>
+                </div>
+>>>>>>> f8b29fe (Add professional user navigation dropdown menu)
             </div>
         </div>
-    `;
+`;
+    
+    attachUserNavListeners();
     
     const oneVsOneBtn = document.getElementById('2PBtn');
     if (oneVsOneBtn) {
@@ -42,16 +54,6 @@ export function renderGameSelectPage(): void {
             setCurrentGameMode('4P');
             history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
-            renderApp();
-        });
-    }
-    
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            await authService.logout();
-            history.pushState({ page: 'landing' }, '', '/');
-            setCurrentPage('landing');
             renderApp();
         });
     }

@@ -4,6 +4,7 @@ import { authService } from '../utils/auth';
 import { registerUser } from '../_api/auth.ts';
 import { updateUserProfile } from '../_api/user';
 import { createPingPongBalls } from '../utils/pingPongBalls';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -60,7 +61,9 @@ export async function renderLandingPage(): Promise<void> {
     }
 
     // Authenticated landing
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
+    ${userNavHTML}
     <div class="neon-grid landing-tight landing-container" style="width:100%; max-width: 980px;">
       <div class="grid-anim"></div>
       <div class="glass-card" style="padding:2.2em 2em; text-align:center; width:100%;">
@@ -72,6 +75,8 @@ export async function renderLandingPage(): Promise<void> {
         </div>
       </div>
     </div>`;
+    
+    attachUserNavListeners();
     
     const playBtn = document.getElementById('playBtn');
     if (playBtn) {

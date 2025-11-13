@@ -1,5 +1,6 @@
 import { getCurrentUser, setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 interface LeaderboardUser {
     username: string;
@@ -128,8 +129,10 @@ export async function renderLeaderboardPage(): Promise<void> {
     );
 
     const leader = leaderboard[0];
+    const userNavHTML = await createUserNav();
 
     root.innerHTML = `
+        ${userNavHTML}
         <div class="neon-grid" style="display: flex; flex-direction: column; align-items: center; gap: 2em;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="max-width: 1200px; width: 100%;">
@@ -359,6 +362,8 @@ export async function renderLeaderboardPage(): Promise<void> {
     `;
 
     const backBtn = document.getElementById('backToLandingBtn');
+    attachUserNavListeners();
+    
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             history.pushState({ page: 'landing' }, '', '/');
