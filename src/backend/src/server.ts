@@ -13,7 +13,6 @@ import roomRoutes from './routes/room';
 import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
-import invitationRoutes from './routes/invite';
 import cookie from '@fastify/cookie';
 import { database } from './database';
 
@@ -103,7 +102,6 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
-    await server.register(invitationRoutes, { prefix: '/api/invitations' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {

@@ -471,7 +471,7 @@ async function userRoutes(
           email: email || undefined,
           username,
           googleId,
-          avatar: avatar || undefined,
+          avatar: avatar || 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg',
           gamesWon: 0,
           gamesLost: 0,
         });
@@ -610,7 +610,7 @@ async function userRoutes(
           email: email || undefined,
           username,
           googleId,
-          avatar: avatar || undefined,
+          avatar: avatar || "https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg",
           gamesWon: 0,
           gamesLost: 0,
         });

@@ -180,7 +180,7 @@ class UserDatabaseManager {
         // SQLite binding compatibility: convert undefined -> null, booleans -> 1/0
         const email = userData.email ?? null;
         const username = userData.username ?? null;
-        const avatar = userData.avatar ?? null;
+        const avatar = userData.avatar ?? 'https://github.com/Schmitzi/webserv/blob/main/local/images/seahorse.jpg';
         const googleId = userData.googleId ?? null;
         const gamesWon = userData.gamesWon ?? 0;
         const gamesLost = userData.gamesLost ?? 0;
@@ -263,7 +263,7 @@ class UserDatabaseManager {
         
         if (userData.avatar !== undefined) {
             fields.push('avatar = ?');
-            values.push(userData.avatar || null);
+            values.push(userData.avatar || 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg');
         }
         
         if (fields.length === 0) {
@@ -1191,8 +1191,8 @@ export class DatabaseManager extends BaseDatabaseManager {
             const stmt = this.db.prepare(`
                 INSERT INTO users (
                     firstName, lastName, email, username, password, 
-                    emailVerified, gamesWon, gamesLost
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    emailVerified, gamesWon, gamesLost, avatar
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
 
             const result = stmt.run(
@@ -1203,7 +1203,8 @@ export class DatabaseManager extends BaseDatabaseManager {
                 '$2a$10$11CaXhwOlAB4VgvhIWBog./z1Pg3yY5KrtW3LYnkD9JuQ6Pt3.41u',               // password (empty for seed user)
                 1,                // emailVerified (true)
                 0,                // gamesWon
-                0                 // gamesLost
+                0,                 // gamesLost
+                'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg' //Avatar
             );
 
             console.log(`Seed user created with ID: ${result.lastInsertRowid}`);
