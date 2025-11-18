@@ -19,7 +19,6 @@ export async function renderProfilePage(): Promise<void> {
         </div>
     `;
 
-    console.log('🔄 Fetching fresh profile data...');
     const user = await authService.fetchUserProfile();
 
     if (!user) {
@@ -64,9 +63,6 @@ export async function renderProfilePage(): Promise<void> {
         gamesWon: user!.gamesWon || 0,
         gamesLost: user!.gamesLost || 0
     };
-    
-    console.log('[PROFILE] User data:', userData);
-    console.log('[PROFILE] Avatar URL:', userData.avatar);
     
     const winRate = userData.gamesPlayed > 0 
         ? ((userData.gamesWon / userData.gamesPlayed) * 100).toFixed(1) : 0;

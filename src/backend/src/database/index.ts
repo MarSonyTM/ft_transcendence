@@ -1196,7 +1196,7 @@ export class DatabaseManager extends BaseDatabaseManager {
             `);
 
             const result = stmt.run(
-                'test',           // firstName
+                'Test',           // firstName
                 'User',           // lastName
                 'test@example.com',  // email
                 'testuser',       // username

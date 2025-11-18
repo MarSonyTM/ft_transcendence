@@ -83,9 +83,6 @@ export async function render2PlayerGame(): Promise<void> {
                 <div style="text-align: center; margin-top: 20px;">
                     <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
                 </div>
-
-                <hr style="border-color: rgba(255, 255, 255, 0.2); margin: 20px 0;">
-                <div id="tournamentRoot" class="t-section"></div>
             </div>
         </div>
     `;

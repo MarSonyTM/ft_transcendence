@@ -12,15 +12,6 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
     const token = urlParams.get('token');
     const needEmailVerification = urlParams.get('needEmailVerification');
 
-    console.log('🔍 Auth Callback - URL params:', {
-        success,
-        hasToken: !!token,
-        tokenPreview: token ? token.substring(0, 30) + '...' : 'NO TOKEN',
-        email,
-        needEmailVerification,
-        fullURL: window.location.href
-    });
-
     if (success === 'true') {
         authService.setPendingEmailVerification(email || '');
         if (needEmailVerification === 'true') {

@@ -714,8 +714,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const gameId = parseInt(id);
             const { winnerId } = request.body as { winnerId: number };
             
-            console.log(`🎯 Winner endpoint called for game ${gameId}, winnerId: ${winnerId}`);
-            
             if (isNaN(gameId)) {
                 reply.code(400).send({
                     success: false,
@@ -735,31 +733,24 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             let gamePlayers = database.players.getPlayers(gameId);
-            console.log(`📊 Players from database: ${gamePlayers.length}`);
             
             if (gamePlayers.length === 0) {
-                console.log(`⚠️ No players in database, checking game engine...`);
                 const gameEngine = activeGames.get(gameId);
                 
                 if (gameEngine) {
-                    console.log(`✅ Game engine found!`);
                     const currentState = gameEngine.getCurrentState();
                     
                     if (currentState && currentState.players) {
-                        console.log(`📝 Getting ${currentState.players.length} players from game engine`);
                         
                         gamePlayers = currentState.players.map((player: any, index: number) => {
                             let actualUserId: number | null = null;
                             let displayName = player.username || player.name || `Player ${index + 1}`;
-                            
-                            console.log(`🔍 Looking up player: "${displayName}" (from player.username: "${player.username}", player.name: "${player.name}")`);
                             
                             // Try to find user in database
                             const searchName = player.username || player.name;
 
                         if (searchName) {
                             const allUsers = database.users.getAllUsers();
-                            console.log(`🔍 Searching for "${searchName}" among ${allUsers.length} users`);
                             
                             const userByUsername = allUsers.find(u => 
                                 u.username === searchName || 
@@ -844,33 +835,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             database.games.updateGame(gameId, updateData);
-            console.log('🚨 STATS UPDATE CODE REACHED! 🚨');
-            console.log('🔍 winnerId:', winnerId);
-            console.log('🔍 gamePlayers:', gamePlayers.map(p => ({ playerId: p.id, name: p.name, position: p.pos })));
-            
-            for (let i = 0; i < gamePlayers.length; i++) {
-                const player = gamePlayers[i];
-                const playerNumber = i + 1; // Player 1, 2, 3, 4
-                
-                console.log(`🔍 Checking player ${playerNumber}: ID=${player.id}, winner=${winnerId}`);
-                
-                if (player.id > 0) {
-                    // Compare by player position (1, 2, 3, 4) not database ID
-                    const wasWinner = playerNumber === winnerId;
-                    const playerUser = database.users.getUserById(player.id);
-                    
-                    console.log(`🔍 Player ${playerNumber} (${player.name}): wasWinner=${wasWinner}`);
-                    
-                    if (playerUser) {
-                        const result = database.users.updateUserStats(player.id, wasWinner);
-                        console.log(`✅ Updated ${playerUser.username}'s stats: ${wasWinner ? 'WIN' : 'LOSS'}`);
-                        console.log(`   Before: W=${playerUser.gamesWon} L=${playerUser.gamesLost}`);
-                        console.log(`   After: W=${result?.gamesWon} L=${result?.gamesLost}`);
-                    }
-                } else {
-                    console.log(`⚠️ Skipping stats update for local player: ${player.name}`);
-                }
-            }
             
             return {
                 success: true,

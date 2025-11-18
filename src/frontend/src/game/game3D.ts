@@ -1,6 +1,6 @@
 import { PongGame } from './PongGame';
 import { GameState } from '../types';
-import { Engine, Scene, ArcRotateCamera, Vector3, MeshBuilder, HemisphericLight, Color3, StandardMaterial, AbstractMesh, Color4 } from "@babylonjs/core";
+import { Texture, CubeTexture, Engine, Scene, ArcRotateCamera, Vector3, MeshBuilder, HemisphericLight, Color3, StandardMaterial, AbstractMesh, Color4 } from "@babylonjs/core";
 
 interface PaddleMeshes {
     left?: AbstractMesh;
@@ -17,6 +17,7 @@ export class baby3D {
     private table!: AbstractMesh;
     private ball!: AbstractMesh;
     private paddles: PaddleMeshes = {};
+    private skybox!: AbstractMesh;
     private mode: string;
     private initialized = false;
     private lastBallX?: number;
@@ -108,9 +109,9 @@ export class baby3D {
             console.log('✅ [3D] Canvas created and appended to:', gameContainer.id || 'body');
         }
         
-        // Create BabylonJS engine with error handling
+        // Create babylonJS engine with error handling
         try {
-            console.log('🎨 [3D] Creating BabylonJS engine...');
+            console.log('🎨 [3D] Creating babylonJS engine...');
             this.engine = new Engine(canvas, true, { 
                 preserveDrawingBuffer: true, 
                 stencil: true,
@@ -119,7 +120,7 @@ export class baby3D {
             });
             console.log('✅ [3D] Engine created successfully');
         } catch (error) {
-            console.error('❌ [3D] Failed to create BabylonJS engine:', error);
+            console.error('❌ [3D] Failed to create babylonJS engine:', error);
             throw new Error(`WebGL initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
@@ -145,6 +146,8 @@ export class baby3D {
         
         // Set background color
         this.scene.clearColor = new Color4(0.04, 0.06, 0.10, 1);
+
+        this.createSkybox();
 
         // Setup lighting
         this.light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
@@ -194,7 +197,6 @@ export class baby3D {
                 this.engine.stopRenderLoop();
             }
         });
-        console.log('✅ [3D] Render loop started');
 
         // Handle window resize
         window.addEventListener('resize', () => {
@@ -213,12 +215,10 @@ export class baby3D {
             ro.observe(canvas.parentElement);
         }
         
-        console.log('✅ [3D] Scene initialization complete!');
         return this.scene;
     }
 
     private checkWebGLSupport(): boolean {
-        console.log('🔍 [3D] Checking WebGL support...');
         try {
             const canvas = document.createElement('canvas');
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -508,5 +508,50 @@ export class baby3D {
             this.paddles.bottom.position.z = bottomEdgeZ + paddleThick / 2;
             this.paddles.bottom.position.y = this.values.lift;
         }
+
+        if (this.skybox && this.camera) {
+            this.skybox.position.copyFrom(this.camera.position);
+        }
+    }
+
+    private createSkybox(): void {
+        console.log('🎨 [3D] Creating skybox...');
+        
+        const skybox = MeshBuilder.CreateBox(
+            "skyBox", 
+            { 
+                size: 6000.0 
+            }, 
+            this.scene
+        );
+        const skyboxMaterial = new StandardMaterial("skyBox", this.scene);
+        skyboxMaterial.backFaceCulling = false;
+        
+        const cubeTexture = CubeTexture.CreateFromImages(
+            [
+                "../assets/px.png",
+                "../assets/py.png",
+                "../assets/pz.png",
+                "../assets/nx.png",
+                "../assets/ny.png",
+                "../assets/nz.png",
+            ],
+            this.scene
+        );
+        
+        cubeTexture.onLoadObservable.add(() => {
+            console.log('✅ [3D] Skybox textures loaded successfully!');
+        });
+        
+        skyboxMaterial.reflectionTexture = cubeTexture;
+        skyboxMaterial.reflectionTexture.coordinatesMode = Texture.SKYBOX_MODE;
+        skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
+        skyboxMaterial.specularColor = new Color3(0, 0, 0);
+        skyboxMaterial.disableLighting = true;
+        
+        skybox.infiniteDistance = true;
+        skybox.material = skyboxMaterial;
+
+        this.skybox = skybox;
     }
 }

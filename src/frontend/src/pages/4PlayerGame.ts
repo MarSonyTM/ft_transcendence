@@ -42,24 +42,6 @@ export async function render4PlayerGame(): Promise<void> {
                     <h1 class="title-neon" style="font-size: 2.5rem;">4-Player Pong</h1>
                 </div>
 
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div>Status: <span id="gameStatus" class="status-text" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
-                        <div>WebSocket: <span id="wsStatus" class="ws-status" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
-                        <div>FPS: <span id="fpsCounter" class="fps-text" style="color: #ff0; font-weight: bold;">0</span></div>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <button id="startBtn" class="btn btn-neon primary">Start Game</button>
-                        <button id="pauseBtn" class="btn btn-neon accent">Pause Game</button>
-                        <button id="endBtn" class="btn btn-neon danger">End Game</button>
-                        <button id="reconnectBtn" class="btn btn-neon primary">Reconnect WebSocket</button>
-                        <button id="tournamentsBtn" class="btn btn-neon accent">Tournaments</button>
-                    </div>
-                </div>
-
                 <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
                     <div class="player-names" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <span id="player1Name" class="player1-name" style="color: #0ff; font-weight: bold;">${players[0].username}</span>
@@ -94,9 +76,6 @@ export async function render4PlayerGame(): Promise<void> {
                 <div style="text-align: center; margin-top: 20px;">
                     <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
                 </div>
-
-                <hr style="border-color: rgba(255, 255, 255, 0.2); margin: 20px 0;">
-                <div id="tournamentRoot" class="t-section"></div>
             </div>
         </div>
     `;

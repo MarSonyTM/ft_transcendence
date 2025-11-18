@@ -370,38 +370,35 @@ export class PongGame {
                 break;
 
             case 'gameEnd':
-                // Update scores from finalScores if available
-                if (Array.isArray(message.finalScores)) {
-                    message.finalScores.forEach((scoreData: any) => {
-                        const playerIndex = scoreData.playerId - 1;
-                        if (this.gameState.players[playerIndex]) {
-                            this.gameState.players[playerIndex].score = scoreData.score || 0;
-                        }
-                    });
-                    // Update the score display with final scores
-                    this.updateScoreDisplay();
-                }
+            if (Array.isArray(message.finalScores)) {
+                message.finalScores.forEach((scoreData: any) => {
+                    const playerIndex = scoreData.playerId - 1;
+                    if (this.gameState.players[playerIndex]) {
+                        this.gameState.players[playerIndex].score = scoreData.score || 0;
+                    }
+                });
+                this.updateScoreDisplay();
+            }
+            
+            if (message.mode === '4P') {
+                this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
+                console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
                 
-                if (message.mode === '4P') {
-                    this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
-                    console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
-                    
-                    // Trigger callback for 4-player mode
-                    if (this.onGameEnd) {
-                        const winnerId = message.winnerName ? this.parseWinnerIdFromName(message.winnerName) : 1;
-                        this.onGameEnd(winnerId);
-                    }
-                } else {
-                    this.updateStatus(`Game Over! ${message.winner} wins!`);
-                    console.log(`Game Over! Winner: ${message.winner}`);
-                    
-                    // Trigger callback for 2-player mode
-                    if (this.onGameEnd && message.winner !== undefined) {
-                        this.onGameEnd(message.winner);
-                    }
+                // Trigger callback for 4-player mode
+                if (this.onGameEnd) {
+                    const winnerId = message.winner || 1;
+                    this.onGameEnd(winnerId);
                 }
-                this.isActive = false;
-                break;
+            } else {
+                this.updateStatus(`Game Over! ${message.winner} wins!`);
+                console.log(`Game Over! Winner: ${message.winner}`);
+                
+                if (this.onGameEnd && message.winner !== undefined) {
+                    this.onGameEnd(message.winner);
+                }
+            }
+            this.isActive = false;
+            break;
 
             case 'ping':
                 console.log("pong");

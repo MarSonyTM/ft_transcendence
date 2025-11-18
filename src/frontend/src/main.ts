@@ -30,11 +30,9 @@ export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback
 // Centralized routing handler
 async function handleRouting(): Promise<void> {
   const path = window.location.pathname;
-  console.log('🔀 handleRouting called, path:', path);
 
   // Skip auth check on public pages (including auth callback)
   const isPublicPage = publicPages.some(publicPath => path.includes(publicPath.replace('//', '/')));
-  console.log('🔍 Is public page?', isPublicPage);
 
   if (!isPublicPage) {
     await authService.whenReady(); 

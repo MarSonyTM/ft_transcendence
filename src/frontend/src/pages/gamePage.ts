@@ -191,10 +191,6 @@ async function renderFourPlayerGame(): Promise<void> {
 async function setupGameButtons(): Promise<void> {
     const room = getCurrentRoom();
     
-    console.log('🔍 Setup game - isRoomBasedGame:', isRoomBasedGame);
-    console.log('🔍 Room:', room);
-    console.log('🔍 Room gameId:', room?.gameId);
-    
     pongGame = new PongGame();
     
     if (isRoomBasedGame) {

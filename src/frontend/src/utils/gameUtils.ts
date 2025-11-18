@@ -73,40 +73,6 @@ export function endGame(pongGame: PongGame) {
             if (!data.success) {
                 console.error('Failed to update winner:', data.message);
             }
-
-            const user = authService.getCurrentUser();
-            if (user && user.id) {
-                let didWin = false;
-                if (room && Array.isArray(room.players)) {
-                    const winnerPlayer = room.players[winnerId - 1];
-                    didWin = !!winnerPlayer && (winnerPlayer.id?.toString() === user.id?.toString());
-                } else {
-                    didWin = (winnerId === 1);
-                }
-                try {                
-                    const statsResponse = await fetch(`${apiEndpoint}/api/users/stats`, {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 
-                            'Content-Type': 'application/json', 
-                        },
-                        body: JSON.stringify({ won: didWin })
-                    });
-                
-                    if (!statsResponse.ok) {
-                        const errorText = await statsResponse.text();
-                        console.error('❌ Failed to update stats:', statsResponse.status, errorText);
-                    } else {
-                        console.log('✅ Stats updated successfully from frontend');
-                        if (authService.fetchUserProfile) {
-                            await authService.fetchUserProfile();
-                            console.log('✅ Profile refreshed');
-                        }
-                    }
-                } catch (e) {
-                    console.error('❌ Error updating user stats:', e);
-                }
-            }
         } catch (error) {
             console.error('Error updating winner or stats:', error);
         }

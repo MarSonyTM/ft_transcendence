@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   root: './src',
   optimizeDeps: {
-    include: ['@babylonjs/core'],
+    include: ['@babylonjs/core', '@babylonjs/loaders'],
     esbuildOptions: {
       target: 'es2020'
     }

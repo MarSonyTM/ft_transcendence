@@ -436,7 +436,6 @@ export class BaseGameEngine {
     }
 
     private initializeGame(): void {
-        console.log('🔍 [DEBUG] initializeGame() called');
         const is2P = this.gameState.mode === '2P';
         
         this.gameState.ballPosX = this.maxX / 2;
@@ -454,10 +453,6 @@ export class BaseGameEngine {
         
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
-        
-        console.log(`🔍 [DEBUG] Ball initialized at (${this.gameState.ballPosX}, ${this.gameState.ballPosY})`);
-        console.log(`🔍 [DEBUG] Ball direction: xDir=${this.xDir}, yDir=${this.yDir}`);
-        console.log(`🔍 [DEBUG] AI Players: ${Array.from(this.aiPlayers).join(', ') || 'none'}`);
     }
 
     private updateBallPosition(): number {
@@ -529,7 +524,7 @@ export class BaseGameEngine {
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
                 if (Math.abs(this.xDir) > this.ballSpeed) this.xDir = Math.sign(this.xDir) * this.ballSpeed;
 
-                this.gameState.ballPosY = this.maxY - this.paddleWidth;
+                this.gameState.ballPosY = this.paddleWidth + this.ballRadius;
             } else {
                 return this.handleGoal();
             }
@@ -585,7 +580,7 @@ export class BaseGameEngine {
                 this.xDir += (Math.random() - 0.5) * 0.15;
                 if (Math.abs(this.xDir) < 0.4)
                     this.xDir = Math.sign(this.xDir || 1) * 0.4;
-                this.addSpinToBall(this.gameState.ballPosY, paddleStart, paddleEnd, true);
+                this.addSpinToBall(this.gameState.ballPosX, paddleStart, paddleEnd, true);
 
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
                 if (Math.abs(this.xDir) > this.ballSpeed) this.xDir = Math.sign(this.xDir) * this.ballSpeed;
@@ -735,7 +730,6 @@ export class BaseGameEngine {
                     clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleHeight));
             }
             const isAI = this.isPlayerAI(playerId);
-            console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
 
             this.gameState.players[playerId - 1].pos = clampedPos;
         }
@@ -754,6 +748,7 @@ export class BaseGameEngine {
         this.gameState.ballPosY = this.maxY / 2;
         this.gameState.ballVelX = 0;
         this.gameState.ballVelY = 0;
+        this.lastContact = 0;
         
         // Random direction
         this.xDir = Math.random() > 0.5 ? 1 : -1;
