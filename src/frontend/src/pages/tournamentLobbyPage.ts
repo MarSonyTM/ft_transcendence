@@ -1,111 +1,185 @@
-import { TPT, TPTmap } from '../types';
+import { get } from 'http';
+import { TPT, TPTmap, Tournament } from '../types';
+import { setCurrentPage } from '../utils/globalState';
+import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
 	getTournament,
 	createTournament,
-	setupMatches,
 	resetTournament,
-	addPlayerToTournament
+	addPlayerToTournament,
+	removeTournamentPlayer,
+	setEffectiveTournament,
+	loadCurrentMatch,
+	startTournament
 } from '../utils/tournamentUtils';
-import { renderTournamentContent } from './tournamentPage';
+import { renderTournamentPage } from './tournamentPage';
+import { renderApp } from '../main';
 
-let activeT: any | undefined = undefined;
+let activeT: Tournament | null = null;
+
+let internalLocalIds: number[] = [];
+let internalAIIds: number[] = [];
+let internalRemoteIds: number[] = [];
+
+function getNextId(existingIds: number[]): number {
+	let nextId = 1;
+	while (existingIds.includes(nextId))
+		nextId++;
+	existingIds.push(nextId);
+	return nextId;
+}
+
+function clearNextIds(): void {
+	internalLocalIds = [];
+	internalAIIds = [];
+	internalRemoteIds = [];
+}
 
 function startTournamentIfReady(): boolean {
 	if (!activeT) {
-		console.error('No active tournament found');
+		console.error('[Tournament] No active tournament found');
 		return false;
 	}
 	const count = activeT.players?.length || 0;
-	console.debug(`[Tournament] Player count: ${count}`);
 	return count >= 3;
 }
 
-export function renderSetup(): void {
-	// Ensure a tournament exists in state
-	activeT = getTournament();
-	if (!activeT) {
-		createTournament();
-		activeT = getTournament();
-	}
+export async function renderSetup(content: HTMLElement): Promise<void> {
+	clearNextIds();
+	activeT = getCurrentTournament();
+	if (!activeT)
+		activeT = await createTournament();
 	if (!activeT) return;
-	const content = document.getElementById('tournamentContent');
-	if (!content) { activeT = undefined; return; }
 	content.innerHTML = `
 		<p class="t-msg">Create a new tournament</p>
-		<div class="t-setup">
+			<div class="t-setup">
 			<div class="t-flex-1">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
 				<button id="addRemoteBtn" class="btn btn-add">${TPTmap.get('remote')} Invite Remote Player?</button>
 			</div>
-			<ul id="playersList" class="t-alias-list"></ul>
-			<div class="t-actions">
-				<button id="clearBtn" class="btn btn-end t-flex-1">Clear</button>
-				<button id="startBtn" class="btn btn-start t-flex-1">Start Tournament</button>
+			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">Remove</button></ul>
+			<div class="t-footer">
+				<div class="t-actions">
+					<button id="clearBtn" class="btn btn-end t-flex-1">Clear</button>
+					<button id="startBtn" class="btn btn-start t-flex-1">Start Tournament</button>
+					<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
+				</div>
 			</div>
 		</div>`;
 
 	const listEl = document.getElementById('playersList') as HTMLUListElement;
-	const rerender = () => {
+	const rerender = async () => {
+		activeT = getTournament();
+		if (activeT?.id)
+			await setEffectiveTournament(activeT.id);
 		activeT = getTournament();
 		if (!activeT) return;
 		if (activeT.players.length === 0) {
 			listEl.innerHTML = `<li class="empty">No players yet</li>`;
-		} else if (activeT.players.length > 10) {
+		} else if (activeT.players.length >= 11) {
 			alert('Maximum of 10 players reached');
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
-				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}</span></li>`;
+				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}</span>
+				<button class="btn btn-remove" data-player-name="${p.name}" data-player-type="${p.tpt}"
+				style="${p.tpt === 'host' ?  'display: none' : ''}">Remove</button></li>`;
 			}).join('');
 		}
-		// Toggle start button enabled state for quick feedback
 		const startBtn = document.getElementById('startBtn') as HTMLButtonElement | null;
 		if (startBtn) startBtn.disabled = (activeT.players.length < 3);
 	};
 	rerender();
 
-	document.getElementById('addLocalBtn')?.addEventListener('click', () => {
+
+	document.getElementById('addLocalBtn')?.addEventListener('click', async () => {
 		if (!activeT) return;
-		const x = activeT.players.filter((p: any) => p.tpt === 'local').length || 0;
-		const alias = prompt('Local player alias', `Local_${x + 1}`)?.trim();
+		const x = getNextId(internalLocalIds);
+		const alias = prompt('Local player alias', `Local_${x}`)?.trim();
 		if (!alias) return;
-		console.debug('[Tournament] Add local player:', alias);
-		addPlayerToTournament({ name: alias, tpt: 'local', isReady: false });
+		console.log('[Tournament] Add local player:', alias);
+		addPlayerToTournament(activeT.id!, alias, 'local');
 		rerender();
 	});
 
-	document.getElementById('addAIBtn')?.addEventListener('click', () => {
+	document.getElementById('addAIBtn')?.addEventListener('click', async () => {
 		if (!activeT) return;
-		const x = activeT.players.filter((p: any) => p.tpt === 'ai').length || 0;
-		const alias = `AI_${x + 1}`;
+		const x = getNextId(internalAIIds);
+		const alias = `AI_${x}`;
 		if (!alias) return;
-		console.debug('[Tournament] Add AI player:', alias);
-		addPlayerToTournament({ name: alias, tpt: 'ai', isReady: true });
+		console.log('[Tournament] Add AI player:', alias);
+		addPlayerToTournament(activeT.id!, alias, 'ai');
 		rerender();
 	});
 
-	document.getElementById('addRemoteBtn')?.addEventListener('click', () => {
+	document.getElementById('addRemoteBtn')?.addEventListener('click', async () => {
 		if (!activeT) return;
-		const alias = prompt('Remote player alias', `Remote_${(activeT.players.length ?? 0) + 1}`)?.trim();
+		let x = getNextId(internalRemoteIds);
+		const alias = prompt('Remote player alias', `Remote_${x}`)?.trim();
 		if (!alias) return;
-		console.debug('[Tournament] Add remote player:', alias);
-		addPlayerToTournament({ name: alias, tpt: 'remote', isReady: false });
+		console.log('[Tournament] Add remote player:', alias);
+		addPlayerToTournament(activeT.id!, alias, 'remote');
 		rerender();
 	});
 
-	document.getElementById('clearBtn')?.addEventListener('click', () => {
-		resetTournament();
-		renderSetup();
+	listEl.addEventListener('click', async (e) => {
+		const target = e.target as HTMLElement;
+		if (target && target.classList.contains('btn-remove')) {
+			const type = target.getAttribute('data-player-type');
+			const name = target.getAttribute('data-player-name');
+			const idNum = Number(name?.split('_')[1]);
+			if (type === 'local' && name?.startsWith('Local_')) {
+				internalLocalIds = internalLocalIds.filter(id => id !== idNum);
+			} else if (type === 'ai' && name?.startsWith('AI_')) {
+				internalAIIds = internalAIIds.filter(id => id !== idNum);
+			} else if (type === 'remote' && name?.startsWith('Remote_')) {
+				internalRemoteIds = internalRemoteIds.filter(id => id !== idNum);
+			}
+			if (name) {
+				console.debug('[Tournament] Remove player:', name);
+				await removeTournamentPlayer(name);
+				await rerender();
+			}
+		}
 	});
 
-	document.getElementById('startBtn')?.addEventListener('click', () => {
+	document.getElementById('clearBtn')?.addEventListener('click', async () => {
+		await resetTournament();
+		const content = document.getElementById('tournamentContent');
+		if (!content) return console.debug('[Tournament] No tournament content element found');
+		await renderSetup(content);
+	});
+
+	document.getElementById('startBtn')?.addEventListener('click', async () => {
+		if (!activeT) return;
 		console.debug('[Tournament] Start button clicked');
 		if (!startTournamentIfReady()) {
 			alert('Add at least 3 players');
-			return;
+			rerender();
 		}
-		setupMatches();
-		renderTournamentContent();
+		else if (activeT && activeT.players.length >= 3) {
+			if (!(await startTournament()))
+				rerender();
+			activeT = getCurrentTournament();
+			if (!activeT) {
+				console.error('[Tournament] No active tournament');
+				return;
+			}
+			if (activeT.currentMatch === null) {
+				activeT.currentMatch = await loadCurrentMatch();
+				console.debug('[Tournament] Current match set to:', activeT.currentMatch);
+			}
+			console.debug('[Tournament] Rendering tournament page');
+			setCurrentTournament(activeT);
+			setCurrentMatch(activeT.currentMatch!);
+			renderTournamentPage();
+		}
+	});
+
+	document.getElementById('backBtn')?.addEventListener('click', () => {
+		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+		setCurrentPage('gameSelect');
+		renderApp();
 	});
 }
 

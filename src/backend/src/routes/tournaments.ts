@@ -1,72 +1,36 @@
 import { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginOptions } from 'fastify';
 import { tournamentManager as TManager } from '../tournament/tournamentManager';
-import { TPT, database } from '../database/index';
-import { BaseGameEngine } from '../game/gameEngine';
-import { activeGames } from './game';
-import { broadcastCountdownToMatch, broadcastGameStartToMatch } from '../websocket/tournamentHandler';
-import { GameState } from '../../../shared/gameTypes';
-
-// Re-export active tournaments instance for potential external use (similar to other routes)
-export const activeTournaments: typeof TManager = TManager;
-
-// Request payload types
-interface CreateTournamentBody {
-	hostId: string;
-	hostUsername: string;
-}
-
-interface JoinTournamentBody {
-	playerId: string;
-	name: string;
-	tpt: TPT;
-	isReady?: boolean;
-}
-
-interface ToggleReadyBody {
-	playerId: string;
-}
-
-interface LeaveTournamentBody {
-	playerId: string;
-}
-
-interface StartMatchBody {
-	gameId?: number; // optional: if not provided, server will create one and start
-}
-
-interface EndMatchBody {
-	winnerId?: string;
-}
-
-interface ToggleMatchReadyBody {
-	playerId: string;
-}
+import { TPT } from '../types/index';
+import { broadcastCountdownToMatch, broadcastGameStartToMatch, publicTournamentShape, publicMatchShape } from '../websocket/tournamentHandler';
 
 // Plugin function that registers all tournament routes
-async function tournamentsRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
+
+	// -------------------------------------- TOURNAMENTS -------------------------------------- //
 	// List all tournaments
 	fastify.get('/api/tournament', async (_request: FastifyRequest, reply: FastifyReply) => {
 		try {
-			const tournaments = TManager.getAllTournaments();
-			return reply.send({ success: true, count: tournaments.length, data: tournaments });
+			const tournaments = await TManager.getAllTournaments();
+			return reply.send({ success: true, count: tournaments.length, tournaments: tournaments.map(publicTournamentShape)});
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get tournaments' });
+			return reply.status(500).send({ success: false, message: 'Failed to list tournaments' });
 		}
 	});
 
 	// Create new tournament
-	fastify.post('/api/tournament', async (request: FastifyRequest<{ Body: CreateTournamentBody }>, reply: FastifyReply) => {
+	fastify.post('/api/tournament', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
-			const { hostId, hostUsername } = request.body;
-			if (!hostId || !hostUsername) {
-				return reply.code(400).send({ success: false, message: 'hostId and hostUsername are required' });
-			}
-			const t = TManager.createTournament(hostId, hostUsername);
-			return reply.code(201).send({ success: true, data: t });
+			const { name, id, ok } = request.body as { name: string, id: string, ok: boolean };
+			if (ok === false || !name || isNaN(+id) || +id <= 0)
+				return reply.status(401).send({ success: false, message: 'No authenticated User' });
+			let tournament = await TManager.createTournament(name, +id);
+			if (!tournament)
+				return reply.status(400).send({ success: false, message: 'Failed to create tournament'});
+			return reply.status(201).send({ success: true, tournament: publicTournamentShape(tournament) });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to create tournament' });
+			return reply.status(500).send({ success: false, message: 'Failed to create tournament' });
 		}
 	});
 
@@ -74,97 +38,37 @@ async function tournamentsRoutes(fastify: FastifyInstance, _options: FastifyPlug
 	fastify.get('/api/tournament/:tournamentId', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const t = TManager.getTournament(tournamentId);
-			if (!t) return reply.code(404).send({ success: false, message: 'Tournament not found' });
-			return reply.send({ success: true, data: t });
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const t = await TManager.getTournament(tId);
+			if (!t)
+				return reply.status(404).send({ success: false, message: 'Tournament not found' });
+			return reply.send({ success: true, tournament: t && publicTournamentShape(t) });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get tournament' });
-		}
-	});
-
-	// Get players
-	fastify.get('/api/tournament/:tournamentId/players', async (request: FastifyRequest, reply: FastifyReply) => {
-		try {
-			const { tournamentId } = request.params as { tournamentId: string };
-			const t = TManager.getTournament(tournamentId);
-			if (!t) return reply.code(404).send({ success: false, message: 'Tournament not found' });
-			return reply.send({ success: true, data: t.players });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get players' });
-		}
-	});
-
-	// Join tournament
-	fastify.post('/api/tournament/:tournamentId/join', async (
-		request: FastifyRequest<{ Params: { tournamentId: string }; Body: JoinTournamentBody }>,
-		reply: FastifyReply
-	) => {
-		try {
-			const { tournamentId } = request.params;
-			const { playerId, name, tpt, isReady = false } = request.body;
-			if (!playerId || !name || !tpt) {
-				return reply.code(400).send({ success: false, message: 'playerId, name and tpt are required' });
-			}
-			const result = TManager.joinTournament(tournamentId, playerId, name, tpt, isReady);
-			if (!result.success) return reply.code(400).send(result);
-			return reply.send({ success: true, data: result.tournament });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to join tournament' });
-		}
-	});
-
-	// Leave tournament
-	fastify.post('/api/tournament/:tournamentId/leave', async (
-		request: FastifyRequest<{ Params: { tournamentId: string }; Body: LeaveTournamentBody }>,
-		reply: FastifyReply
-	) => {
-		try {
-			const { tournamentId } = request.params;
-			const { playerId } = request.body;
-			if (!playerId) return reply.code(400).send({ success: false, message: 'playerId is required' });
-			const ok = TManager.leaveTournament(tournamentId, playerId);
-			if (!ok) return reply.code(404).send({ success: false, message: 'Tournament or player not found' });
-			return reply.send({ success: true, message: 'Left tournament' });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to leave tournament' });
-		}
-	});
-
-	// Toggle tournament-level player ready
-	fastify.post('/api/tournament/:tournamentId/ready', async (
-		request: FastifyRequest<{ Params: { tournamentId: string }; Body: ToggleReadyBody }>,
-		reply: FastifyReply
-	) => {
-		try {
-			const { tournamentId } = request.params;
-			const { playerId } = request.body;
-			if (!playerId) return reply.code(400).send({ success: false, message: 'playerId is required' });
-			const ok = TManager.togglePlayerReady(tournamentId, playerId);
-			if (!ok) return reply.code(404).send({ success: false, message: 'Tournament or player not found' });
-			const t = TManager.getTournament(tournamentId);
-			return reply.send({ success: true, data: t });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to toggle ready' });
+			return reply.status(500).send({ success: false, message: 'Failed to get tournament' });
 		}
 	});
 
 	// Start tournament
 	fastify.post('/api/tournament/:tournamentId/start', async (request: FastifyRequest, reply: FastifyReply) => {
-		try {
+		try {	
 			const { tournamentId } = request.params as { tournamentId: string };
-			const t = TManager.getTournament(tournamentId);
-			if (!t) return reply.code(404).send({ success: false, message: 'Tournament not found' });
-			const ok = TManager.startTournament(tournamentId);
-			if (!ok) return reply.code(400).send({ success: false, message: 'Failed to start tournament' });
-			return reply.send({ success: true, message: 'Tournament started' });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to start tournament' });
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const setup = await TManager.setupMatches(tId);
+			if (!setup)
+				return reply.status(400).send({ success: false, message: 'Failed to setup matches before starting tournament' });
+			const started = await TManager.startTournament(tId);
+			if (!started)
+				return reply.status(400).send({ success: false, message: 'Failed to start tournament' });
+			const t = TManager.getTournament(tId);
+			return reply.send({ success: true, tournament: publicTournamentShape(t) });
+			} catch (error) {
+				fastify.log.error(error);
+				return reply.status(500).send({ success: false, message: 'Failed to start tournament' });
 		}
 	});
 
@@ -172,240 +76,245 @@ async function tournamentsRoutes(fastify: FastifyInstance, _options: FastifyPlug
 	fastify.post('/api/tournament/:tournamentId/end', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const ok = TManager.endTournament(tournamentId);
-			if (!ok) return reply.code(404).send({ success: false, message: 'Tournament not found or already ended' });
-			return reply.send({ success: true, message: 'Tournament ended' });
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const ok = await TManager.endTournament(tId);
+			if (!ok)
+				return reply.status(404).send({ success: false, message: 'Tournament not found or already ended' });
+			const t = await TManager.getTournament(tId);
+			return reply.send({ tournament: t && publicTournamentShape(t) });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to end tournament' });
+			return reply.status(500).send({ success: false, message: 'Failed to end tournament' });
 		}
 	});
 
-	// Persist archive manually (optional, since end auto-persists)
-	fastify.post('/tournaments/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {
+	// -------------------------------------- PLAYERS -------------------------------------- //
+	// Get all players in a tournament
+	fastify.get('/api/tournament/:tournamentId/player', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const t = TManager.getTournament(tournamentId);
-			if (!t) return reply.code(404).send({ success: false, message: 'Tournament not found' });
-			const ok = TManager.persistArchive(tournamentId);
-			if (!ok) return reply.code(400).send({ success: false, message: 'Failed to archive tournament' });
-			return reply.send({ success: true, message: 'Tournament archived' });
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const t = await TManager.getTournament(tId);
+			return reply.send({ success: true, data: t.players });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to archive tournament' });
+			return reply.status(500).send({ success: false, message: 'Failed to get players' });
 		}
 	});
 
+	// Post/Add player //Join tournament
+	fastify.post('/api/tournament/:tournamentId/player', async (request: FastifyRequest, reply: FastifyReply) => {
+		try {
+			const { tournamentId } = request.params as { tournamentId: string };
+			const { name, idString: id, tpt } = request.body as { name: string; idString: string, tpt: TPT };
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			if (!name || (id !== '-' && (isNaN(+id) || +id <= 0)))
+				return reply.status(401).send({ error: 'Not authenticated' });
+			let success;
+			if (id === '-')
+				success = await TManager.addPlayerToTournament(tId, name, tpt);
+			else
+				success = await TManager.addPlayerToTournament(tId, name, tpt, +id);
+			if (!success)
+				return reply.status(400).send({ error: 'Failed to add player to tournament' });
+			const t = await TManager.getTournament(tId);
+			return { success: true, tournament: t && publicTournamentShape(t) };
+		} catch (error) {
+			fastify.log.error(error);
+			return reply.status(500).send({ success: false, message: 'Failed to add player to tournament' });
+		}
+	});
+
+	// Toggle player ready
+	fastify.post('/api/tournament/:tournamentId/match/:matchId/player/:playerId/ready', async (request: FastifyRequest, reply: FastifyReply) => {
+		try {
+			const { tournamentId, matchId, playerId } = request.params as { tournamentId: string; matchId: string; playerId: string };
+			if (isNaN(+tournamentId) || isNaN(+matchId) || isNaN(+playerId)
+				|| +tournamentId <= 0 || +matchId <= 0 || +playerId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+			const success = await TManager.toggleMatchPlayerReady(+tournamentId, +matchId, +playerId);
+			if (!success)
+				return reply.status(400).send({ success: false, message: 'Unable to toggle player ready' });
+			const m = await TManager.getMatch(+matchId);
+			return reply.send({ success: true, data: publicMatchShape(m) });
+		} catch (error) {
+			fastify.log.error(error);
+			return reply.status(500).send({ success: false, message: 'Failed to toggle player ready status' });
+		}
+	});
+
+	// // Toggle match-level ready
+	// fastify.post('/api/tournament/:tournamentId/match/:matchId/ready', async (request: FastifyRequest, reply: FastifyReply) => {
+	// 	try {
+	// 		const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
+	// 		const tId = +tournamentId;
+	// 		const mId = +matchId;
+	// 		if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
+	// 			return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+	// 		const { playerId } = request.body as { playerId: string };
+	// 		const pId = +playerId;
+	// 		if (isNaN(pId) || pId <= 0)
+	// 			return reply.status(400).send({ success: false, message: 'playerId is required' });
+	// 		const ok = await TManager.toggleMatchPlayerReady(tId, mId, pId);
+	// 		if (!ok) return reply.status(404).send({ success: false, message: 'Tournament, match, or player not found' });
+	// 		const match = await TManager.getMatch(mId);
+	// 		return reply.send({ success: true, data: publicMatchShape(match) });
+	// 	} catch (error) {
+	// 		fastify.log.error(error);
+	// 		return reply.status(500).send({ success: false, message: 'Failed to toggle match ready' });
+	// 	}
+	// });
+
+	// Leave tournament
+	fastify.post('/api/tournament/:tournamentId/leave', async (request: FastifyRequest ,reply: FastifyReply) => {
+		try {
+			const { tournamentId } = request.params as { tournamentId: string };
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const { playerId } = request.body as { playerId: number };
+			const pId = +playerId;
+			if (isNaN(pId) || pId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid player id' });
+			const ok = await TManager.leaveTournament(tId, pId);
+			if (!ok)
+				return reply.status(404).send({ success: false, message: 'Tournament or player not found' });
+			console.log(`✅ Player ${pId} left tournament ${tId}`);
+			return reply.send({ success: true, message: 'Left tournament' });
+		} catch (error) {
+			fastify.log.error(error);
+			return reply.status(500).send({ success: false, message: 'Failed to leave tournament' });
+		}
+	});
+
+	// -------------------------------------- ARCHIVE -------------------------------------- //
 	// Get archive snapshot
-	fastify.get('/tournaments/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {
-		try {
-			const { tournamentId } = request.params as { tournamentId: string };
-			const archive = TManager.getArchive(tournamentId);
-			if (!archive) return reply.code(404).send({ success: false, message: 'Archive not found' });
-			return reply.send({ success: true, data: archive });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get archive' });
-		}
-	});
+	// //TODO
+	// fastify.get('/api/tournament/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {
+	// 	try {
+	// 		const { tournamentId } = request.params as { tournamentId: string };
+	// 		const tId = +(tournamentId);
+	// 		if (isNaN(tId) || tId <= 0)
+	// 			return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+	// 		const archive = await TManager.getArchive(tId);
+	// 		if (!archive)
+	// 			return reply.status(404).send({ success: false, message: 'Archive not found' });
+	// 		return reply.send({ success: true, data: archive });
+	// 	} catch (error) {
+	// 		fastify.log.error(error);
+	// 		return reply.status(500).send({ success: false, message: 'Failed to get archive' });
+	// 	}
+	// });
 
-	// List all archives//TODO /tournament/archives ? //TODO add /api/ ?
-	fastify.get('/tournaments-archives', async (_request: FastifyRequest, reply: FastifyReply) => {
-		try {
-			const archives = TManager.getAllArchives();
-			return reply.send({ success: true, count: archives.length, data: archives });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to list archives' });
-		}
-	});
+	// // List all archives
+	// fastify.get('/api/tournament/archives', async (_request: FastifyRequest, reply: FastifyReply) => {
+	// 	try {
+	// 		const archives = await TManager.getAllArchives();
+	// 		return reply.send({ success: true, count: archives.length, data: archives });
+	// 	} catch (error) {
+	// 		fastify.log.error(error);
+	// 		return reply.status(500).send({ success: false, message: 'Failed to list archives' });
+	// 	}
+	// });
 
+	// -------------------------------------- MATCHES -------------------------------------- //
 	// Get current match (next in queue) for a tournament
 	fastify.get('/api/tournament/:tournamentId/match/current', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const match = TManager.getCurrentMatch(tournamentId);
-			if (!match) return reply.code(404).send({ success: false, message: 'No current match available' });
-			return reply.send({ success: true, data: match });
+			const tId = +tournamentId;
+			if (isNaN(tId) || tId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+			const m = await TManager.getCurrentMatch(tId);
+			if (!m)
+				return reply.send({ success: true, data: null, message: 'No current match available yet' });
+			return reply.send({ success: true, data: publicMatchShape(m) });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get current match' });
+			return reply.status(500).send({ success: false, message: 'Failed to get current match' });
 		}
 	});
 
-	// Get active matches for a tournament
-	fastify.get('/api/tournament/:tournamentId/match/active', async (request: FastifyRequest, reply: FastifyReply) => {
-		try {
-			const { tournamentId } = request.params as { tournamentId: string };
-			const matches = TManager.getActiveMatches(tournamentId);
-			return reply.send({ success: true, count: matches.length, data: matches });
-		} catch (error) {
-			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get active matches' });
-		}
-	});
+	// // Get active matches for a tournament
+	// fastify.get('/api/tournament/:tournamentId/match/active', async (request: FastifyRequest, reply: FastifyReply) => {
+	// 	try {
+	// 		const { tournamentId } = request.params as { tournamentId: string };
+	// 		const tId = +tournamentId;
+	// 		if (isNaN(tId) || tId <= 0)
+	// 			return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+	// 		const matches = await TManager.getActiveMatches(tId);
+	// 		return reply.send({ success: true, count: matches.length, data: matches.map(publicMatchShape) });
+	// 	} catch (error) {
+	// 		fastify.log.error(error);
+	// 		return reply.status(500).send({ success: false, message: 'Failed to get active matches' });
+	// 	}
+	// });
 
 	// Get match by ID in a tournament
 	fastify.get('/api/tournament/:tournamentId/match/:matchId', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
-			const match = TManager.getMatch(tournamentId, matchId);
-			if (!match) return reply.code(404).send({ success: false, message: 'Match not found' });
-			const players = TManager.getPlayersInMatch(tournamentId, matchId);
-			return reply.send({ success: true, data: { match, players } });
+			const tId = +tournamentId;
+			const mId = +matchId;
+			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+			const match = await TManager.getMatch(mId);
+			if (!match)
+				return reply.status(404).send({ success: false, message: 'Match not found' });
+			return reply.send({ success: true, data: { match: publicMatchShape(match) } });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to get match' });
+			return reply.status(500).send({ success: false, message: 'Failed to get match' });
 		}
 	});
 
-	// Toggle match-level ready for a player
-	fastify.post('/api/tournament/:tournamentId/match/:matchId/ready', async (
-		request: FastifyRequest<{ Params: { tournamentId: string; matchId: string }; Body: ToggleMatchReadyBody }>,
-		reply: FastifyReply
-	) => {
+	// Start match
+	fastify.post('/api/tournament/:tournamentId/match/:matchId/start', async (req, reply) => {
 		try {
-			const { tournamentId, matchId } = request.params;
-			const { playerId } = request.body;
-			if (!playerId) return reply.code(400).send({ success: false, message: 'playerId is required' });
-			const ok = TManager.toggleMatchPlayerReady(tournamentId, matchId, playerId);
-			if (!ok) return reply.code(404).send({ success: false, message: 'Tournament, match, or player not found' });
-			const match = TManager.getMatch(tournamentId, matchId);
-			return reply.send({ success: true, data: match });
+			const { tournamentId, matchId } = req.params as { tournamentId: string; matchId: string };
+			const tId = +tournamentId;
+			const mId = +matchId;
+			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
+				return reply.code(400).send({ success: false, message: 'invalid id(s)' });
+			const m = await TManager.startMatch(tId, mId);
+			if (!m)
+				return reply.code(400).send({ success: false, message: 'failed to start match' });
+			return reply.send({ success: true, message: 'match starting', gameId: m.gameId ?? null, matchId: m.id ?? null });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to toggle match ready' });
-		}
-	});
-
-	// Start a match
-	fastify.post('/api/tournament/:tournamentId/match/:matchId/start', async (
-		request: FastifyRequest<{ Params: { tournamentId: string; matchId: string }; Body: StartMatchBody }>,
-		reply: FastifyReply
-	) => {
-		try {
-			const { tournamentId, matchId } = request.params;
-			const body = request.body || {};
-			const providedGameId = body.gameId;
-
-			// If a gameId is provided, attempt to start immediately using it
-			if (typeof providedGameId === 'number') {
-				const ok = TManager.startMatch(tournamentId, matchId, providedGameId);
-				if (!ok) return reply.code(400).send({ success: false, message: 'Failed to start match (not ready?)' });
-				// Notify match channel clients that game has started
-				broadcastGameStartToMatch(matchId, providedGameId);
-				const match = TManager.getMatch(tournamentId, matchId);
-				return reply.send({ success: true, data: match });
-			}
-
-			// Otherwise, orchestrate countdown + game creation similar to room start
-			const players = TManager.getPlayersInMatch(tournamentId, matchId);
-			if (!players || players.length < 1) {
-				return reply.code(404).send({ success: false, message: 'Match or players not found' });
-			}
-
-			// Kick off a short countdown for UX and return immediately
-			broadcastCountdownToMatch(matchId);
-			reply.send({ success: true, message: 'Countdown started' });
-
-			setTimeout(() => {
-				try {
-					const mode = '2P';
-					const createdGame = database.games.createGame({ mode, difficulty: 'normal' });
-					const gameId = createdGame.id;
-
-					// Try to attach DB players when we can parse user ids, else fall back to engine-only players
-					const positions = ['left', 'right'];
-
-					const enginePlayers = players.slice(0, 2).map((tp, index) => {
-						const parsedId = parseInt(tp.playerId);
-						const userId = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : index + 1;
-						// Best-effort: persist to DB only if we have a real user id
-						if (Number.isFinite(parsedId) && parsedId > 0) {
-							try {
-								const position = positions[index] || 'left';
-								database.players.addPlayerToGame(gameId, parsedId, position);
-							} catch {
-								// non-fatal
-							}
-						}
-						return {
-							id: userId,
-							name: tp.name || `Player ${index + 1}`,
-							gameId,
-							isReady: tp.isReady === true,
-							pos: 70,
-							score: 0,
-							connectionStatus: 'connected',
-							lastActivity: new Date().toISOString()
-						};
-					});
-
-					const initialGameState: GameState = {
-						id: 0,
-						gameId,
-						players: enginePlayers,
-						ballPosX: 200,
-						ballPosY: 100,
-						ballVelX: 0,
-						ballVelY: 0,
-						mode,
-						lastContact: 0,
-						lastActivity: new Date().toISOString(),
-					};
-
-					const gameEngine: BaseGameEngine = new BaseGameEngine(initialGameState);
-
-					// Attach AI players based on tournament player type
-					players.slice(0, 2).forEach((tp, index) => {
-						const playerNum = index + 1;
-						if (tp.tpt === 'ai') {
-							const difficulty = 'normal';
-							gameEngine.setPlayerAI(playerNum, true, difficulty);
-						}
-					});
-
-					activeGames.set(gameId, gameEngine);
-					gameEngine.startGame();
-
-					// Update in-memory tournament match and notify clients
-					const ok = TManager.startMatch(tournamentId, matchId, gameId);
-					if (ok) {
-						broadcastGameStartToMatch(matchId, gameId);
-					} else {
-						// if players not ready, we still keep engine running; could be stopped if desired
-					}
-				} catch (e) {
-					console.error('Error starting tournament match after countdown:', e);
-				}
-			}, 3000);
-		} catch (error) {
-			fastify.log.error(error);
-			// If reply might have been sent already (countdown branch), just bail
-			try {
-				return reply.code(500).send({ success: false, message: 'Failed to start match' });
-			} catch {}
+			return reply.status(500).send({ success: false, message: 'Failed to start match' });
 		}
 	});
 
 	// End a match
-	fastify.post('/api/tournament/:tournamentId/match/:matchId/end', async (
-		request: FastifyRequest<{ Params: { tournamentId: string; matchId: string }; Body: EndMatchBody }>,
-		reply: FastifyReply
-	) => {
+	fastify.post('/api/tournament/:tournamentId/match/:matchId/end', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
-			const { tournamentId, matchId } = request.params;
-			const { winnerId } = request.body || {};
-			const ok = TManager.endMatch(tournamentId, matchId, winnerId);
-			if (!ok) return reply.code(400).send({ success: false, message: 'Failed to end match' });
-			const match = TManager.getMatch(tournamentId, matchId);
-			return reply.send({ success: true, data: match });
+			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
+			const tId = +tournamentId;
+			const mId = +matchId;
+			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
+				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+			// const { winnerId } = request.body as { winnerId: string };
+			// const winner = +winnerId;
+			// if (isNaN(winner) || winner <= 0)
+			// 	return reply.status(400).send({ success: false, message: 'Invalid winnerId' });
+			const ok = await TManager.endMatch(mId);
+			if (!ok)
+				return reply.status(400).send({ success: false, message: 'Failed to end match' });
+			const m = await TManager.getMatch(mId);
+			return reply.send({ success: true, data: { match: publicMatchShape(m) } });
 		} catch (error) {
 			fastify.log.error(error);
-			return reply.code(500).send({ success: false, message: 'Failed to end match' });
+			return reply.status(500).send({ success: false, message: 'Failed to end match' });
 		}
 	});
 }
 
-export default tournamentsRoutes;
+export default tournamentRoutes;
 

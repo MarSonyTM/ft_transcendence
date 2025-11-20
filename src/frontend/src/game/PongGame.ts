@@ -1,9 +1,9 @@
 import { GameState, WebSocketMessage, Player } from '../../../shared/gameTypes';
 import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
-import { RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from '../utils/auth';
 import { baby3D } from './game3D';
+import { RoomWebSocketManager } from '../utils/roomWebSocket';
 
 export class PongGame {
     gameId?: number = 0;
@@ -48,7 +48,7 @@ export class PongGame {
     private lerpFactor = 1;
     
     constructor() {
-        this.setupKeyboardControls();
+        // this.setupKeyboardControls();
         const uiMode = getCurrentGameMode();
         if (uiMode) this.gameState.mode = uiMode as any;
         this.initializeModelFromGameState();
@@ -153,7 +153,7 @@ export class PongGame {
                 console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
             }
             // If there's a room with a gameId, use it
-            else if (room && room.gameId) {
+            if (room && room.gameId) {
                 this.gameId = room.gameId;
                 console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
             }
@@ -492,22 +492,81 @@ export class PongGame {
         }
     }
 
-    setupKeyboardControls(): void {
-        document.addEventListener('keydown', (e) => {
-            this.keys[e.code] = true;
+    setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () => void {
+        const keys: { [key: string]: boolean } = {};
+        const hasLocal = this.hasLocal;
+        
+        const gameMode = getCurrentGameMode();
+    
+        console.log('Setting up controls:', { 
+            playerId,
+            hasLocal,
+            gameMode
         });
         
-        document.addEventListener('keyup', (e) => {
-            this.keys[e.code] = false;
-        });
-        
-        document.addEventListener('keydown', (e) => {
-            const gameKeys = ['KeyW', 'KeyS'];
-            if (gameKeys.includes(e.code)) {
+        const movementKeys = new Set(['w','s','o','l']);
+    
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+            const wasPressed = keys[key];
+            keys[key] = true;
+            
+            // Only send on key state CHANGE
+            if (!wasPressed && movementKeys.has(key)) {
                 e.preventDefault();
+                
+                // Check if this is a local guest key (o/l)
+                const isGuestKey = ['o', 'l'].includes(key);
+                
+                if (isGuestKey && hasLocal) {
+                    // Send as guest/local player
+                    ws.sendKeyState(key, true, true);
+                } else if (!isGuestKey) {
+                    // Send as main player
+                    ws.sendKeyState(key, true, false);
+                }
             }
-        });
+        };
+    
+        const handleKeyUp = (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+            keys[key] = false;
+            
+            if (movementKeys.has(key)) {
+                const isGuestKey = ['o', 'l'].includes(key);
+                
+                if (isGuestKey && hasLocal) {
+                    ws.sendKeyState(key, false, true);
+                } else if (!isGuestKey) {
+                    ws.sendKeyState(key, false, false);
+                }
+            }
+        };
+    
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
+        }
     }
+
+    // setupKeyboardControls(): void {
+    //     document.addEventListener('keydown', (e) => {
+    //         this.keys[e.code] = true;
+    //     });
+        
+    //     document.addEventListener('keyup', (e) => {
+    //         this.keys[e.code] = false;
+    //     });
+        
+    //     document.addEventListener('keydown', (e) => {
+    //         const gameKeys = ['KeyW', 'KeyS'];
+    //         if (gameKeys.includes(e.code)) {
+    //             e.preventDefault();
+    //         }
+    //     });
+    // }
 
     startHeartbeat(): void {
         this.heartbeatInterval = setInterval(() => {
@@ -550,6 +609,7 @@ export class PongGame {
         const element = document.getElementById('wsStatus');
         if (element) {
             element.className = connected ? 'connected' : 'disconnected';
+            element.textContent = status;
         }
     }
 

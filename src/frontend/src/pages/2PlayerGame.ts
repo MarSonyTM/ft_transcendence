@@ -5,6 +5,8 @@ import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
+// import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
+// import { getCurrentMatch } from '../utils/tournamentState';
 
 export let pongGame: PongGame | null = null;
 
@@ -81,14 +83,8 @@ export async function render2PlayerGame(): Promise<void> {
                 cleanupGame(pongGame);
                 endGame(pongGame);
             }
-            // If it's a tournament game, go back to tournament page
-            if (room?.roomId?.startsWith('tournament-')) {
-                history.pushState({ page: 'tournament' }, '', '/tournament');
-                setCurrentPage('tournament');
-            } else {
-                history.pushState({ page: 'landing' }, '', '/landing');
-                setCurrentPage('landing');
-            }
+            history.pushState({ page: 'landing' }, '', '/landing');
+            setCurrentPage('landing');
             renderApp();
         });
     }
@@ -239,7 +235,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls
-function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () => void {
     const keys: { [key: string]: boolean } = {};
     const hasLocal = pongGame && pongGame.hasLocal;
     
@@ -251,7 +247,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
         gameMode
     });
     
-    const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);
+    const movementKeys = new Set(['w','s','o','l']);
 
     const handleKeyDown = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase();
@@ -292,6 +288,10 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+    }
 }
 
 

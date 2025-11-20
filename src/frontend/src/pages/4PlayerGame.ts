@@ -237,7 +237,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls for room-based game
-function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () => void {
     const keys: { [key: string]: boolean } = {};
     const hasLocal = pongGame && pongGame.hasLocal;
     
@@ -249,7 +249,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
         gameMode
     });
 
-    const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);
+    const movementKeys = new Set(['w','s','o','l']);
 
     const handleKeyDown = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase();
@@ -290,6 +290,10 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+    }
 }
 
 

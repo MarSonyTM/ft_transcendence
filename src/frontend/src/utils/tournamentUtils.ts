@@ -1,237 +1,248 @@
-import { Tournament, TournamentMatch, TournamentPlayer, MatchStatus, TournamentStatus, TournamentArchiveEntry } from "../types";
-import { getCurrentTournament, hydrateTournament, setCurrentTournament } from "./tournamentState";
-import { getCurrentUser } from "./globalState";
-import { authService } from "./auth";
+import { Tournament, TournamentMatch, TournamentPlayer, TournamentArchiveEntry, TPT } from '../types';
+import { getCurrentTournament, hydrateTournament, setCurrentTournament, setCurrentMatch, updateCurrentMatch, getTournamentPlayers } from './tournamentState';
+import { authService } from './auth';
+import { setCurrentPage } from './globalState';
+import { renderApp } from '../main';
+import { get } from 'http';
 
-// Canonical tournament utilities (no legacy adapter layer)
-
-// -------- Canonical local archive (V2) --------
+// -------- Local archive --------
 type ArchiveEntry = TournamentArchiveEntry;
 const LOCAL_ARCHIVE_KEY = 'tournamentArchiveV2';
 let legacyArchive: ArchiveEntry[] = [];
 
-function loadArchive(): void {
-	try {
-		const raw = localStorage.getItem(LOCAL_ARCHIVE_KEY);
-		if (raw) legacyArchive = JSON.parse(raw) || [];
-	} catch { /* ignore */ }
-}
 function persistArchive(): void {
-	try { localStorage.setItem(LOCAL_ARCHIVE_KEY, JSON.stringify(legacyArchive)); } catch { /* ignore */ }
+	localStorage.setItem(LOCAL_ARCHIVE_KEY, JSON.stringify(legacyArchive));
 }
-loadArchive();
 
-export function getArchive(): ArchiveEntry[] { return legacyArchive.slice(); }
+export function getArchive(): ArchiveEntry[] {
+	return legacyArchive.slice();
+}
 
-function addToArchive(entry: ArchiveEntry): void { legacyArchive.push(entry); persistArchive(); }
+function addToArchive(entry: ArchiveEntry): void {
+	legacyArchive.push(entry);
+	persistArchive();
+}
 
 // -------- Tournament creation / management --------
-// Removed legacy counters (tId, tPId, matchId); display ordering derived at render time.
-
-// Create a fresh canonical tournament and hydrate state.
-export function createTournament(): Tournament {
-	const tournamentId = `t-${Date.now()}-${Math.floor(Math.random()*1e5)}`;
-	const host: TournamentPlayer = {
-		playerId: `p-${Date.now()}-${Math.floor(Math.random()*1e4)}`,
-		tournamentId,
-		name: authService.getCurrentUser()?.username,
-		avatar: authService.getCurrentUser()?.avatar,
-		tpt: 'host',
-		isReady: false,
-		score: 0,
-		identity: getCurrentUser() || 'host',
-		eliminated: false
-	}
-	const t: Tournament = {
-		tournamentId,
-		status: 'setup',
-		players: [host],
-		allMatches: [],
-		currentMatch: null,
-		championId: null
-	};
-	hydrateTournament(t);
-	// Initialize bracket state fields
-	t.bracketRound = 0; t.matchQueueIds = [];
-	return getCurrentTournament()!;
+function getApiEndpoint(): string {
+	return (window as any).__INITIAL_STATE__?.apiEndpoint?.replace(/\/$/, '') || '';
 }
 
-export function resetTournament(): void {
-	setCurrentTournament(null); // clears state
-	createTournament();
+function unwrapPayload<T>(raw: any): T | null {
+    if (!raw) return null;
+    if (raw.success !== undefined) {
+        if (!raw.success) return null;
+        return (raw.data ?? raw.tournament ?? raw.match ?? null) as T | null;
+    }
+    return raw as T;
+}
+
+function normalizeMatch(raw: any): TournamentMatch {
+    return {
+        id: raw.id,
+        tournamentId: raw.tournamentId ?? raw.tId ?? 0,
+        gameId: raw.gameId ?? undefined,
+        status: raw.status || 'pending',
+        isBye: raw.isBye ?? false,
+        p1: raw.p1,
+        p2: raw.p2,
+        playerId1: raw.playerId1 ?? raw.p1?.playerId ?? raw.p1?.id,
+        playerId2: raw.playerId2 ?? raw.p2?.playerId ?? raw.p2?.id,
+        winnerId: raw.winnerId ?? null,
+        round: typeof raw.round === 'number' ? raw.round : 0,
+        roundIdx: typeof raw.roundIdx === 'number' ? raw.roundIdx : 0,
+        createdAt: raw.createdAt,
+        startedAt: raw.startedAt,
+        endedAt: raw.endedAt
+    };
+}
+
+function normalizeTournament(raw: any): Tournament {
+    return {
+        id: raw.id,
+        status: raw.status || 'setup',
+        players: (raw.players || []).map((p: any) => ({
+            id: p.id,
+            playerId: p.playerId ?? p.id,
+            tournamentId: p.tournamentId,
+            name: p.name,
+            tpt: p.tpt,
+            user: p.user,
+            isReady: !!p.isReady,
+            eliminated: !!p.eliminated,
+            score: p.score ?? 0,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt
+        })),
+        allMatches: (raw.allMatches || raw.matches || []).map(normalizeMatch),
+        championId: raw.championId ?? null,
+        currentMatch: raw.currentMatch ? normalizeMatch(raw.currentMatch) : null,
+        matchQueue: raw.matchQueue ? (raw.matchQueue || []).map(normalizeMatch) : undefined,
+        round: raw.round,
+        createdAt: raw.createdAt,
+        startedAt: raw.startedAt,
+        endedAt: raw.endedAt
+    };
+}
+
+export async function createTournament(): Promise<Tournament | null> {
+    try {
+		let name = null;
+		let id;
+		const host = authService.getCurrentUser();
+		name = host?.username;
+		id = host?.id;
+		const ok = authService.isAuthenticated();
+        const response = await fetch(`${getApiEndpoint()}/api/tournament`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+            body: JSON.stringify({ name, id, ok })
+        });
+        const json = await response.json();
+        if (!response.ok) return null;
+		const raw = unwrapPayload<any>(json);
+        if (!raw) return null;
+        const t = normalizeTournament(raw);
+        hydrateTournament(t);
+        setCurrentTournament(t);
+        return t;
+    } catch (err) {
+        console.error('createTournament error:', err);
+        return null;
+    }
+}
+
+export async function resetTournament(): Promise<void> {
+	setCurrentTournament(null);
+	const host = authService.getCurrentUser();
+	if (!host) return console.error('Cannot create new tournament: no user logged in');
+	await createTournament();
 }
 
 export function getTournament(): Tournament | null {
-	const t = getCurrentTournament();
-	if (!t) return createTournament();
-	return t;
+	return getCurrentTournament();
 }
 
 export function setTournament(t: Tournament): void {
-    // Hydrate canonical tournament directly
     hydrateTournament(t);
 }
 
-// Utility to derive numeric-ish id for display ordering (not guaranteed unique globally)
-// (numeric derivation helpers removed)
-
-export function addPlayerToTournament(partial: { name: string; tpt: string; isReady: boolean }): TournamentPlayer | null {
-	// Always operate on canonical tournament state to avoid mutating t objects
-	let canon = getCurrentTournament();
-	if (!canon) canon = createTournament();
-	if (!canon) { console.warn('[Tournament] Failed to obtain canonical tournament for player add'); return null; }
-	const player: TournamentPlayer = {
-		playerId: `p-${Date.now()}-${Math.floor(Math.random()*1e4)}`,
-		tournamentId: canon.tournamentId,
-		tpt: partial.tpt as any,
-		identity: partial.name,
-		name: partial.name,
-		avatar: undefined,
-		isReady: partial.isReady,
-		pos: undefined,
-		score: 0,
-		eliminated: false,
-		byeRounds: []
-	};
-	canon.players.push(player);
-	// Re-hydrate to ensure any derived t reads next time reflect updated list
-	hydrateTournament(canon);
-	return player;
+export async function addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, id?: number): Promise<TournamentPlayer | null> {
+    try {
+		let idString = '-';
+		if (id) idString = id.toString();
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}/player`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+            body: JSON.stringify({ name, idString, tpt })
+        });
+        const json = await resp.json();
+        if (!resp.ok) return null;
+        const raw = unwrapPayload<any>(json);
+        if (!raw) return null;
+        const t = normalizeTournament(raw);
+        hydrateTournament(t);
+        setCurrentTournament(t);
+        return t.players.find(p => p.name === name) || null;
+    } catch {
+        return null;
+    }
 }
 
-// removed legacy getPlayerById()
-
-// Simple bracket setup: pair players sequentially by shuffled order, set tournament active.
-// ---------------- New round-based bracket logic (adapted from legacy request) ----------------
-// Ephemeral state (not yet persisted in canonical Tournament type)
-let bracketRound = 0; // current round number (starts at 0 until first insertion)
-let matchQueue: TournamentMatch[] = []; // queue of matches for current round
-let currentMatchShadow: any | null = null; // current active/pending match (shadow only)
-
-function createMatch(index: number, round: number): any {
-	const t = getCurrentTournament();
-	return {
-		matchRoomId: `room-${round}-${Date.now()}-${Math.floor(Math.random()*1e4)}`,
-		tournamentId: t?.tournamentId || '',
-		status: 'setup',
-		playerId1: '',
-		playerId2: '',
-		p1: undefined,
-		p2: undefined,
-		winner: null,
-		round,
-		roundIdx: index - 1
-	};
-}
-
-function toggleByePlayer(player: TournamentPlayer): void {
-	console.debug(`[Tournament] BYE awarded to ${player.name}`);
-}
-
-// Insert (non-eliminated) players into matches of the next round; advance bracket state.
-export function insertPlayersIntoNextRound(): void {
-	const t = getTournament();
-	if (!t || !t.players) return;
-	bracketRound++;
-	let remaining: TournamentPlayer[] = t.players.filter((p: any) => !p.eliminated).slice();
-	if (remaining.length === 0) return;
-	if (remaining.length === 1) {
-		// Champion found – finalize tournament
-		const champ = remaining.pop()!;
-		t.championId = champ.playerId;
-		t.status = 'completed';
-		// Persist archive entry using existing finalize helper
-		finalizeTournament(champ.playerId);
-		t.status = 'completed';
-		setTournament(t); // updates canonical championId/status
-		console.log('Tournament is done!');
+export async function removeTournamentPlayer(alias: string): Promise<void> {
+	const currentTournament = getCurrentTournament();
+	if (!currentTournament) return;
+	const player = currentTournament.players.find(p => p.name === alias);
+	if (!player || !player.id) {
+		console.error(`❌ Player ${alias} not found or missing playerId`, { player, allPlayers: currentTournament.players });
 		return;
 	}
-	// Shuffle remaining players
-	for (let i = remaining.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-	}
-	// Build queue from matches of this round (reverse so pop gives earliest added)
-	matchQueue = (t.allMatches || []).filter((m: any) => m.round === bracketRound).reverse();
-	for (const m of matchQueue) {
-		const set = remaining.splice(0, 2);
-		if (set[0]) m.playerId1 = set[0].playerId;
-		if (set[1]) m.playerId2 = set[1].playerId;
-	}
-	if (remaining.length > 0) {
-		// Assign single BYE player to next round automatically
-		toggleByePlayer(remaining.shift()!);
-		if (remaining.length > 0) throw new Error('More than one player left after assigning BYE');
-	}
-	matchQueue.forEach(m => m.status = 'setup');
-	currentMatchShadow = matchQueue.pop() || null;
-	t.currentMatch = currentMatchShadow || null;
-	if (t.currentMatch) t.currentMatch.status = 'active';
-	t.status = t.currentMatch ? 'active' : t.status;
-	// Persist bracket state
-	t.bracketRound = bracketRound;
-	t.matchQueueIds = matchQueue.map(m => m.matchRoomId);
-	// Persist updated matches & status back into canonical state
-	setTournament(t);
-}
 
-export function setupMatches(): void {
-	let t = getTournament();
-	if (!t) throw new Error('No tournament');
-	if (!t.players) throw new Error('No players in tournament');
-	bracketRound = 0; matchQueue = []; currentMatchShadow = null;
-	let round: number = 1;
-	let amount: number = t.players.length;
-	let bye: boolean = amount % 2 === 1;
-	amount = Math.floor(amount / 2);
-	while (amount > 1 || bye) {
-		let i = 0;
-		while (i++ < amount) {
-			const match = createMatch(i, round);
-			t.allMatches = t.allMatches || [];
-			t.allMatches.push(match);
+	try {
+		console.log(`🔄 Removing player ${alias} (id=${player.id}) from tournament ${currentTournament.id}`);
+		const resp = await fetch(`${getApiEndpoint()}/api/tournament/${currentTournament.id}/leave`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${authService.getToken()}`
+			},
+			body: JSON.stringify({ playerId: player.id })
+		});
+
+		if (!resp.ok) {
+			const msg = await resp.text().catch(() => '');
+			console.error(`❌ Failed to remove player ${player.id} from tournament ${currentTournament.id}`, msg);
+			return;
 		}
-		amount += bye ? 1 : 0;
-		bye = amount % 2 === 1;
-		amount = Math.floor(amount / 2);
-		round++;
+		
+		showTournamentPlayerDisconnectedMessage(alias);
+		console.log(`✅ Player ${player.id} removed from tournament ${currentTournament.id}`);
+		if (!currentTournament.id) return;
+		await setEffectiveTournament(currentTournament.id);
+	} catch (e) {
+		console.error('removeTournamentPlayer failed:', e);
 	}
-	t.status = 'setup';
-	setTournament(t); // persist base bracket structure
-	insertPlayersIntoNextRound(); // populate first round players & start tournament
-	t = getTournament();
-	if (t) setTournament(t);
 }
 
-export function getCurrentMatch(): TournamentMatch | undefined {
-	let t = getTournament();
-	if (!t) return undefined;
-	if (t.currentMatch && t.currentMatch.status !== 'completed') {
-		return t.currentMatch;
+export async function startTournament(): Promise<boolean> {
+	const t = getCurrentTournament();
+	if (!t || !t.id) {
+		console.error('Cannot start tournament: no current tournament');
+		return false;
 	}
-	if (matchQueue.length === 0) {
-		insertPlayersIntoNextRound();
-		t = getTournament();
-	} else {
-		const nxt = matchQueue.pop() || null;
-		if (nxt) nxt.status = 'active';
-		t.currentMatch = nxt;
-		if (t?.matchQueueIds) t.matchQueueIds = matchQueue.map(m => m.matchRoomId);
-		setTournament(t);
+	try {
+		const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/start`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+			body: JSON.stringify({})
+		});
+		const json = await resp.json();
+		if (!resp.ok) {
+			console.error('Failed to start tournament:', json?.message || `HTTP ${resp.status}`);
+			return false;
+		}
+		await setEffectiveTournament(t.id);
+		console.debug(`[Tournament] Tournament ${t.id} started`);
+		return true;
+	} catch (e) {
+		console.error('startTournament failed:', e);
+		return false;
 	}
-	t = getTournament();
-	return t?.currentMatch || undefined;
 }
 
-// Mark tournament complete and archive (legacy path)
-export function finalizeTournament(championId: string | null): void {
+export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
+    let t = getCurrentTournament();
+    if (!t) return null;
+    try {
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/current`, {
+            headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+        });
+        const json = await resp.json();
+        if (!resp.ok) return null;
+        const raw = unwrapPayload<any>(json);
+        if (!raw) return null;
+        const match = normalizeMatch(raw);
+        setCurrentMatch(match);
+        // t = getCurrentTournament();
+        // if (t) {
+        //     const idx = t.allMatches.findIndex(m => m.id === match.id);
+        //     if (idx >= 0) t.allMatches[idx] = match;
+		// 	else t.allMatches.push(match);
+        //     hydrateTournament(t);
+        // }
+        return match;
+    } catch {
+        return null;
+    }
+}
+
+export function finalizeTournament(championId: number | null): void {
 	const t = getCurrentTournament();
 	if (!t) return;
 	t.status = 'completed';
 	t.championId = championId;
 	const entry: ArchiveEntry = {
-		tournamentId: t.tournamentId,
+		tournamentId: t.id || 0,
 		status: t.status,
 		players: t.players.slice(),
 		matches: t.allMatches.slice(),
@@ -243,52 +254,43 @@ export function finalizeTournament(championId: string | null): void {
 	addToArchive(entry);
 }
 
-// Fetch and hydrate a tournament by id; returns current tournament or null on failure
-export async function setEffectiveTournament(tournamentId: string): Promise<Tournament | null> {
-	try {
-		const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-		const resp = await fetch(`${apiEndpoint}/api/tournament/${tournamentId}`);
-		const json = await resp.json();
-		if (json?.success && json?.data) {
-			// Expect backend to return shape convertible to frontend Tournament
-			// If shape already matches, hydrate directly; otherwise map minimal fields
-			const serverT = json.data as Partial<Tournament> & { tournamentId?: string };
-			const normalized: Partial<Tournament> & { tournamentId: string } = {
-				tournamentId: serverT.tournamentId,
-				status: serverT.status,
-				players: (serverT as any).players || [],
-				allMatches: (serverT as any).allMatches || (serverT as any).matches || [],
-				championId: (serverT as any).championId ?? null,
-			} as any;
-			hydrateTournament(normalized);
-			return getCurrentTournament();
-		}
-	} catch (e) {
-		console.error('Failed to fetch tournament:', e);
-	}
-	return null;
+export async function setEffectiveTournament(tournamentId: number): Promise<Tournament | null> {
+    try {
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}`, {
+            headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+        });
+        const json = await resp.json();
+        if (!resp.ok) return null;
+        const raw = unwrapPayload<any>(json);
+        if (!raw) return null;
+        const t = normalizeTournament(raw);
+        hydrateTournament(t);
+        setCurrentTournament(t);
+		t.currentMatch = await loadCurrentMatch();
+		console.debug(`[Tournament] Loaded effective tournament ${tournamentId} with ${t.players.length} players and ${t.allMatches.length} matches`);
+        return t;
+    } catch {
+        return null;
+    }
 }
 
-// Post winner for a tournament match
-export async function postTournamentMatchWinner(tournamentId: string, matchRoomId: string, winner: string | null): Promise<boolean> {
+export async function postTournamentMatchWinner(tournamentId: number, matchId: number, winnerId: number | null): Promise<boolean> {
 	try {
-		const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
-		const resp = await fetch(`${apiEndpoint}/api/tournament/${tournamentId}/match/${matchRoomId}/end`, {
+		const apiEndpoint = getApiEndpoint();
+		const resp = await fetch(`${apiEndpoint}/api/tournament/${tournamentId}/match/${matchId}/end`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ winnerId: winner !== null ? String(winner) : undefined })
+			headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+			body: JSON.stringify({ winnerId })
 		});
 		if (!resp.ok) return false;
-		const json = await resp.json();
-		return !!json?.success;
+		return true;
 	} catch (e) {
 		console.error('Failed to post match winner:', e);
 		return false;
 	}
 }
 
-// Show a simple overlay announcing the tournament champion
-export function showTournamentEndScreen(championId: string, championName?: string): void {
+export function showTournamentEndScreen(championId: number, championName?: string): void {
 	const existingOverlay = document.getElementById('tournamentEndOverlay');
 	if (existingOverlay) existingOverlay.remove();
 
@@ -300,7 +302,7 @@ export function showTournamentEndScreen(championId: string, championName?: strin
 	`;
 
 	const t = getCurrentTournament();
-	const name = championName || (t?.players.find(p => p.playerId === championId)?.name) || `Player ${championId}`;
+	const name = championName || (t?.players.find(p => p.id === championId)?.name) || `Player ${championId}`;
 
 	overlay.innerHTML = `
 		<div style="background: rgb(55 65 81); padding: 3em; border-radius: 12px; text-align: center; max-width: 560px;">
@@ -316,11 +318,16 @@ export function showTournamentEndScreen(championId: string, championName?: strin
 	document.body.appendChild(overlay);
 	setTimeout(() => {
 		const backBtn = document.getElementById('backToHomeBtn');
-		if (backBtn) backBtn.addEventListener('click', () => { overlay.remove(); history.pushState({ page: 'landing' }, '', '/'); window.location.reload(); });
+		if (backBtn)
+			backBtn.addEventListener('click', () => {
+				overlay.remove();
+				history.pushState({ page: 'landing' }, '', '/');
+				setCurrentPage('landing');
+				renderApp();
+			});
 	}, 0);
 }
 
-// Small toast for disconnects
 export function showTournamentPlayerDisconnectedMessage(playerName: string): void {
 	const notification = document.createElement('div');
 	notification.style.cssText = `
@@ -333,20 +340,15 @@ export function showTournamentPlayerDisconnectedMessage(playerName: string): voi
 	setTimeout(() => { notification.style.animation = 'slideOut 0.3s ease-in'; setTimeout(() => notification.remove(), 300); }, 4000);
 }
 
-// Utility to resolve a match by id from local state
-export function findMatch(matchRoomId: string): TournamentMatch | undefined {
+export function findMatch(matchId: number): TournamentMatch | undefined {
 	const t = getCurrentTournament();
-	return t?.allMatches.find(m => m.matchRoomId === matchRoomId);
+	return t?.allMatches.find(m => m.id === matchId);
 }
 
-export function findPlayer(playerId: string): TournamentPlayer | undefined {
+export function findPlayer(playerId: number): TournamentPlayer | undefined {
 	const t = getCurrentTournament();
-	return t?.players.find(p => p.playerId === playerId);
+	return t?.players.find(p => p.id === playerId);
 }
 
-// Legacy name compatibility (so existing imports in pages stop erroring)
-export const getTournamentPlayersLegacy = getTournament;
-export const getTournamentLegacy = getTournament;
-// getPlayerLegacy removed; use findPlayer instead if needed
 
 

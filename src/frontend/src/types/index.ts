@@ -3,12 +3,17 @@ export type AppPage =
     'profile' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'authCallback' |
     'game' | 'lobby' | 'join' | '2PGame' | '4PGame' | 'tournament';
 
+export function getApiEndpoint(): string {
+	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
+}
+
 /* TOURNAMENT TYPES */
-export type TournamentStatus = 'setup' | 'active' | 'completed';
+export type TournamentStatus = 'setup' | 'active' | 'completed' | 'archived';
 export const TSmap: Map<TournamentStatus, string> = new Map<TournamentStatus, string>([
 	['setup', '⚙️'],
 	['active', '🎮'],
-	['completed', '🏁']
+	['completed', '🏁'],
+    ['archived', '📦']
 ]);
 
 export type MatchStatus = 'setup' | 'pending' | 'ready' | 'active' | 'completed';
@@ -29,48 +34,60 @@ export const TPTmap: Map<TPT, string> = new Map<TPT, string>([
 ]);
 
 export interface TournamentPlayer {
-    playerId: string;
-    tournamentId: string;
+    id?: number;
+    // playerId: number;
+    tournamentId: number;
     tpt: TPT;
-    identity: string;
     name?: string;
-    avatar?: string;
+    user?: any;
     isReady?: boolean;
-    pos?: number;
     score?: number;
     eliminated: boolean;
-    byeRounds?: number[]; // TODO delete maybe
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface TournamentMatch {
-    matchRoomId: string;
-    tournamentId: string;
+    id?: number;
+    // matchId: number;
+    // matchRoomId?: number; // Alias for backward compatibility
+    tournamentId: number;
     gameId?: number;
     status: MatchStatus;
-    playerId1: string;
-    playerId2: string;
-    winner: string | null;
+    isBye?: boolean;
+    p1?: TournamentPlayer;
+    p2?: TournamentPlayer;
+    playerId1?: number;
+    playerId2?: number;
+    winnerId: number | null;
     round: number;
     roundIdx: number;
+    createdAt?: string;
+    startedAt?: string;
+    endedAt?: string;
 }
 
 export interface Tournament {
-    tournamentId: string;
+    id?: number;
+    // tournamentId: number;
     status: TournamentStatus;
-    players: TournamentPlayer[];
-    allMatches: TournamentMatch[];
+    players: Array<TournamentPlayer>;//TournamentPlayer[];
+    allMatches: Array<TournamentMatch>;//TournamentMatch[];
     currentMatch: TournamentMatch | null;
-    championId: string | null;
-    bracketRound?: number; // current round number
-    matchQueueIds?: string[]; // remaining matchRoomIds for current round (LIFO pop)
+    matchQueue?: Array<number>;//TournamentMatch[];
+    championId: number | null;
+    round?: number;
+    createdAt?: string;
+    startedAt?: string;
+    endedAt?: string;
 }
 
 export interface TournamentArchiveEntry {
-	tournamentId: string;
+	tournamentId: number;
 	status: TournamentStatus;
-	players: TournamentPlayer[];
-	matches: TournamentMatch[];
-	championId: string | null;
+	players: Array<TournamentPlayer>;//TournamentPlayer[];
+	matches: Array<TournamentMatch>;//TournamentMatch[];
+	championId: number | null;
 	createdAt: string;
 	startedAt?: string;
 	finishedAt?: string;

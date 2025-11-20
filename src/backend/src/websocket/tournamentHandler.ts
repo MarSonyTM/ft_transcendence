@@ -1,109 +1,63 @@
 import { FastifyInstance } from 'fastify';
 import { tournamentManager as TManager } from '../tournament/tournamentManager';
+import { TournamentMatch } from '../types/index';
 import { activeGames } from '../routes/game';
-import { TournamentMatch } from '../database/index';
 
 const DEBUG = true;
 
-// Store WebSocket connections per tournament and per match
-const tournamentConnections = new Map<string, Map<string, any>>(); // Map<tournamentId, Map<participantId, socket>>
-const matchConnections = new Map<string, Map<string, any>>(); // Map<matchId, Map<playerId, socket>>
+const tournamentConnections = new Map<number, Map<number, any>>(); // Map<tournamentId, Map<participantId, socket>>
 
-// Optional reverse indices
-const playerTournamentMap = new Map<string, string>(); // Map<playerId, tournamentId>
-const playerMatchMap = new Map<string, string>(); // Map<playerId, matchId>
+const playerTournamentMap = new Map<number, number>(); // Map<playerId, tournamentId>
 
-// Register Tournament and Match websocket routes
 async function tournamentWebSocketRoutes(fastify: FastifyInstance) {
-	// Tournament-level channel
-	fastify.get('/tournament/:tournamentId/ws', { websocket: true }, (connection: any, req: any) => {
+	fastify.get('/api/tournament/:tournamentId/ws', { websocket: true }, async (connection: any, req: any) => {
 		const { tournamentId } = req.params as { tournamentId: string };
 		const queryParams = new URLSearchParams((req.url.split('?')[1] || ''));
-		const playerId = queryParams.get('playerId') || 'unknown';
+		const rawPid = queryParams.get('playerId') || '';
+		const tId = +tournamentId;
+		const playerId = +rawPid;
+		if (isNaN(tId) || isNaN(playerId) || tId <= 0 || playerId <= 0) {
+			if (connection?.socket) connection.socket.close(1008, 'Invalid tournament or player ID');
+			return;
+		}
 
-		const tournament = TManager.getTournament(tournamentId);
+		const tournament = await TManager.getTournament(tId);
 		if (!tournament) {
 			if (connection?.socket) connection.socket.close(1008, 'Tournament not found');
 			return;
 		}
 
-		let socket = connection;
+		const socket = connection?.socket;
 		if (!socket) return;
 
-		if (!tournamentConnections.has(tournamentId)) tournamentConnections.set(tournamentId, new Map());
-		const tournamentSockets = tournamentConnections.get(tournamentId)!;
+		if (!tournamentConnections.has(tId)) tournamentConnections.set(tId, new Map());
+		const tournamentSockets = tournamentConnections.get(tId)!;
 		tournamentSockets.set(playerId, socket);
-		playerTournamentMap.set(playerId, tournamentId);
+		playerTournamentMap.set(playerId, tId);
+		TManager.setPlayerSocket(playerId, playerId.toString());
 
-		// Associate socket with player in manager
-		TManager.setPlayerSocket(tournamentId, playerId, playerId);
-
-		// Incoming messages
 		socket.on('message', (data: any) => {
 			try {
 				const msg = JSON.parse(data.toString());
-				handleTournamentMessage(tournamentId, playerId, msg, socket);
+				handleTournamentMessage(tId, playerId, msg, socket);
 			} catch (e) {
 				if (DEBUG) console.error('Tournament WS parse error', e);
 			}
 		});
 		
-		sendTournamentState(tournamentId, playerId);
-		broadcastToTournament(tournamentId, { type: 'playerJoined', playerId, tournament: publicTournamentShape(tournament) }, playerId);
+		sendTournamentState(tId, playerId);
+		broadcastToTournament(tId, { type: 'playerJoined', playerId, tournament: publicTournamentShape(tournament) }, playerId);
 
-		socket.on('close', () => removeTournamentPlayer(tournamentId, playerId, playerMatchMap.get(playerId)));
-		socket.on('error', () => removeTournamentPlayer(tournamentId, playerId, playerMatchMap.get(playerId)));
+		socket.on('close', () => removeTournamentPlayer(tId, playerId));
+		socket.on('error', () => removeTournamentPlayer(tId, playerId));
 
-		safeSend(socket, { type: 'connected', tournamentId, playerId });
-	});
-
-	// Match-level channel
-	fastify.get('/tournament/:tournamentId/match/:matchId/ws', { websocket: true }, (connection: any, req: any) => {
-		const { tournamentId, matchId } = req.params as { tournamentId: string; matchId: string };
-		const queryParams = new URLSearchParams((req.url.split('?')[1] || ''));
-		const playerId = queryParams.get('playerId') || 'unknown';
-
-		const match = TManager.getMatch(tournamentId, matchId);
-		if (!match) {
-			if (connection?.socket) connection.socket.close(1008, 'Match not found');
-			return;
-		}
-
-		const socket = connection;
-		if (!socket) return;
-
-		if (!matchConnections.has(matchId)) matchConnections.set(matchId, new Map());
-		const sockets = matchConnections.get(matchId)!;
-		sockets.set(playerId, socket);
-		playerMatchMap.set(playerId, matchId);
-
-		// Associate socket with player in manager
-		TManager.setMatchPlayerSocket(tournamentId, matchId, playerId, playerId);
-
-		// Incoming messages
-		socket.on('message', (data: any) => {
-			try {
-				const msg = JSON.parse(data.toString());
-				handleMatchMessage(tournamentId, matchId, playerId, msg, socket);
-			} catch (e) {
-				if (DEBUG) console.error('Match WS parse error', e);
-			}
-		});
-		
-		sendMatchState(tournamentId, matchId, playerId);
-		broadcastToMatch(matchId, { type: 'playerJoined', playerId, match: publicMatchShape(match) }, playerId);
-
-		socket.on('close', () => removeTournamentPlayer(tournamentId, playerId, matchId));
-		socket.on('error', () => removeTournamentPlayer(tournamentId, playerId, matchId));
-		
-		safeSend(socket, { type: 'connected', tournamentId, matchId, playerId });
+		safeSend(socket, { type: 'connected', tournamentId: tId, playerId });
 	});
 }
 
 /* --------------------------- Handlers ---------------------------- */
-function handleTournamentMessage(tournamentId: string, senderId: string, message: any, socket: any): void {
-	const t = TManager.getTournament(tournamentId);
-	if (!t) return;
+function handleTournamentMessage(tournamentId: number, senderId: number, message: any, socket: any): void {
+	const tPromise = Promise.resolve(TManager.getTournament(tournamentId));
 	switch (message?.type) {
 		case 'ping':
 			safeSend(socket, { type: 'pong', ts: Date.now() });
@@ -111,96 +65,94 @@ function handleTournamentMessage(tournamentId: string, senderId: string, message
 		case 'requestState':
 			sendTournamentState(tournamentId, senderId);
 			break;
+		case 'requestMatchState':
+			tPromise.then(t => {
+				const m = t?.curM;
+				if (m) sendMatchStateViaTournament(tournamentId, senderId, m.id);
+			});
+			break;
+		case 'ready':
+			tPromise.then(t => {
+				const m = t?.curM; if (!m) return;
+				broadcastToTournament(tournamentId, { type: 'playerReady', playerId: senderId, isReady: message.isReady, matchId: m.id });
+			});
+			break;
+		case 'move':
+			tPromise.then(t => {
+				const m = t?.curM; if (!m) return;
+				if (typeof message.position === 'number' && m.gameId) {
+					const engine = activeGames.get(m.gameId);
+					if (engine && typeof engine.updatePlayerPosition === 'function') {
+						const playerNum = getMatchPlayerNumber(m as TournamentMatch, senderId);
+						engine.updatePlayerPosition(playerNum, message.position);
+					}
+					broadcastToTournament(tournamentId, { type: 'playerMove', playerId: senderId, position: message.position, matchId: m.id });
+				}
+			});
+			break;
+		case 'keyState':
+			tPromise.then(t => {
+				const m = t?.curM; if (!m || !m.gameId) return;
+				const engine = activeGames.get(m.gameId);
+				if (engine && typeof engine.setPlayerKeyState === 'function') {
+					const playerNum = getMatchPlayerNumber(m as TournamentMatch, senderId);
+					engine.setPlayerKeyState(playerNum, message.key, message.pressed);
+				}
+			});
+			break;
 		default:
 			if (DEBUG) console.log('Unknown tournament message', message);
 	}
 }
 
-function handleMatchMessage(tournamentId: string, matchId: string, playerId: string, message: any, socket: any): void {
-	const match = TManager.getMatch(tournamentId, matchId);
-	if (!match) return;
-	switch (message.type) {
-		case 'ping':
-			safeSend(socket, { type: 'pong', ts: Date.now() });
-			break;
-		case 'requestState':
-			sendMatchState(tournamentId, matchId, playerId);
-			break;
-		case 'ready': {
-			// const ok = TManager.toggleMatchPlayerReady(tournamentId, matchId, playerId);
-			// if (ok) broadcastToMatch(matchId, { type: 'playerReady', playerId });
-			broadcastToMatch(matchId, { type: 'playerReady', playerId, isReady: message.isReady });
-			break;
-		}
-		case 'move': {
-			if (typeof message.position === 'number' && match.gameId) {
-				const engine = activeGames.get(match.gameId);
-				if (engine && typeof engine.updatePlayerPosition === 'function') {
-					const playerNum = getMatchPlayerNumber(match, playerId);
-					engine.updatePlayerPosition(playerNum, message.position);
-				}
-				broadcastToMatch(matchId, { type: 'playerMove', playerId, position: message.position }, playerId);
-			}
-			break;
-		}
-		case 'keyState': {
-			if (match.gameId) {
-				const engine = activeGames.get(match.gameId);
-				if (engine && typeof engine.setPlayerKeyState === 'function') {
-					const playerNum = getMatchPlayerNumber(match, playerId);
-					engine.setPlayerKeyState(playerNum, message.key, message.pressed);
-				}
-			}
-			break;
-		}
-			
-		default:
-			if (DEBUG) console.log('Unknown match message', message);
-	}
-}
-
 /* --------------------------- Helpers ----------------------------- */
 function safeSend(socket: any, payload: any) {
-	try {
-		if (socket && typeof socket.send === 'function' && (socket.readyState === undefined || socket.readyState === 1)) {
-			socket.send(JSON.stringify(payload));
-		}
-	} catch {}
+	if (socket && typeof socket.send === 'function' && (socket.readyState === undefined || socket.readyState === 1))
+		socket.send(JSON.stringify(payload));
 }
 
-function publicTournamentShape(t: any) {
+export function publicTournamentShape(t: any) {
 	return {
-		tournamentId: t.tournamentId,
+		id: t.id,
 		status: t.status,
-		hostId: t.hostId,
 		round: t.round,
-		queue: t.queue,
 		players: t.players,
 		allMatches: t.allMatches,
-		championId: t.championId
+		curM: t.curM,
+		matchQueue:t.matchQueue,
+		championId: t.championId,
+		createdAt: t.createdAt,
+		startedAt: t.startedAt,
+		endedAt: t.endedAt
 	};
 }
 
-function publicMatchShape(m: any) {
+export function publicMatchShape(m: any) {
 	return {
-		matchRoomId: m.matchRoomId,
+		id: m.id,
+		tournamentId: m.tournamentId,
 		status: m.status,
-		playerId1: m.playerId1,
-		playerId2: m.playerId2,
+		p1: m.p1,
+		p2: m.p2,
 		gameId: m.gameId,
+		winnerId: m.winnerId,
 		round: m.round,
-		roundIdx: m.roundIdx
+		roundIdx: m.roundIdx,
+		isBye: m.isBye,
+		createdAt: m.createdAt,
+		startedAt: m.startedAt,
+		endedAt: m.endedAt
 	};
 }
 
-function getMatchPlayerNumber(match: TournamentMatch, playerId: string): number {
-	if (playerId === match.playerId1) return 1;
-	if (playerId === match.playerId2) return 2;
+function getMatchPlayerNumber(match: TournamentMatch, playerId: number): number {
+	if (playerId === match.p1?.id) return 1;
+	if (playerId === match.p2?.id) return 2;
 	return 1;
 }
 
-function sendTournamentState(tournamentId: string, receiverId: string): void {
-	const t = TManager.getTournament(tournamentId);
+async function sendTournamentState(tournamentId: number, receiverId: number): Promise<void> {
+	const t = await TManager.getTournament(tournamentId);
 	if (!t) return;
 	const sockets = tournamentConnections.get(tournamentId);
 	if (!sockets) return;
@@ -213,15 +165,14 @@ function sendTournamentState(tournamentId: string, receiverId: string): void {
 	});
 }
 
-function sendMatchState(tournamentId: string, matchId: string, receiverId: string): void {
-	const match = TManager.getMatch(tournamentId, matchId);
+async function sendMatchStateViaTournament(tournamentId: number, receiverId: number, matchId: number): Promise<void> {
+	const match = await TManager.getMatch(matchId);
 	if (!match) return;
-	const sockets = matchConnections.get(matchId);
+	const sockets = tournamentConnections.get(tournamentId);
 	if (!sockets) return;
 	const socket = sockets.get(receiverId);
 	if (!socket) return;
 
-	// live game state if active
 	if (match.gameId && match.status === 'active') {
 		const engine = activeGames.get(match.gameId);
 		if (engine) {
@@ -238,20 +189,9 @@ function sendMatchState(tournamentId: string, matchId: string, receiverId: strin
 }
 
 /* ------------------------ Connection utils ----------------------- */
-function removeTournamentPlayer(tournamentId: string, playerId: string, matchId?: string) {
+function removeTournamentPlayer(tournamentId: number, playerId: number) {
 	const tournamentSockets = tournamentConnections.get(tournamentId);
 	if (!tournamentSockets) return;
-	if (matchId) {
-		const matchSockets = matchConnections.get(matchId);
-		if (matchSockets) {
-			matchSockets.delete(playerId);
-			if (matchSockets.size === 0)
-				matchConnections.delete(matchId);
-			else
-				broadcastToMatch(matchId, { type: 'playerDisconnected', playerId });
-		}
-		playerMatchMap.delete(playerId);
-	}
 	tournamentSockets.delete(playerId);
 	if (tournamentSockets.size === 0)
 		tournamentConnections.delete(tournamentId);
@@ -259,26 +199,8 @@ function removeTournamentPlayer(tournamentId: string, playerId: string, matchId?
 	broadcastToTournament(tournamentId, { type: 'playerDisconnected', playerId });
 }
 
-// function removePlayerFromTournament(tournamentId: string, playerId: string) {
-// 	const tournamentSockets = tournamentConnections.get(tournamentId);
-// 	if (!tournamentSockets) return;
-// 	tournamentSockets.delete(playerId);
-// 	if (tournamentSockets.size === 0) tournamentConnections.delete(tournamentId);
-// 	playerTournamentMap.delete(playerId);
-// 	broadcastToTournament(tournamentId, { type: 'playerDisconnected', playerId });
-// }
-
-// function removePlayerFromMatch(matchId: string, playerId: string) {
-// 	const matchSockets = matchConnections.get(matchId);
-// 	if (!matchSockets) return;
-// 	matchSockets.delete(playerId);
-// 	if (matchSockets.size === 0) matchConnections.delete(matchId);
-// 	playerMatchMap.delete(playerId);
-// 	broadcastToMatch(matchId, { type: 'playerDisconnected', playerId });
-// }
-
 /* ----------------------------- API -------------------------------- */
-export function broadcastToTournament(tournamentId: string, message: any, excludeId?: string) {
+export function broadcastToTournament(tournamentId: number, message: any, excludeId?: number) {
 	const sockets = tournamentConnections.get(tournamentId);
 	if (!sockets) return;
 	const msg = JSON.stringify(message);
@@ -299,70 +221,59 @@ export function broadcastToTournament(tournamentId: string, message: any, exclud
 	if (sockets.size === 0) tournamentConnections.delete(tournamentId);
 }
 
-export function broadcastToMatch(matchId: string, message: any, excludeId?: string) {
-	const sockets = matchConnections.get(matchId);
-	if (!sockets) return;
-	const msg = JSON.stringify(message);
-	const dead: any[] = [];
-	sockets.forEach((socket, pid) => {
-		if (excludeId && pid === excludeId) return;
-		try {
-			if (socket && typeof socket.send === 'function' && (socket.readyState === undefined || socket.readyState === 1)) {
-				socket.send(msg);
-			} else {
-				dead.push(pid);
-			}
-		} catch {
-			dead.push(pid);
-		}
+export function broadcastToMatch(matchId: number, message: any, excludeId?: number) {
+	// Route match events through the tournament channel (single-WS design)
+	Promise.resolve(TManager.getMatch(matchId)).then(m => {
+		if (!m) return;
+		const payload = { ...message, matchId };
+		broadcastToTournament(m.tournamentId, payload);
 	});
-	dead.forEach((pid) => sockets.delete(pid));
-	if (sockets.size === 0) matchConnections.delete(matchId);
 }
 
-export function broadcastGameStartToMatch(matchId: string, gameId: number) {
+export function broadcastGameStartToMatch(matchId: number, gameId: number) {
 	broadcastToMatch(matchId, { type: 'gameStart', gameId });
 }
 
-export function broadcastCountdownToMatch(matchId: string) {
+export function broadcastCountdownToMatch(matchId: number) {
 	broadcastToMatch(matchId, { type: 'countdown', message: 'Match starting soon' });
 }
 
-export function broadcastGameStateToMatch(matchId: string, state: any) {
+export function broadcastGameStateToMatch(matchId: number, state: any) {
 	broadcastToMatch(matchId, { type: 'gameState', state });
 }
 
-export function broadcastScoreToMatch(matchId: string, scores: any) {
+export function broadcastScoreToMatch(matchId: number, scores: any) {
 	broadcastToMatch(matchId, { type: 'score', ...scores });
 }
 
-export function broadcastGameEndToMatch(matchId: string, winnerId: string) {
+export function broadcastGameEndToMatch(matchId: number, winnerId: number) {
 	broadcastToMatch(matchId, { type: 'gameEnd', winnerId });
 }
 
-export function broadcastTournamentEnd(tournamentId: string, championId: string) {
-	broadcastToTournament(tournamentId, { type: 'tournamentEnd', championId });
+export function broadcastTournamentEnd(tournamentId: number) {
+	broadcastToTournament(tournamentId, { type: 'tournamentEnd' });
 }
 
-export function broadcastMatchEndToTournament(tournamentId: string, matchId: string, winnerId: string) {
+export function broadcastMatchEndToTournament(tournamentId: number, matchId: number, winnerId: number) {
 	broadcastToTournament(tournamentId, { type: 'matchEnd', matchId, winnerId });
+	Promise.resolve(TManager.getTournament(tournamentId)).then(t => {
+		if (t) broadcastToTournament(tournamentId, { type: 'tournamentState', tournament: publicTournamentShape(t) });
+	});
 }
 
-export function getTournamentConnectionCount(tournamentId: string): number {
+export function broadcastTournamentState(tournamentId: number) {
+	Promise.resolve(TManager.getTournament(tournamentId)).then(t => {
+		if (!t) return;
+		broadcastToTournament(tournamentId, { type: 'tournamentState', tournament: publicTournamentShape(t) });
+	});
+}
+
+export function getTournamentConnectionCount(tournamentId: number): number {
 	return tournamentConnections.get(tournamentId)?.size || 0;
 }
 
-export function isTournamentPlayerConnected(tournamentId: string, playerId: string): boolean {
+export function isTournamentPlayerConnected(tournamentId: number, playerId: number): boolean {
 	return tournamentConnections.get(tournamentId)?.has(playerId) || false;
 }
 
-export function getMatchConnectionCount(matchId: string): number {
-	return matchConnections.get(matchId)?.size || 0;
-}
-
-export function isMatchPlayerConnected(matchId: string, playerId: string): boolean {
-	return matchConnections.get(matchId)?.has(playerId) || false;
-}
-
 export default tournamentWebSocketRoutes;
-

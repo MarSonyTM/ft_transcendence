@@ -6,47 +6,8 @@ const DEBUG = false;
 // Store active WebSocket connections per game
 const gameConnections = new Map<number, Set<any>>();
 
-// Simple tournament broadcast channel
-const tournamentConnections = new Set<any>();
-
 // Register WebSocket routes
 async function webSocketRoutes(fastify: FastifyInstance) {
-
-  (fastify as any).register(async function (fastify: any) {
-    fastify.get('/tournament/ws', { websocket: true }, (connection: any) => {
-      const socket = connection;
-      if (!socket) return;
-
-      tournamentConnections.add(socket);
-
-      if (typeof socket.on === 'function') {
-        socket.on('message', (data: any) => {
-          try {
-            const msg = JSON.parse(data.toString());
-            if (msg?.type === 'ping') {
-              if (typeof socket.send === 'function') {
-                socket.send(JSON.stringify({ type: 'pong' }));
-              }
-            }
-          } catch {
-            // ignore
-          }
-        });
-
-        socket.on('close', () => {
-          tournamentConnections.delete(socket);
-        });
-
-        socket.on('error', () => {
-          tournamentConnections.delete(socket);
-        });
-      }
-
-      if (typeof socket.send === 'function') {
-        socket.send(JSON.stringify({ type: 'connected' }));
-      }
-    });
-  });
 
   // WebSocket endpoint for game connections
     (fastify as any).register(async function (fastify: any) {
@@ -195,25 +156,6 @@ export function broadcastToGame(gameId: number, message: any) {
     if (connections.size === 0) {
         gameConnections.delete(gameId);
     }
-}
-
-// Broadcast a tournament update to all connected tournament clients
-export function broadcastTournamentUpdate(message: any) {
-  if (tournamentConnections.size === 0) return;
-  const msg = JSON.stringify(message);
-  const dead: any[] = [];
-  tournamentConnections.forEach((socket) => {
-    try {
-      if (socket && typeof socket.send === 'function' && socket.readyState === 1) {
-        socket.send(msg);
-      } else {
-        dead.push(socket);
-      }
-    } catch {
-      dead.push(socket);
-    }
-  });
-  dead.forEach(s => tournamentConnections.delete(s));
 }
 
 // Get connection count for a game

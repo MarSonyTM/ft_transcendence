@@ -13,8 +13,8 @@ import roomWebSocketRoutes from './websocket/roomHandler';
 import tournamentRoutes from './routes/tournaments';
 import tournamentWebSocketRoutes from './websocket/tournamentHandler';
 import { authGuard } from './middleware';
-import friendRoutes from './routes/friends';
-import invitationRoutes from './routes/invite';
+// import friendRoutes from './routes/friends';
+// import invitationRoutes from './routes/invite';
 import { database } from './database';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -31,6 +31,20 @@ const server: FastifyInstance = fastify({
             colorize: true
         }
         } : undefined
+    }
+});
+
+server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, payload, done) => {
+    try {
+        const text = (payload || '').toString();
+        if (!text || text.trim() === '') {
+            done(null, {});
+            return;
+        }
+        const parsed = JSON.parse(text);
+        done(null, parsed);
+    } catch (err) {
+        done(err as Error);
     }
 });
 
@@ -99,8 +113,8 @@ const start = async (): Promise<void> => {
     await server.register(tournamentRoutes);
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
-    await server.register(friendRoutes, { prefix: '/api/friends' });
-    await server.register(invitationRoutes, { prefix: '/api/invitations' });
+    // await server.register(friendRoutes, { prefix: '/api/friends' });
+    // await server.register(invitationRoutes, { prefix: '/api/invitations' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
@@ -129,14 +143,7 @@ const start = async (): Promise<void> => {
             createRoom: '/api/room/create',
             ping: '/api/ping',
             health: '/health',
-            webSocket: '/game/:gameid/ws',
-            tournament: '/api/tournament',
-            joinTournament: '/api/tournament/join',
-            tournamentById: '/api/tournament/:tournamentId',
-            tournamentMatches: '/api/tournament/:tournamentId/matches',
-            tournamentPlayers: '/api/tournament/:tournamentId/players',
-            tournamentMatchById: '/api/tournament/match/:matchId',
-            tournamentPlayerById: '/api/tournament/player/:playerId',
+            webSocket: '/game/:gameid/ws'
           },
           pages: {
             landing: '/',

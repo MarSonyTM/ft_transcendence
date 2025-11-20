@@ -96,6 +96,21 @@
 	margin-top: 1rem;
 }
 
+/* Ensure the embedded 3D canvas has a visible height inside the tournament container */
+.t-game-container .threeD-wrapper {
+	height: 420px; /* Fallback fixed height for visibility */
+	max-height: 70vh; /* Prevent overflow on small screens */
+}
+
+@media (max-width: 768px) {
+	.t-game-container {
+		min-width: 0;
+	}
+	.t-game-container .threeD-wrapper {
+		height: 56vh;
+	}
+}
+
 /* FLEX UTILITIES */
 .t-flex {
 	display: flex;

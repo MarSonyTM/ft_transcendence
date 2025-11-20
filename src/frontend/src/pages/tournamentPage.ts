@@ -1,189 +1,158 @@
-// Implemented from .tournamentPage reference, adapted to current utils and types
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { PongGame } from '../game/PongGame';
 import { authService } from '../utils/auth';
-// RoomWebSocket not used; tournament WebSocket (match scope) handles controls
-import { setGameScreen, cleanupGame } from '../utils/gameUtils';
-// Room state no longer used for tournament matches
+import { setGameScreen, cleanupGame, setEffectiveRoom } from '../utils/gameUtils';
 import { openTournamentArchive } from '../utils/tournamentArchive';
 import {
 	getArchive,
 	getTournament,
+	findPlayer,
 	resetTournament,
-	findPlayer
+	loadCurrentMatch,
+	createTournament,
+	setEffectiveTournament,
+	postTournamentMatchWinner,
+	showTournamentEndScreen,
+	startTournament
 } from '../utils/tournamentUtils';
-import { MatchStatus, MSmap, TournamentMatch } from '../types';
-import { hydrateTournament } from '../utils/tournamentState';
+import { renderSetup } from './tournamentLobbyPage';
+import { MatchStatus, MSmap, TournamentMatch, getApiEndpoint, TournamentPlayer } from '../types';
+import { getCurrentTournament, hydrateTournament, setCurrentMatch } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 
 let activeMatch: PongGame | undefined = undefined;
 let isGameActive = false;
 let tWS: TournamentWebSocketManager | undefined = undefined;
 let tournamentControlsCleanup: (() => void) | undefined = undefined;
+let lastRenderedCurrentMatchId: number | null = null;
 
-function getApiEndpoint(): string {
-	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
-}
-
-async function ensureMatchRoom(match: any): Promise<void> {
-	if (match.matchRoomId) return;
-	if (!match.tournamentId) throw new Error('Match missing tournamentId');
-	const currentUser = authService.getCurrentUser();
-	if (!currentUser) return;
-	const p1 = match.playerId1 ? findPlayer(match.playerId1) : undefined;
-	const p2 = match.playerId2 ? findPlayer(match.playerId2) : undefined;
-	const hostPlayer = p1?.tpt === 'host' ? p1 : (p2?.tpt === 'host' ? p2 : undefined);
-	const hostId = hostPlayer?.playerId || currentUser?.id?.toString() || `host-${Date.now()}`;
-	const hostUsername = hostPlayer?.name || currentUser?.username || 'Host';
-	const resp = await fetch(`${getApiEndpoint()}/api/tournament/${match.tournamentId}/match/create`, {
-		method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
-		body: JSON.stringify({ hostId, hostUsername, maxPlayers: 2, difficulty: 'normal' })
-	});
-	const data = await resp.json();
-	if (!data.success || !data.data?.room) throw new Error('Failed to create room');
-	const room = data.data.room;
-	match.matchRoomId = room.roomId;
-	const joinIfAuto = async (name: string, id: string, tpt: string) => {
-		if (room.hostId === id) return;
-		try {
-			const resp = await fetch(`${getApiEndpoint()}/api/tournament/${match.tournamentId}/match/${room.roomId}/join`, {
-				method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
-				body: JSON.stringify({ id, name, tpt })
-			});
-			const data = await resp.json();
-			if (!data?.success) console.warn('Auto-join failed:', data?.message || data);
-		} catch (e) { console.warn('Auto-join error:', e); }
-	};
-	if (p1) await joinIfAuto(p1.name || `Player_${p1.playerId}`, p1.playerId, p1.tpt);
-	if (p2) await joinIfAuto(p2.name || `Player_${p2.playerId}`, p2.playerId, p2.tpt);
-}
-
-async function startMatchCountdown(roomId: string): Promise<void> {
-	const overlay = document.createElement('div');
-	overlay.id = 'countdown-overlay';
-	overlay.className = 'countdown-overlay animate-fade-in';
-	const countdownText = document.createElement('div');
-	countdownText.className = 'countdown-text animate-pulse';
-	const messageText = document.createElement('div');
-	messageText.className = 'countdown-message';
-	messageText.textContent = 'Get Ready!';
-	overlay.appendChild(countdownText);
-	overlay.appendChild(messageText);
-	document.body.appendChild(overlay);
-	let count = 3;
-	countdownText.textContent = count.toString();
-	await new Promise<void>((resolve) => {
-		const iv = setInterval(() => {
-			count--;
-			if (count > 0) {
-				countdownText.textContent = count.toString();
-				countdownText.classList.remove('animate-pulse');
-				void (countdownText as HTMLElement).offsetWidth;
-				countdownText.classList.add('animate-pulse');
-			} else {
-				countdownText.textContent = 'GO!';
-				countdownText.style.color = 'rgb(251 191 36)';
-				messageText.textContent = 'Game Starting...';
-				clearInterval(iv);
-				setTimeout(() => {
-					overlay.classList.remove('animate-fade-in');
-					overlay.classList.add('animate-fade-out');
-					setTimeout(() => { overlay.remove(); resolve(); }, 300);
-				}, 800);
-			}
-		}, 1000);
-	});
-}
+// async function startMatchCountdown(roomId: number): Promise<void> {
+// 	const overlay = document.createElement('div');
+// 	overlay.id = 'countdown-overlay';
+// 	overlay.className = 'countdown-overlay animate-fade-in';
+// 	const countdownText = document.createElement('div');
+// 	countdownText.className = 'countdown-text animate-pulse';
+// 	const messageText = document.createElement('div');
+// 	messageText.className = 'countdown-message';
+// 	messageText.textContent = 'Get Ready!';
+// 	overlay.appendChild(countdownText);
+// 	overlay.appendChild(messageText);
+// 	document.body.appendChild(overlay);
+// 	let count = 3;
+// 	countdownText.textContent = count.toString();
+// 	await new Promise<void>((resolve) => {
+// 		const iv = setInterval(() => {
+// 			count--;
+// 			if (count > 0) {
+// 				countdownText.textContent = count.toString();
+// 				countdownText.classList.remove('animate-pulse');
+// 				void (countdownText as HTMLElement).offsetWidth;
+// 				countdownText.classList.add('animate-pulse');
+// 			} else {
+// 				countdownText.textContent = 'GO!';
+// 				countdownText.style.color = 'rgb(251 191 36)';
+// 				messageText.textContent = 'Game Starting...';
+// 				clearInterval(iv);
+// 				setTimeout(() => {
+// 					overlay.classList.remove('animate-fade-in');
+// 					overlay.classList.add('animate-fade-out');
+// 					setTimeout(() => { overlay.remove(); resolve(); }, 300);
+// 				}, 800);
+// 			}
+// 		}, 1000);
+// 	});
+// }
 
 function matchBracketHTML(t: any): string {
-	const matches = t.allMatches || [];
-	const byRound = new Map<number, any[]>();
-	matches.forEach((m: any) => {
+	const matches = Array.isArray(t.allMatches) ? t.allMatches : [];
+	const byRound = new Map<number, TournamentMatch[]>();
+	for (const m of matches) {
 		const r = m.round || 1;
 		if (!byRound.has(r)) byRound.set(r, [] as any);
 		(byRound.get(r) as any[]).push(m);
-	});
-	const rounds = Array.from(byRound.keys()).sort((a, b) => a - b);
-
+	}
+	const queueIds: string[] = (t.matchQueue || []).map((mq: any) => String(mq.id));
+	const activeRound: number | undefined = (t.round ?? t.bracketRound ?? t.currentMatch?.round);
+	const rounds = Array.from(byRound.keys())
+		.filter(r => activeRound === undefined ? true : r <= activeRound)
+		.sort((a, b) => a - b);
 	const roundHtml = rounds.map(r => {
-		const ms = (byRound.get(r) || []).sort((a: any, b: any) => (a.roundIdx || 0) - (b.roundIdx || 0));
+		let ms = (byRound.get(r) || []).sort((a: any, b: any) => (a.roundIdx || 0) - (b.roundIdx || 0));
+	if (activeRound !== undefined && r === activeRound && queueIds.length > 0) {
+			const inQueue: any[] = [];
+			const done: any[] = [];
+			const queueOrder = new Map<string, number>();
+			queueIds.forEach((id, idx) => queueOrder.set(id, idx));
+			for (const m of ms) {
+				const id = String(m.id);
+				if (queueOrder.has(id) && m.status !== 'completed')
+					inQueue.push(m);
+				else
+					done.push(m);
+			}
+			inQueue.sort((a: any, b: any) => (queueOrder.get(String(a.id))! - queueOrder.get(String(b.id))!));
+			ms = [...inQueue, ...done];
+		}
 		const cards = ms.map((m: any) => {
 			const p1 = m.playerId1 ? (findPlayer(m.playerId1)?.name || '—') : '—';
 			const p2 = m.playerId2 ? (findPlayer(m.playerId2)?.name || '—') : '—';
 			let status = MSmap.get(m.status) || '—';
-			const score = '';
-			return `
-				<div class="t-match-card ${m.status} ${status}">
-					<div class="t-match-number">R${r}#${(m.roundIdx ?? 0) + 1}</div>
-					<div class="t-match-players">
-						<div class="t-match-player ${m.winner === m.playerId1 ? 'winner' : ''}">${p1}</div>
-						<div class="t-match-vs">VS</div>
-						<div class="t-match-player ${m.winner === m.playerId2 ? 'winner' : ''}">${p2}</div>
-					</div>
-					${score}
-					<div class="t-match-status">${status}</div>
-				</div>`;
+			const isQueued = queueIds.includes(String(m.matchRoomId)) && m.status !== 'completed';
+			const isCurrent = t.currentMatch && String(t.currentMatch.matchRoomId) === String(m.matchRoomId);
+			return `<div class="t-match-card ${m.status} ${status} ${isQueued ? 'queued' : ''} ${isCurrent ? 'current' : ''}">`
+				+ `
+				<div class="t-match-number">R${r}#${(m.roundIdx ?? 0) + 1}</div>
+				<div class="t-match-players">
+					<div class="t-match-player ${m.winner === m.playerId1 ? 'winner' : ''}">${p1}</div>
+					<div class="t-match-vs">VS</div>
+					<div class="t-match-player ${m.winner === m.playerId2 ? 'winner' : ''}">${p2}</div>
+				</div>
+				<div class="t-match-status">${status}${isQueued ? ' •' : ''}</div>
+			</div>`;
 		}).join('');
 		return `<div class="t-bracket-round"><h4>Round ${r}</h4><div class="t-bracket-grid">${cards}</div></div>`;
 	}).join('');
-
 	return `<div class="t-bracket">${roundHtml}</div>`;
 }
 
-function setMatchLiveInfoByRoom(matchRoomId: string, info: Partial<{ status: MatchStatus; gameId: number }>): void {
-	const t = getTournament();
+function setMatchLiveInfoByRoom(matchRoomId: number, info: Partial<{ status: MatchStatus; gameId: number }>): void {
+	let t = getTournament();
 	if (!t) return;
-	const m = (t.allMatches || []).find((x: any) => x.matchRoomId === matchRoomId) || (t.currentMatch && t.currentMatch.matchRoomId === matchRoomId ? t.currentMatch : null);
+	const m = (t.allMatches || []).find((x: any) => x.id === matchRoomId) ||
+		(t.currentMatch && t.currentMatch.id === matchRoomId ? t.currentMatch : null);
 	if (!m) return;
 	Object.assign(m, info);
-	if (info.status === 'active') (m as any).startedAt = new Date().toISOString();
+	if (info.status === 'active')
+		(m as any).startedAt = new Date().toISOString();
+	if (info.gameId !== undefined)
+		(m as any).gameId = info.gameId;
 }
 
-function advanceAfterResult(matchRoomId: string, winnerPlayerId: string, p1Score?: number, p2Score?: number): void {
-	const t = getTournament();
-	if (!t) return;
-	const match = (t.allMatches || []).find((m: any) => m.matchRoomId === matchRoomId) || t.currentMatch;
-	if (!match) return;
-	const p1 = match.playerId1 ? findPlayer(match.playerId1) : undefined;
-	const p2 = match.playerId2 ? findPlayer(match.playerId2) : undefined;
-	if (p1Score !== undefined && p1) (p1 as any).score = p1Score;
-	if (p2Score !== undefined && p2) (p2 as any).score = p2Score;
-	match.status = 'completed';
-	match.winner = winnerPlayerId;
-	(match as any).finishedAt = new Date().toISOString();
-	const loserId = winnerPlayerId === match.playerId1 ? match.playerId2 : match.playerId1;
-	const loser = loserId ? findPlayer(loserId) : undefined;
-	if (loser) loser.eliminated = true;
-	const alive = (t.players || []).filter((pl: any) => !pl.eliminated);
-	if (alive.length === 1) {
-		t.status = 'completed';
-		t.championId = alive[0].playerId;
+async function waitForNextMatch(tournamentId: any, attempts = 8, delayMs = 500): Promise<boolean> {
+	for (let i = 0; i < attempts; i++) {
+		try {
+			await loadCurrentMatch();
+			const t = getTournament();
+			if (!t) return false;
+			if (t.currentMatch) return true;
+		} catch {}
+		await new Promise(res => setTimeout(res, delayMs));
 	}
+	return false;
 }
 
-export async function renderTournamentContent(): Promise<void> {
-	const content = document.getElementById('tournamentContent');
-	if (!content) return;
+function statusComplete(content: HTMLElement): void {
 	const t = getTournament();
 	if (!t) return;
-
-	if (t.status === 'setup') {
-		// Lazy import to avoid circular
-		const mod = await import('./tournamentLobbyPage');
-		mod.renderSetup();
-		return;
-	}
-
-	if (t.status === 'completed') {
-		const champPlayer = t.championId ? findPlayer(t.championId) : undefined;
+	const champPlayer = t.championId ? findPlayer(t.championId) : undefined;
 		const champ = champPlayer?.name ? `<strong>${champPlayer.name}</strong>` : '—';
 		content.innerHTML = `
 			<p class="t-info-text"><strong>Tournament #</strong>${(() => {
 				try {
 					const ar: any[] = getArchive();
 					const sorted = [...ar].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-					const pos = sorted.findIndex((x: any) => x.tournamentId === t.tournamentId);
+					const pos = sorted.findIndex((x: any) => x.tournamentId === t!.id);
 					return pos >= 0 ? (pos + 1) : (ar.length || '?');
 				} catch { return '?'; }
 			})()}</p>
@@ -198,41 +167,65 @@ export async function renderTournamentContent(): Promise<void> {
 			</div>
 		`;
 		document.getElementById('archiveBtn')?.addEventListener('click', () => openTournamentArchive());
-		document.getElementById('resetBtn')?.addEventListener('click', () => { resetTournament(); renderTournamentContent(); });
+		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+			await resetTournament();
+			await renderTournamentContent();
+		});
 		document.getElementById('backBtn')?.addEventListener('click', () => {
 			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
 			setCurrentPage('gameSelect');
 			renderApp();
 		});
 		return;
-	}
+}
 
-	const cm = t.currentMatch;
-	let p1 = cm?.playerId1 ? findPlayer(cm.playerId1) : undefined;
-	let p2 = cm?.playerId2 ? findPlayer(cm.playerId2) : undefined;
-	if (cm && p1 && p2) {
-		if (p2.tpt === 'host' && p1.tpt !== 'host') { const tmp = p1; p1 = p2; p2 = tmp; }
-	}
+export async function renderTournamentContent(): Promise<void> {
+	const content = document.getElementById('tournamentContent');
+	if (!content)
+		return console.debug('[Tournament] No tournament content element found');
+	let t = getTournament();
+	if (!t)
+		return console.error('[Tournament] renderTournamentContent - tournament is null, cannot render');
+	// console.debug('[Tournament] renderTournamentContent - getTournament():', t);
 
-	const curLabel = cm ? `${p1?.name || '—'} vs ${p2?.name || '—'}` : '(no current match)';
+	if (t.status === 'setup')
+		renderSetup(content);
+	console.debug('HERE 1');
+	t = getTournament();
+	if (!t) {
+		console.debug('[Tournament] No tournament after setup');
+		return;
+	}
+	console.debug('HERE 2');
+	if (t.status === 'completed') {
+		return statusComplete(content);
+	}
+	t = getTournament();
+	if (!t || !t.currentMatch) {
+		return;
+	}
+	console.debug('HERE 3');
+	let p1 = t.players.find((pl: any) => pl.playerId === t?.currentMatch?.playerId1);
+	let p2 = t.players.find((pl: any) => pl.playerId === t?.currentMatch?.playerId2);
+	const curLabel = t.currentMatch ? `${p1?.name || '—'} vs ${p2?.name || '—'}` : '(no current match)';
 
 	content.innerHTML = `
 		${(() => {
 			try {
 				const ar: any[] = getArchive();
-				const archivedIdx = ar.findIndex((a: any) => a.tournamentId === t.tournamentId);
+				const archivedIdx = ar.findIndex((a: any) => a.tournamentId === t!.id);
 				if (archivedIdx >= 0) {
 					const sorted = [...ar].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-					const pos = sorted.findIndex((x: any) => x.tournamentId === t.tournamentId);
+					const pos = sorted.findIndex((x: any) => x.tournamentId === t!.id);
 					const friendly = pos >= 0 ? pos + 1 : (archivedIdx + 1);
 					return `<p class=\"t-info-text\"><strong>Tournament #</strong>${friendly}</p>`;
 				}
-				const friendly = ar.length + 1;
-				return `<p class=\"t-info-text\"><strong>Tournament #</strong>${friendly}</p>`;
+				return `<p class=\"t-info-text\"><strong>Tournament #</strong>${t.id}</p>`;
 			} catch { return `<p class=\"t-info-text\"><strong>Tournament #</strong>?</p>`; }
 		})()}
-		<p class="t-info-text"><strong>Status:</strong> <span id="tStatusText">${t.status}</span> <span id="tSyncIndicator" style="margin-left:.5rem;font-size:.85em;opacity:.8;">WS: …</span></p>
-	${t.currentMatch ? `<p class="t-info-text"><strong>Current Match:</strong> ${curLabel}</p>` : ''}
+		<p class="t-info-text"><strong>Status:</strong> <span id="tStatusText">${t.status}</span>
+		<span id="tSyncIndicator" style="margin-left:.5rem;font-size:.85em;opacity:.8;">WS: …</span></p>
+		${t.currentMatch ? `<p class="t-info-text"><strong>Current Match:</strong> ${curLabel}</p>` : ''}
 		<div id="currentMatchBox" class="t-match-controls"></div>
 		<div id="tournamentGameContainer" class="t-game-container" style="display: none;">
 			<div id="pureGameContainer">
@@ -274,52 +267,90 @@ export async function renderTournamentContent(): Promise<void> {
 		</div>
 	`;
 
+	console.debug('HERE 4');
 	document.getElementById('toggleGameBtn')?.addEventListener('click', () => {
 		const pure = document.getElementById('pureGameContainer') as HTMLElement | null;
 		const btn = document.getElementById('toggleGameBtn') as HTMLButtonElement | null;
 		if (!pure || !btn) return;
-		if (!isGameActive) { console.log('No active game to show/hide.'); return; }
+		if (!isGameActive) return console.log('[Tournament] No active game to show/hide.');
 		const isVisible = pure.style.display !== 'none';
-		if (isVisible) { pure.style.display = 'none'; btn.textContent = 'Show Game'; }
-		else { pure.style.display = 'block'; btn.textContent = 'Hide Game'; }
-	});
-
-	document.getElementById('backBtn')?.addEventListener('click', () => {
-		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-		setCurrentPage('gameSelect');
-		renderApp();
-	});
-
-	document.getElementById('resetBtn')?.addEventListener('click', () => {
-		if (confirm('Reset tournament?')) {
-			cleanupActiveGame();
-			resetTournament();
-			renderTournamentContent();
+		if (isVisible) {
+			pure.style.display = 'none';
+			btn.textContent = 'Show Game';
+		}
+		else {
+			pure.style.display = 'block';
+			btn.textContent = 'Hide Game';
 		}
 	});
 
-	document.getElementById('archiveBtn')?.addEventListener('click', () => { openTournamentArchive(); });
+	document.getElementById('backBtn')?.addEventListener('click', async () => {
+		if (confirm('Leave tournament page? Any active games will be ended.')) {
+			cleanupActiveGame();
+			await resetTournament();
+			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+			setCurrentPage('gameSelect');
+			renderApp();
+		}
+	});
+
+	document.getElementById('resetBtn')?.addEventListener('click', async () => {
+		if (confirm('Reset tournament?')) {
+			cleanupActiveGame();
+			await resetTournament();
+			const content = document.getElementById('tournamentContent');
+			if (!content) return;
+			await renderSetup(content);
+		};
+	});
+
+	document.getElementById('archiveBtn')?.addEventListener('click', () => {
+		openTournamentArchive();
+	});
 
 	const box = document.getElementById('currentMatchBox')!;
-	if (!t.currentMatch) {
-		if (t.championId) { box.innerHTML = '<p>No more matches. Tournament complete.</p>'; }
-		else if ((t.players?.length || 0) < 3) { box.innerHTML = '<p>Add at least 3 players and click Start.</p>'; }
-		else { box.innerHTML = '<p>Bracket is preparing. Please wait…</p>'; }
-		return;
+	console.debug('HERE 5');
+	if (t.currentMatch.status !== 'active') { 
+		if (t.championId) {
+			box.innerHTML = '<p>No more matches. Tournament complete.</p>';
+			showTournamentEndScreen(t.championId);
+			return;
+		}
+		if (t.players?.length < 3) {
+			box.innerHTML = '<p>Add at least 3 players to seed matches (minimum 3).</p>';
+			return;
+		}
+		if (!t.championId && (t as any).status !== 'completed') {
+			console.debug('HERE 6');
+			box.innerHTML = '<p>Loading next match…</p>';
+			try {
+				if (await waitForNextMatch(t.id))
+					t.currentMatch = await loadCurrentMatch();
+			} catch (e) {
+				console.error('[Tournament]: ', e);
+				box.innerHTML = '<p style="color:#f87171;">Failed to start tournament.</p>';
+				return;
+			}
+		}
+		console.debug('HERE 7');
+		box.innerHTML = '<p>Fetching first match…</p>';
+		t.currentMatch = await loadCurrentMatch();
+		if (!t.currentMatch) {
+			box.innerHTML = '<p style="opacity:.85;">Waiting for server to generate first match…</p>';
+			return;
+		}
 	}
-
-	await ensureMatchRoom(t.currentMatch);
-
-	const joinUrl = `${window.location.origin}/join/${t.currentMatch.matchRoomId}`;
+	console.debug('HERE 8');
+	let rp1 = t.players.find((pl: any) => pl.playerId === t?.currentMatch?.playerId1);
+	let rp2 = t.players.find((pl: any) => pl.playerId === t?.currentMatch?.playerId2);
 	box.innerHTML = `
 		<p class="t-info-bold">Next up:</p>
 		<div class="t-flex" style="gap:.5rem;">
-			<div class="t-flex-1" id="p1Badge" style="color:#fff;font-weight:bold;">${p1?.name || '—'}</div>
-			<div class="t-flex-1" id="p2Badge" style="color:#fff;font-weight:bold;">${p2?.name || '—'}</div>
+			<div class="t-flex-1" id="p1Badge" style="color:#fff;font-weight:bold;">${rp1?.name || '—'}</div>
+			<div class="t-flex-1" id="p2Badge" style="color:#fff;font-weight:bold;">${rp2?.name || '—'}</div>
 		</div>
 		<div style="margin-top:.5rem;">
-			<div style="font-size:.9em;color:#fff;opacity:.9;">Room: <code>${t.currentMatch.matchRoomId}</code></div>
-			<div style="font-size:.9em;color:#fff;opacity:.9;">Share link: <a href="${joinUrl}" target="_blank" style="color: rgba(172, 204, 255, 1);">${joinUrl}</a></div>
+			<div style="font-size:.9em;color:#fff;opacity:.9;">Match: <code>${t.currentMatch.id}</code></div>
 		</div>
 		<div class="t-flex" style="gap:.5rem;margin-top:.5rem;">
 			<button id="p1ReadyBtn" class="btn btn-ready t-flex-1">Ready?</button>
@@ -335,215 +366,366 @@ export async function renderTournamentContent(): Promise<void> {
 		const noPlayer = !opts.playerId;
 		btn.disabled = opts.isAI || noPlayer;
 		btn.classList.toggle('clicked', opts.isReady);
-		btn.setAttribute('aria-pressed', opts.isReady ? 'true' : 'false');
+		btn.setAttribute('aria-pressed', opts.isReady ? 'true' : 'true');//'false');//TODO just for testing
 		btn.textContent = opts.isReady ? 'Ready ✓' : 'Ready?';
 	};
 
-	const updateReadyUI = (room: TournamentMatch) => {
-		if (!room) return;
-		const p1 = room.playerId1 ? findPlayer(room.playerId1) : undefined;
-		const p2 = room.playerId2 ? findPlayer(room.playerId2) : undefined;
+	const updateReadyUI = async (match: TournamentMatch) => {
+		if (!match) return;
+		const t = getTournament();
+		if (!t || match.tournamentId !== t.id) return;
+		const p1 = t.players.find((pl: any) => pl.playerId === match.playerId1);
+		const p2 = t.players.find((pl: any) => pl.playerId === match.playerId2);
 		if (!p1 || !p2) return;
+		
 		const p1Btn = document.getElementById('p1ReadyBtn') as HTMLButtonElement | null;
 		const p2Btn = document.getElementById('p2ReadyBtn') as HTMLButtonElement | null;
 		const startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement | null;
-		syncReadyButton(p1Btn, { playerId: p1.playerId, isAI: p1.tpt === 'ai', isReady: p1.isReady ?? (p1.tpt === 'ai') });
-		syncReadyButton(p2Btn, { playerId: p2.playerId, isAI: p2.tpt === 'ai', isReady: p2.isReady ?? (p2.tpt === 'ai') });
-		if (startBtn) startBtn.disabled = !(!!p1.isReady && !!p2.isReady);
-		const token = authService.getToken();
-		const autoReady = async (idx: 0 | 1, state: any) => {
+		
+		syncReadyButton(p1Btn, { playerId: String(p1.id), isAI: p1.tpt === 'ai', isReady: p1.isReady ?? (p1.tpt === 'ai') });
+		syncReadyButton(p2Btn, { playerId: String(p2.id), isAI: p2.tpt === 'ai', isReady: p2.isReady ?? (p2.tpt === 'ai') });
+		
+		if (startBtn)
+			startBtn.disabled = (match.status === 'ready') ? false : !(!!p1.isReady && !!p2.isReady);
+		
+		const autoReady = async (idx: 0 | 1, p: TournamentPlayer) => {
 			const isAI = idx === 0 ? p1.tpt === 'ai' : p2.tpt === 'ai';
-			if (!isAI || state.isReady || (state as any)._autoReadySent) return;
-			try {
-				(state as any)._autoReadySent = true;
-				await fetch(`${getApiEndpoint()}/api/tournament/${t.tournamentId}/match/${t.currentMatch?.matchRoomId}/ready`, {
-					method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-					body: JSON.stringify({ playerId: state.playerId })
-				});
-			} catch {}
+			if (!isAI || p.isReady || (p as any)._autoReadySent) return;
+			(p as any)._autoReadySent = true;
+			await fetch(`${getApiEndpoint()}/api/tournament/${match.tournamentId}/match/${match.id}/player/${p.id}/ready`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+				body: JSON.stringify({ })
+			});
 		};
-		if (p1 && p2) { void autoReady(0, p1); void autoReady(1, p2); }
-	};
 
-	// Initialize tournament websocket (tournament + match scopes)
-	let tConnected = false;
-	let mConnected = false;
-	const updateSyncIndicator = () => {
-		const el = document.getElementById('tSyncIndicator');
-		if (!el) return;
-		const parts: string[] = [];
-		parts.push(`T:${tConnected ? '✓' : '×'}`);
-		parts.push(`M:${mConnected ? '✓' : '×'}`);
-		el.textContent = `WS: ${parts.join(' | ')}`;
-		el.style.opacity = (tConnected || mConnected) ? '0.9' : '0.6';
-	};
-
-	tWS = initTournamentWebSocket({
-		tournamentId: t.tournamentId,
-		matchId: t.currentMatch.matchRoomId,
-		playerId: authService.getCurrentUser()?.id?.toString() || `viewer-${Date.now()}`,
-		onConnect: (scope) => {
-			if (!tWS) return;
-			if (scope === 'tournament') { tConnected = true; tWS.requestTournamentState(); }
-			if (scope === 'match') { mConnected = true; tWS.requestMatchState(); }
-			updateSyncIndicator();
-		},
-		onDisconnect: (scope) => {
-			if (scope === 'tournament') tConnected = false;
-			if (scope === 'match') mConnected = false;
-			updateSyncIndicator();
-		},
-		onTournamentState: (incoming) => {
-			try {
-				hydrateTournament(incoming);
-				const ts = getTournament();
-				if (!ts) return;
-				const st = document.getElementById('tStatusText');
-				if (st) st.textContent = ts.status;
-				const br = document.getElementById('bracketSection');
-				if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(ts)}`;
-			} catch {}
-		},
-		onCountdown: async () => { await startMatchCountdown(t.currentMatch?.matchRoomId!); },
-		onGameStart: async (gameId) => {
-			if (!t.currentMatch) return;
-			setMatchLiveInfoByRoom(t.currentMatch.matchRoomId, { status: 'active', gameId });
-			const startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement | null;
-			if (startBtn) startBtn.disabled = true;
-			await showMatch(t.currentMatch, gameId);
-		},
-		onMatchState: (match) => { if (match?.matchRoomId === t.currentMatch?.matchRoomId) updateReadyUI(match); },
-		onGameEnd: async (data) => {
-			if (!data?.winnerId || !t.currentMatch) return;
-			advanceAfterResult(t.currentMatch.matchRoomId, String(data.winnerId));
-			await renderTournamentContent();
+		if (p1 && p2) {
+			void autoReady(0, p1);
+			void autoReady(1, p2);
 		}
-	});
+	};
 
-	// Connect tournament scope then match scope
-	try { await tWS.connectTournament(); } catch {}
-	try { await tWS.connectMatch({ matchId: t.currentMatch.matchRoomId }); } catch {}
-	const initialRoom = getTournament()?.currentMatch; if (initialRoom) updateReadyUI(initialRoom);
+    if (tWS === undefined) {
+		tWS = initTournamentWebSocket({
+			tournamentId: String(t.id),
+            playerId: authService.getCurrentUser()!.id,
 
-	const postToggleReady = async (_which: 'p1' | 'p2', button: HTMLButtonElement) => {
-		const prevDisabled = button.disabled; button.disabled = true;
+			onConnect: async() => {
+                if (!tWS) return;
+				tWS.requestTournamentState();
+				tWS.requestMatchState();
+            },
+
+			onDisconnect: async () => {
+				if (!tWS) return;
+				tWS.disconnectTournament();
+			},
+
+			onTournamentState: (incoming) => {
+				hydrateTournament(incoming);
+				t = incoming;//getTournament();
+				if (!t) return;
+				const st = document.getElementById('tStatusText');
+				if (st)
+					st.textContent = t.status;
+				const br = document.getElementById('bracketSection');
+				if (br)
+					br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
+
+				const cmId = t.currentMatch?.id;
+				if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
+					lastRenderedCurrentMatchId = cmId;
+					renderTournamentContent();
+				}
+			},
+
+            onCountdown: async () => {
+				console.log('Please call actual countdown');
+				// await startMatchCountdown(t?.currentMatch?.id!);
+			},
+
+            onGameStart: async (gameId) => {
+				t = getTournament();
+                if (!t || !t.currentMatch) return;
+                setMatchLiveInfoByRoom(t.currentMatch.id!, { status: 'active', gameId });
+                const startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement | null;
+                if (startBtn) startBtn.disabled = false;//true;//TODO just for testing
+                await showMatch(t.currentMatch);
+            },
+
+            onMatchState: (match) => {
+				if (t && match?.id === t.currentMatch?.id)
+					updateReadyUI(match);
+			},
+
+            onMatchEnd: async (data) => {//TODO why matchEnd and GameEnd??
+				if (!t)
+					t = getTournament();
+				if (!t) return;
+                const target = t.allMatches.find(m => m.id === Number(data.matchId));
+                if (target) {
+					target.winnerId = Number(data.winnerId) || null;
+					target.status = 'completed';
+				}
+				const br = document.getElementById('bracketSection');
+				if (br)
+					br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
+                const box = document.getElementById('currentMatchBox');
+                if (box)
+					box.innerHTML = '<p>Fetching next match…</p>';
+                const found = await waitForNextMatch(t.id);
+                if (!found && t.status === 'completed')
+					showTournamentEndScreen(Number(data.winnerId));
+                await renderTournamentContent();
+            },
+
+            onGameEnd: (data) => {
+				if (data.matchId && t) {
+					setMatchLiveInfoByRoom(Number(data.matchId), { status: 'completed' });
+					postTournamentMatchWinner(t.id!, Number(data.matchId), Number(data.winnerId));
+				}
+                if (!data?.winnerId || !t?.currentMatch) return;
+                setCurrentMatch(null)
+                cleanupActiveGame();
+                const gc = document.getElementById('tournamentGameContainer');
+                if (gc) gc.style.display = 'none';
+            },
+
+            onError: (err) => {
+				console.error('[Tournament] WebSocket error:', err);
+			}
+
+        });
+
+        await tWS.connectTournament();
+        if (t.currentMatch)
+			await tWS.connectMatch({ matchId: String(t.currentMatch.id) });
+
+	} else {
+		if (t.currentMatch && tWS) {
+			if (!tWS.isMatchConnected() || (t.currentMatch.id !== (tWS as any).matchCfg?.matchId))
+				await tWS.connectMatch({ matchId: String(t.currentMatch.id) });
+		}
+	}
+
+	const initialRoom = getTournament()?.currentMatch;
+	if (initialRoom) updateReadyUI(initialRoom);
+
+	const postToggleReady = async (p: TournamentPlayer, button: HTMLButtonElement) => {
+		const prevDisabled = button.disabled;
+		button.disabled = true;
 		try {
-			const token = authService.getToken();
+			if (!t) return;
 			const playerId = (button.dataset && button.dataset.playerId) ? String(button.dataset.playerId) : undefined;
 			if (!playerId) return;
-			const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.tournamentId}/match/${t.currentMatch?.matchRoomId}/ready`, {
-				method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-				body: JSON.stringify({ playerId })
+			const response = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.currentMatch?.id}/player/${p.id}/ready`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+				body: JSON.stringify({ })
 			});
-			await resp.json();
-			if (tWS) tWS.requestMatchState();
-		} catch (e) { console.error(e); }
-		finally { button.disabled = prevDisabled; }
+			await response.json();
+			const latest = await loadCurrentMatch();
+			if (latest)
+				updateReadyUI(latest);
+			if (tWS)
+				tWS.requestMatchState();//tWS.requestTournamentState();//
+		} catch (e) {
+			console.error(e);
+		}
+		finally {
+			button.disabled = prevDisabled;
+		}
 	};
 
 	const button1 = document.getElementById('p1ReadyBtn') as HTMLButtonElement;
 	const button2 = document.getElementById('p2ReadyBtn') as HTMLButtonElement;
-	button1.addEventListener('click', async () => postToggleReady('p1', button1));
-	button2.addEventListener('click', async () => postToggleReady('p2', button2));
+	button1.addEventListener('click', async () => postToggleReady(t?.currentMatch?.p1!, button1));
+	button2.addEventListener('click', async () => postToggleReady(t?.currentMatch?.p2!, button2));
 
 	document.getElementById('readyAndStartBtn')?.addEventListener('click', async () => {
 		try {
-			if (!t.currentMatch) return;
-			const token = authService.getToken();
-				// Determine hostId without room state
-				const p1h = t.currentMatch.playerId1 ? findPlayer(t.currentMatch.playerId1) : undefined;
-				const p2h = t.currentMatch.playerId2 ? findPlayer(t.currentMatch.playerId2) : undefined;
-				const hostPl = p1h?.tpt === 'host' ? p1h : (p2h?.tpt === 'host' ? p2h : undefined);
-				const hostId = hostPl?.playerId || authService.getCurrentUser()?.id?.toString();
-				const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.tournamentId}/match/${t.currentMatch!.matchRoomId}/start`, {
-					method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-					body: JSON.stringify({ hostId })
-				});
-			const data = await resp.json();
-			if (!t.currentMatch) return;
-			if (!data.success) alert(data.message || 'Failed to start');
-			else setMatchLiveInfoByRoom(t.currentMatch.matchRoomId, { status: 'active' });
-		} catch (e) { console.error(e); alert('Failed to start match'); }
+			if (!t || !t.currentMatch) return;
+			const p1h = t.currentMatch.p1;
+			const p2h = t.currentMatch.p2;
+			// const hostPl = p1h?.tpt === 'host' ? p1h : (p2h?.tpt === 'host' ? p2h : undefined);
+			// const hostId = hostPl?.id || authService.getCurrentUser()?.id?.toString();
+
+			const response = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.currentMatch!.id}/start`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authService.getToken()}` },
+				body: JSON.stringify({  })
+			});
+			const data = await response.json();
+			if (!response.ok) {
+				alert((data && data.message) || `Failed to start (HTTP ${response.status})`);
+				return;
+			}
+			// if (data && data.gameId)
+			// 	t.currentMatch.gameId = data.gameId;
+			console.log('[Tournament] Requesting match start for room ID:', t.currentMatch.id);
+			// console.log('[Tournament] Match start successful:', data);
+			setMatchLiveInfoByRoom(t.currentMatch.id!, { status: 'active' });
+			// t.currentMatch.status = 'active';
+			const startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement | null;
+			if (startBtn) startBtn.disabled = false;//true;//TODO just for testing
+			const statusSpan = document.getElementById('gameStatus');
+			if (statusSpan) statusSpan.textContent = 'Starting…';
+			tWS?.requestMatchState();
+			await renderTournamentContent();
+			setTimeout(async () => {
+				if (!getTournament()?.currentMatch?.gameId) {
+					await loadCurrentMatch();
+					await renderTournamentContent();
+				}
+			}, 800);
+			t = getTournament();
+			if (!t || !t.currentMatch) return;
+			await showMatch(t.currentMatch);//TODO at least it shows up
+			// await renderTournamentContent();
+		} catch (e) {
+			console.error(e);
+			alert('Failed to start match');
+		}
 	});
 }
 
-async function showMatch(match: any, gameId: number): Promise<void> {
+async function showMatch(match: TournamentMatch): Promise<void> {
+	console.debug('[Tournament] inside showMatch')
 	const gameContainer = document.getElementById('tournamentGameContainer');
 	if (!gameContainer) return;
 	gameContainer.style.display = 'block';
 	isGameActive = true;
 
-	if (!activeMatch) activeMatch = new PongGame();
-	activeMatch.gameId = gameId;
-	const p1Name = findPlayer(match.playerId1 || '')?.name || 'Player 1';
-	const p2Name = findPlayer(match.playerId2 || '')?.name || 'Player 2';
-	(document.getElementById('player1Name') || { textContent: '' }).textContent = p1Name;
-	(document.getElementById('player2Name') || { textContent: '' }).textContent = p2Name;
+	activeMatch = undefined;
+	activeMatch = new PongGame();
+	activeMatch.gameId = match.gameId;
+	const response = await fetch(`${getApiEndpoint()}/api/game/${activeMatch.gameId}`, {
+		headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+	})
+	const gameData = await response.json();
+	if (!response.ok) {
+		console.error('Failed to fetch game data for tournament match:', gameData);
+		return;
+	}
+	activeMatch.gameState = gameData;
+	await setEffectiveRoom();
+	console.log('Initialized PongGame instance for tournament match:', activeMatch);
+	
+	let p1 = match.p1;
+	let p2 = match.p2;
+	(document.getElementById('player1Name') || { textContent: '' }).textContent = p1?.name || 'Player 1';
+	(document.getElementById('player2Name') || { textContent: '' }).textContent = p2?.name || 'Player 2';
 
 	setTimeout(async () => {
 		if (!activeMatch) return;
-		await setGameScreen(activeMatch);
+		await setGameScreen(activeMatch);//TODO HERE! look at actual ponggame implementation!!
+		activeMatch.startHeartbeat();
+		activeMatch.startRenderLoop();
+		activeMatch.startServerGame();
+		activeMatch.addStateListener(activeMatch.currentGameState);
+		// renderTournamentContent();
+
 		activeMatch.onGameEnd = async (winnerIdx: number) => {
-			const p1Score = activeMatch?.gameState?.players?.[0]?.score || 0;
-			const p2Score = activeMatch?.gameState?.players?.[1]?.score || 0;
-			// Map winner index (1-based) to playerId fields
-			const winnerPlayerId = winnerIdx === 1 ? match.playerId1 : match.playerId2;
-			if (winnerPlayerId) advanceAfterResult(match.matchRoomId, winnerPlayerId, p1Score, p2Score);
-			const gc = document.getElementById('tournamentGameContainer');
-			if (gc) gc.style.display = 'none';
-			const bracket = document.getElementById('bracketSection') as HTMLElement | null;
-			if (bracket) bracket.style.display = 'block';
+			if (p1)
+				p1.score = activeMatch?.gameState?.players?.[0]?.score || 0;
+			if (p2)
+				p2.score = activeMatch?.gameState?.players?.[1]?.score || 0;
+			const winnerPlayerId = winnerIdx === 1 ? p1?.id : p2?.id;
+			match.winnerId = winnerPlayerId || null;
+			activeMatch?.stopRenderLoop();
+			isGameActive = false;
 			cleanupActiveGame();
-			await renderTournamentContent();
+			const gameContainer = document.getElementById('tournamentGameContainer');
+			if (gameContainer) gameContainer.style.display = 'none';
+			try {
+				const t = getTournament();
+				if (!t) return;
+				if (t && winnerPlayerId) 
+					p1?.id === winnerPlayerId ? (p2!.eliminated = true) : (p1!.eliminated = true);
+				console.log(`Match ended. Winner: Player ${winnerIdx} (ID: ${winnerPlayerId}). Scores: ${p1?.score || 0}-${p2?.score || 0}`);
+				await postTournamentMatchWinner(t.id!, match.id!, winnerPlayerId || null);
+				renderTournamentContent();
+			} catch (e) {
+				console.warn('[Tournament] Failed to post tournament match winner:', e);
+			}
+			// renderTournamentContent();
 		};
 
-		try {
-			// Attach keyboard handlers that send key state via tournament WS (match scope)
-			const keys: Record<string, boolean> = {};
-			const movement = new Set(['w','s','o','l']);
-			const onDown = (e: KeyboardEvent) => {
-				const k = e.key.toLowerCase();
-				if (!movement.has(k)) return;
-				if (!keys[k]) {
-					keys[k] = true;
-					e.preventDefault();
-					const isGuest = (k === 'o' || k === 'l');
-					tWS?.sendKeyState(k, true);
-					// If you need guest lane support, extend tournamentWS to carry isGuest
-				}
-			};
-			const onUp = (e: KeyboardEvent) => {
-				const k = e.key.toLowerCase();
-				if (!movement.has(k)) return;
-				keys[k] = false;
-				tWS?.sendKeyState(k, false);
-			};
-			document.addEventListener('keydown', onDown);
-			document.addEventListener('keyup', onUp);
-			tournamentControlsCleanup = () => {
-				document.removeEventListener('keydown', onDown);
-				document.removeEventListener('keyup', onUp);
-			};
-		} catch (e) { console.warn('Controls setup skipped:', e); }
+		// try {
+		// 	const keys: Record<string, boolean> = {};
+		// 	const movement = new Set(['w','s','o','l']);
+			
+		// 	const onDown = (e: KeyboardEvent) => {
+		// 		const k = e.key.toLowerCase();
+		// 		if (!movement.has(k)) return;
+		// 		if (!keys[k]) {
+		// 			keys[k] = true;
+		// 			e.preventDefault();
+		// 			const isGuest = (k === 'o' || k === 'l');
+		// 			tWS?.sendKeyState(k, true, isGuest);
+		// 		}
+		// 	};
+
+		// 	const onUp = (e: KeyboardEvent) => {
+		// 		const k = e.key.toLowerCase();
+		// 		if (!movement.has(k)) return;
+		// 		keys[k] = false;
+		// 		e.preventDefault();
+		// 		const isGuest = (k === 'o' || k === 'l');
+		// 		tWS?.sendKeyState(k, false, isGuest);
+		// 	};
+
+		// 	document.addEventListener('keydown', onDown);
+		// 	document.addEventListener('keyup', onUp);
+		// 	tournamentControlsCleanup = () => {
+		// 		document.removeEventListener('keydown', onDown);
+		// 		document.removeEventListener('keyup', onUp);
+		// 	};
+		// } catch (e) {
+		// 	console.warn('Controls setup skipped:', e);
+		// }
 	}, 50);
 }
 
 function cleanupActiveGame(): void {
-	if (activeMatch) { cleanupGame(activeMatch); activeMatch = undefined; }
-	if (tournamentControlsCleanup) { try { tournamentControlsCleanup(); } catch {} tournamentControlsCleanup = undefined; }
-	if (tWS) { try { tWS.disconnectAll(); } catch {} tWS = undefined; }
+	if (activeMatch) {
+		cleanupGame(activeMatch);
+		activeMatch = undefined;
+	}
+	if (tournamentControlsCleanup) {
+		try {
+			tournamentControlsCleanup();
+		} catch {}
+		tournamentControlsCleanup = undefined;
+	}
+	if (tWS) {
+		try {
+			tWS.disconnectMatch();
+		} catch {}
+		tWS = undefined;
+	}
 	isGameActive = false;
 }
 
 export async function renderTournamentPage(): Promise<void> {
 	const root = document.getElementById('app-root');
 	if (!root) return;
+
 	root.innerHTML = `
 		<div class="t-section">
 			<h2>Tournament Mode</h2>
 			<div id="tournamentContent" class="t-content">Loading...</div>
 		</div>`;
-	renderTournamentContent();
+	
+	let t = getTournament();
+	if (!t) {
+		t = await createTournament();
+		if (t)
+			await setEffectiveTournament(t.id!);
+		else
+			return console.error('Failed to create or retrieve tournament.');
+	}
+	await renderTournamentContent();
 }
 
 export function cleanupTournamentPage(): void { cleanupActiveGame(); }

@@ -26,7 +26,7 @@ export interface GameState {
 export interface WebSocketMessage {
   type: string;
   gameId?: number;
-  state?: GameState;//state?: any;//
+  state?: GameState;
   message?: string | null;
   winner?: number;
   winnerName?: string | null;

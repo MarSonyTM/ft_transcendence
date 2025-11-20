@@ -241,13 +241,12 @@ export class BaseGameEngine {
     }
 
     public setPlayerKeyState(playerId: number, key: string, pressed: boolean): void {
-        this.playerKeyStates.set(playerId, { [key]: pressed });//TODO: check
-        // if (!this.playerKeyStates.has(playerId)) {
-        //     this.playerKeyStates.set(playerId, {});
-        // }
-        
-        // const playerKeys = this.playerKeyStates.get(playerId)!;
-        // playerKeys[key] = pressed;
+        // Maintain a persistent key map per player instead of overwriting
+        if (!this.playerKeyStates.has(playerId)) {
+            this.playerKeyStates.set(playerId, {});
+        }
+        const playerKeys = this.playerKeyStates.get(playerId)!;
+        playerKeys[key] = pressed;
     }
 
     // Process player inputs based on key states
@@ -320,7 +319,7 @@ export class BaseGameEngine {
 
         const maxPlayers = is2P ? 2 : 4;
         for (let i = 0; i < maxPlayers; i++) {
-            this.gameState.players[i].pos = this.defaultPaddlePos;//(this.maxY + this.min) / 2 - (this.paddleLength / 2);
+            this.gameState.players[i].pos = (this.maxY + this.min) / 2 - (this.paddleLength / 2);//this.defaultPaddlePos;//
             this.gameState.players[i].score = 0;
         }
         
