@@ -242,7 +242,7 @@ export async function renderEditProfilePage(): Promise<void> {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
-                    avatar: avatarValue && avatarValue.length > 0 ? avatarValue : undefined
+                    avatar: avatarValue
                 };
                 
                 const result = await updateUserProfile(updateData);

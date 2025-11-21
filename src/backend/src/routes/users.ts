@@ -14,6 +14,67 @@ export interface CreateUserInput {
     avatar?: string;
 }
 
+// Add input validation schemas
+const userIdSchema = {
+    type: 'object',
+    properties: {
+        id: { type: 'string', pattern: '^[0-9]+$' } // Ensure id is numeric string
+    },
+    required: ['id']
+};
+
+const usernameSchema = {
+    type: 'object',
+    properties: {
+        username: { type: 'string', minLength: 3, maxLength: 50 } // Basic length check
+    },
+    required: ['username']
+};
+
+const updateUserSchema = {
+    type: 'object',
+    properties: {
+        firstName: { type: 'string', minLength: 1, maxLength: 100 },
+        lastName: { type: 'string', minLength: 1, maxLength: 100 },
+        email: { type: 'string', format: 'email' }, // Use email format validation
+        username: { type: 'string', minLength: 3, maxLength: 50 },
+        avatar: { type: 'string', maxLength: 500 } // Limit length to prevent oversized inputs
+    },
+    additionalProperties: false // Prevent extra fields
+};
+
+const emailChangeSchema = {
+    type: 'object',
+    properties: {
+        email: { type: 'string', format: 'email' }
+    },
+    required: ['email']
+};
+
+const verifyEmailSchema = {
+    type: 'object',
+    properties: {
+        verificationCode: { type: 'string', pattern: '^[0-9]{6}$' } // Exactly 6 digits
+    },
+    required: ['verificationCode']
+};
+
+const changeUsernameSchema = {
+    type: 'object',
+    properties: {
+        newUsername: { type: 'string', minLength: 3, maxLength: 50 }
+    },
+    required: ['newUsername']
+};
+
+const updateStatsSchema = {
+    type: 'object',
+    properties: {
+        won: { type: 'boolean' }
+    },
+    required: ['won']
+};
+
 // Plugin function that registers all user routes
 async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
     
@@ -67,7 +128,11 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
     
     // ==== Get user by ID ====
-    fastify.get('/:id', async (request, reply) => {
+    fastify.get('/:id', {
+        schema: {
+            params: userIdSchema
+        }
+    }, async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
             const userId = parseInt(id);
@@ -107,7 +172,12 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
     
     // ==== Update user ====
-    fastify.put('/:id', async (request, reply) => {
+    fastify.put('/:id', {
+        schema: {
+            params: userIdSchema,
+            body: updateUserSchema
+        }
+    }, async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
             const userId = parseInt(id);
@@ -121,6 +191,11 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             const updateData = request.body as Partial<CreateUserInput>;
+            // Sanitize strings: trim and basic escape (adjust as needed)
+            if (updateData.firstName) updateData.firstName = updateData.firstName.trim();
+            if (updateData.lastName) updateData.lastName = updateData.lastName.trim();
+            if (updateData.username) updateData.username = updateData.username.trim().toLowerCase(); // Example normalization
+            if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
             
             const updatedUser = database.users.updateUser(userId, updateData);
             
@@ -150,7 +225,11 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
     
     // ==== Delete user ====
-    fastify.delete('/:id', async (request, reply) => {
+    fastify.delete('/:id', {
+        schema: {
+            params: userIdSchema
+        }
+    }, async (request, reply) => {
         try {
             const { id } = request.params as { id: string };
             const userId = parseInt(id);
@@ -218,10 +297,23 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Update current user profile (protected) ====
-    fastify.put('/me', async (request, reply) => {
+    fastify.put('/me', {
+        schema: {
+            body: updateUserSchema
+        }
+    }, async (request, reply) => {
         try {
+            console.log('Update profile request body:', request.body);
             const userId = (request as any).user.id;
             const updateData = request.body as Partial<CreateUserInput>;
+
+            // Sanitize as above
+            if (updateData.firstName) updateData.firstName = updateData.firstName.trim();
+            if (updateData.lastName) updateData.lastName = updateData.lastName.trim();
+            if (updateData.username) updateData.username = updateData.username.trim().toLowerCase();
+            if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
+
+            console.log('Update data received:', updateData);
             
             const updatedUser = await database.users.updateUser(userId, updateData);
             
@@ -279,21 +371,20 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Request email change (protected) ====
-    fastify.post('/request-email-change', async (request, reply) => {
+    fastify.post('/request-email-change', {
+        schema: {
+            body: emailChangeSchema
+        }
+    }, async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             const { email } = request.body as { email: string };
 
-            if (!email || !email.includes('@')) {
-                reply.code(400).send({
-                    success: false,
-                    message: 'Valid email address is required'
-                });
-                return;
-            }
+            // Sanitize email
+            const sanitizedEmail = email.trim().toLowerCase();
 
             // Check if email is already in use
-            const existingUser = await database.users.getUserByEmail(email);
+            const existingUser = await database.users.getUserByEmail(sanitizedEmail);
             if (existingUser && existingUser.id !== userId) {
                 reply.code(409).send({
                     success: false,
@@ -308,7 +399,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Create verification request
             const verification = database.emailVerifications.createVerificationRequest(
                 userId, 
-                email, 
+                sanitizedEmail, 
                 verificationCode
             );
 
@@ -322,7 +413,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
 
-            const emailSent = await sendVerificationEmail(email, verificationCode, user.username);
+            const emailSent = await sendVerificationEmail(sanitizedEmail, verificationCode, user.username);
             
             if (!emailSent) {
                 reply.code(500).send({
@@ -350,7 +441,11 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Verify email change (protected) ====
-    fastify.post('/verify-email-change', async (request, reply) => {
+    fastify.post('/verify-email-change', {
+        schema: {
+            body: verifyEmailSchema
+        }
+    }, async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             const { verificationCode } = request.body as { verificationCode: string };
@@ -405,24 +500,22 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Check username availability ====
-    fastify.get('/check-username/:username', async (request, reply) => {
+    fastify.get('/check-username/:username', {
+        schema: {
+            params: usernameSchema
+        }
+    }, async (request, reply) => {
         try {
             const { username } = request.params as { username: string };
             
-            if (!username || username.length < 3) {
-                reply.code(400).send({
-                    success: false,
-                    message: 'Username must be at least 3 characters long'
-                });
-                return;
-            }
+            const sanitizedUsername = username.trim().toLowerCase(); // Sanitize
 
-            const isAvailable = database.usernameChanges.isUsernameAvailable(username);
+            const isAvailable = database.usernameChanges.isUsernameAvailable(sanitizedUsername);
 
             reply.code(200).send({
                 success: true,
                 data: {
-                    username,
+                    username: sanitizedUsername,
                     available: isAvailable
                 }
             });
@@ -436,21 +529,19 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Change username (protected) ====
-    fastify.post('/change-username', async (request, reply) => {
+    fastify.post('/change-username', {
+        schema: {
+            body: changeUsernameSchema
+        }
+    }, async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             const { newUsername } = request.body as { newUsername: string };
 
-            if (!newUsername || newUsername.length < 3) {
-                reply.code(400).send({
-                    success: false,
-                    message: 'Username must be at least 3 characters long'
-                });
-                return;
-            }
+            const sanitizedUsername = newUsername.trim().toLowerCase();
 
             // Check if username is available
-            const isAvailable = database.usernameChanges.isUsernameAvailableForUser(newUsername, userId);
+            const isAvailable = database.usernameChanges.isUsernameAvailableForUser(sanitizedUsername, userId);
             
             if (!isAvailable) {
                 reply.code(409).send({
@@ -474,12 +565,12 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const changeRequest = database.usernameChanges.createUsernameChangeRequest(
                 userId,
                 currentUser.username,
-                newUsername
+                sanitizedUsername
             );
 
             // Update username directly (since we've verified it's available)
             const updatedUser = await database.users.updateUser(userId, {
-                username: newUsername
+                username: sanitizedUsername
             });
 
             if (!updatedUser) {
@@ -540,7 +631,11 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     });
 
     // ==== Update game statistics (protected) ====
-    fastify.post('/stats', async (request, reply) => {
+    fastify.post('/stats', {
+        schema: {
+            body: updateStatsSchema
+        }
+    }, async (request, reply) => {
         try {
             const userId = (request as any).user.id;
             const { won } = request.body as { won: boolean };
