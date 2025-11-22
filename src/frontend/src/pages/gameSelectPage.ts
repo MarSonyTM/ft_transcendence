@@ -18,14 +18,10 @@ export async function renderGameSelectPage(): Promise<void> {
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                 </div>
-<<<<<<< HEAD
-                <button id="backToLandingBtn" class="btn btn-back">Back</button>
-=======
                 <div style="display:flex; gap:0.8em; justify-content:center; margin-top:1.2em;">
                     <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
                     <button id="profileBtn" class="btn-neon accent">Profile</button>
                 </div>
->>>>>>> f8b29fe (Add professional user navigation dropdown menu)
             </div>
         </div>
 `;
