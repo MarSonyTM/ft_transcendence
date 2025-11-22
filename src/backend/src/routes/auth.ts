@@ -534,6 +534,7 @@ async function userRoutes(
         access_type: "offline",
         scope: ["profile", "email"],
         redirect_uri: GOOGLE_REDIRECT_URI,
+        prompt: "select_account", // Force account selection every time
       });
 
       reply.redirect(authUrl);
