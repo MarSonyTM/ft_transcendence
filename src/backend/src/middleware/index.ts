@@ -93,7 +93,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
             reply.code(403).send({
                 success: false,
                 message: 'Email verification required',
-                redirectUrl: `${FRONTEND_URL}/verify-email?email=${user.email}&needEmailVerification=true`,
+                redirectUrl: `${FRONTEND_URL}verify-email?email=${user.email}&needEmailVerification=true`,
                 email: user.email,
                 needEmailVerification: true
             });
