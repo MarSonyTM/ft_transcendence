@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
+const DATABASE_PATH = process.env.DATABASE_PATH || "/app/database/database.db";
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
 
 // Interface definitions
