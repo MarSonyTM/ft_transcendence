@@ -8,7 +8,7 @@ export function renderTempLoginPage(): void {
   if (!root) return;
 
   root.innerHTML = `
-    <div class="neon-grid">
+    <div class="neon-grid profile-container" style="width:100%; max-width:1800px;">
       <div class="grid-anim"></div>
       <div class="glass-card" style="max-width: 450px; width: 100%;">
 
@@ -70,25 +70,29 @@ export function renderTempLoginPage(): void {
       const username = usernameInput.value.trim() || undefined;
       const result = await createGuestUser(username);
 
-      if (result.success && result.token) {        
-        // Mark as guest user
-        localStorage.setItem('isGuest', 'true');
+      console.log('Guest user creation result:', result);
 
+      if (result.success && result.token) {    
+        
+        console.log('successfully:', result.success);
         // Update current user
         const userData = {
-          username: username,
+          id: null,
+          username: result.username || 'Guest',
           email: 'guest@transcendence.com',
           firstName: 'Guest',
           lastName: 'User',
-          avatar: null,
-          emailVerified: 'true',
-          gamesPlayed: 0,
+          avatar: "null",
+          googleId: "null",
           gamesWon: 0,
           gamesLost: 0
         };
-      
-        localStorage.setItem('currentUser', JSON.stringify(userData));
-        setCurrentUser(result.username || 'Guest');
+
+
+        localStorage.setItem('isGuest', 'true');
+        
+        console.log('Setting current user to:', userData);
+        await authService.setCurrentUserProfile(userData);
         
         // Show success message
         if (guestErrorEl) {

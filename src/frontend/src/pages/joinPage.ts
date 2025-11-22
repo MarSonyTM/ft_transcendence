@@ -7,6 +7,8 @@ export async function renderJoinPage(roomId: string): Promise<void> {
   const root = document.getElementById('app-root');
   if (!root) return;
 
+  console.log('Is authenticated:', authService.isAuthenticated());
+
   // Check if user is authenticated
   if (!authService.isAuthenticated()) {
     // Show login prompt with return URL

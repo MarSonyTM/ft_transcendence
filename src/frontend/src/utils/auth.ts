@@ -13,7 +13,7 @@ interface DecodedToken {
 }
 
 interface UserProfile {
-  id: string;
+  id: string | null;
   username: string;
   email?: string;
   firstName?: string;
@@ -105,17 +105,7 @@ export class AuthService {
   async fetchUserProfile(): Promise<UserProfile | null> {
     console.log('🔍 fetchUserProfile called from:', window.location.pathname);
     
-    if (localStorage.getItem("isGuest")) {
-      // Guest mode: read cached user directly to avoid recursion
-      try {
-        const raw = localStorage.getItem("currentUser");
-        const guest = raw ? (JSON.parse(raw) as UserProfile) : null;
-        this.currentUser = guest;
-        return this.currentUser;
-      } catch {
-        return null;
-      }
-    }
+
 
     const path = window.location.pathname;
     // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
@@ -155,6 +145,10 @@ export class AuthService {
     }
   }
 
+  async setCurrentUserProfile(user: UserProfile): Promise<void> {
+    this.currentUser = user;
+  }
+
   // Get current user (from memory or localStorage)
   async getCurrentUser(): Promise<UserProfile | null> {
     if (this.currentUser) {
@@ -165,6 +159,7 @@ export class AuthService {
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
+    console.log("Checking authentication, currentUser:", this.currentUser);
     return this.currentUser !== null;
   }
 
@@ -182,7 +177,6 @@ export class AuthService {
     setCurrentPage('pingPong');
     await renderApp();
     history.pushState({ page: 'pingPong' }, '', '/ping-pong');
-    localStorage.removeItem("isGuest");
   }
 
   // Update user stats after game

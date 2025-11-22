@@ -42,8 +42,8 @@ export async function renderStartPage(): Promise<void> {
   const guestBtn = document.getElementById('guestBtn');
   if (guestBtn) {
     guestBtn.addEventListener('click', () => {
-      history.pushState({ page: 'tempLogin' }, '', '/tempLogin');
-      setCurrentPage('tempLogin');
+      history.pushState({ page: 'temp-login' }, '', '/temp-login');
+      setCurrentPage('temp-login');
       renderApp();
     });
   }

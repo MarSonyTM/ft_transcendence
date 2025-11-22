@@ -10,7 +10,7 @@ export async function renderGameSelectPage(): Promise<void> {
     const userNavHTML = await createUserNav();
     root.innerHTML = `
         ${userNavHTML}
-        <div class="neon-grid landing-tight game-select-container" style="display:flex; flex-direction:column; align-items:center; min-height:70vh; width:100%; max-width:980px;">
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="padding:2em 2em; text-align:center; width:100%;">
                 <h2 class="select-title title-neon">Choose Game Mode</h2>
@@ -35,7 +35,7 @@ export async function renderGameSelectPage(): Promise<void> {
                 setCurrentUser('Player 1');
             }
             setCurrentGameMode('2P');
-            history.pushState({ page: 'lobby' }, '', '#lobby');
+            history.pushState({ page: 'lobby' }, '', '/lobby');
             setCurrentPage('lobby');
             renderApp();
         });

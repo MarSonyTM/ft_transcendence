@@ -16,9 +16,9 @@ export async function renderLandingPage(): Promise<void> {
     if (!res) {
         // Public landing for unauthenticated users
         root.innerHTML = `
-        <div class="neon-grid landing-tight landing-container" style="gap: 1.2em; margin-top: 2.2em; width:100%; max-width: 980px;">
+        <div class="neon-grid landing-tight landing-container" style="gap: 1.2em; width:100%; max-width: 980px; justify-content: center; min-height: 80vh;">
           <div class="grid-anim"></div>
-          <div class="glass-card" style="padding:2.2em 2em; text-align:center; width:100%; position: relative;">
+          <div class="glass-card" style=" text-align:center; width:100%; position: relative;">
             <h1 class="main-title title-neon" style="margin-bottom:.25em;">PING PONG</h1>
             <p style="color:#9ca3af; text-align:center; max-width:640px; margin: 0 auto 1em auto;">Welcome to ft_transcendence. Play classic Pong, join rooms, and compete on the leaderboard.</p>
             <div style="display:flex; gap:0.8em; flex-wrap:wrap; justify-content:center; margin-top: .75em;">
@@ -31,8 +31,8 @@ export async function renderLandingPage(): Promise<void> {
         const guestBtn = document.getElementById('guestBtn');
         if (guestBtn) {
             guestBtn.addEventListener('click', () => {
-                history.pushState({ page: 'tempLogin' }, '', '/tempLogin');
-                setCurrentPage('tempLogin');
+                history.pushState({ page: 'temp-login' }, '', '/temp-login');
+                setCurrentPage('temp-login');
                 renderApp();
             });
         }
@@ -62,14 +62,32 @@ export async function renderLandingPage(): Promise<void> {
     const userNavHTML = await createUserNav();
     root.innerHTML = `
     ${userNavHTML}
-    <div class="neon-grid landing-tight landing-container" style="width:100%; max-width: 980px;">
+    <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
       <div class="grid-anim"></div>
-      <div class="glass-card" style="padding:2.2em 2em; text-align:center; width:100%;">
-        <h1 class="main-title title-neon" style="margin-bottom:.25em;">PING PONG</h1>
-        <div style="display:flex; gap:0.8em; flex-wrap:wrap; justify-content:center; margin-top: .75em;">
-          <button id="profileBtn" class="btn-neon accent">Profile</button>
-          <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
-          <button id="playBtn" class="btn-neon primary">Play</button>
+      <div style="width:100%; display:flex; flex-direction:column; align-items:center; gap:1em; padding:0.75em 1.5em 0.5em 1.5em; justify-content: center; min-height: 80vh;">
+        <div style="text-align:center; width:100%;">
+          <h1 class="main-title title-neon" style="margin:0 0 0.15em 0; font-size:4rem;">PING PONG</h1>
+          <p style="color:#9ca3af; font-size:1rem; max-width:600px; margin:0 auto;">Welcome back! Ready to play?</p>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.25em; width:100%; max-width:1000px;">
+          <div class="glass-card action-card" style="padding:1.5em 1.25em; text-align:center; cursor:pointer; transition:transform 0.2s ease;" id="playCard">
+            <div style="font-size:2.25rem; margin-bottom:0.3em;">🎮</div>
+            <h2 style="font-size:1.4rem; font-weight:600; margin-bottom:0.3em; color:#fff;">Play Game</h2>
+            <p style="color:#9ca3af; font-size:0.875rem; margin-bottom:1em;">Start a new match and compete</p>
+            <button id="playBtn" class="btn-neon primary" style="width:100%; padding:0.75em; font-size:0.95rem; font-weight:600;">Play Now</button>
+          </div>
+          <div class="glass-card action-card" style="padding:1.5em 1.25em; text-align:center; cursor:pointer; transition:transform 0.2s ease;" id="leaderboardCard">
+            <div style="font-size:2.25rem; margin-bottom:0.3em;">🏆</div>
+            <h2 style="font-size:1.4rem; font-weight:600; margin-bottom:0.3em; color:#fff;">Leaderboard</h2>
+            <p style="color:#9ca3af; font-size:0.875rem; margin-bottom:1em;">View top players and rankings</p>
+            <button id="leaderboardBtn" class="btn-neon accent" style="width:100%; padding:0.75em; font-size:0.95rem; font-weight:600;">View Rankings</button>
+          </div>
+          <div class="glass-card action-card" style="padding:1.5em 1.25em; text-align:center; cursor:pointer; transition:transform 0.2s ease;" id="profileCard">
+            <div style="font-size:2.25rem; margin-bottom:0.3em;">👤</div>
+            <h2 style="font-size:1.4rem; font-weight:600; margin-bottom:0.3em; color:#fff;">Profile</h2>
+            <p style="color:#9ca3af; font-size:0.875rem; margin-bottom:1em;">Manage your account and stats</p>
+            <button id="profileBtn" class="btn-neon accent" style="width:100%; padding:0.75em; font-size:0.95rem; font-weight:600;">View Profile</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -77,31 +95,34 @@ export async function renderLandingPage(): Promise<void> {
     attachUserNavListeners();
     
     const playBtn = document.getElementById('playBtn');
-    if (playBtn) {
-        playBtn.addEventListener('click', () => {
-            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-            setCurrentPage('gameSelect');
-            renderApp();
-        });
-    }
+    const playCard = document.getElementById('playCard');
+    const playHandler = () => {
+        history.pushState({ page: 'gameSelect' }, '', '/game-select');
+        setCurrentPage('gameSelect');
+        renderApp();
+    };
+    if (playBtn) playBtn.addEventListener('click', playHandler);
+    if (playCard) playCard.addEventListener('click', playHandler);
 
     const profileBtn = document.getElementById('profileBtn');
-    if (profileBtn) {
-        profileBtn.addEventListener('click', () => {
-            history.pushState({ page: 'profile' }, '', '/profile');
-            setCurrentPage('profile');
-            renderApp();
-        });
-    }
+    const profileCard = document.getElementById('profileCard');
+    const profileHandler = () => {
+        history.pushState({ page: 'profile' }, '', '/profile');
+        setCurrentPage('profile');
+        renderApp();
+    };
+    if (profileBtn) profileBtn.addEventListener('click', profileHandler);
+    if (profileCard) profileCard.addEventListener('click', profileHandler);
 
     const leaderboardBtn = document.getElementById('leaderboardBtn');
-    if (leaderboardBtn) {
-        leaderboardBtn.addEventListener('click', () => {
-            history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
-            setCurrentPage('leaderboard');
-            renderApp();
-        });
-    }
+    const leaderboardCard = document.getElementById('leaderboardCard');
+    const leaderboardHandler = () => {
+        history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
+        setCurrentPage('leaderboard');
+        renderApp();
+    };
+    if (leaderboardBtn) leaderboardBtn.addEventListener('click', leaderboardHandler);
+    if (leaderboardCard) leaderboardCard.addEventListener('click', leaderboardHandler);
     
     // Add ping pong balls animation
     createPingPongBalls();

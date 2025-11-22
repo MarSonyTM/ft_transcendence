@@ -3,6 +3,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { requestEmailChange, verifyEmailChange } from '../_api/user';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 export async function renderChangeEmailPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -58,49 +59,55 @@ export async function renderChangeEmailPage(): Promise<void> {
     let verificationStep = 'email'; // 'email' or 'verification'
     let pendingEmail = '';
 
-    const renderEmailStep = () => {
+    const renderEmailStep = async () => {
+        const userNavHTML = await createUserNav();
         root.innerHTML = `
-            <div class="profile-container">
-                <div class="profile-card" style="max-width: 500px; margin: 0 auto;">
-                    <h2 style="text-align: center; margin-bottom: 2em;">Change Email Address</h2>
+            <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+                ${userNavHTML}
+                <div class="grid-anim"></div>
+                <div class="glass-card" style="padding: 2em; width:100%;">
+                    <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Change Email Address</h2>
                     
-                    <div style="background: rgb(31 41 55); padding: 1.5em; border-radius: 8px; margin-bottom: 2em;">
-                        <p style="color: rgb(209 213 219); margin-bottom: 1em;"><strong>Current Email:</strong></p>
-                        <p style="color: rgb(229 231 235); font-size: 1.1em;">${user.email || 'Not set'}</p>
-                    </div>
-                    
-                    <form id="changeEmailForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                        <div class="form-group">
-                            <label for="newEmail" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">New Email Address</label>
-                            <input 
-                                type="email" 
-                                id="newEmail" 
-                                name="newEmail" 
-                                required
-                                style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
-                                placeholder="Enter new email address"
-                            >
+                    <div style="max-width: 600px; margin: 0 auto;">
+                        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1.2em; border-radius: 8px; margin-bottom: 2em;">
+                            <p style="color: rgb(156 163 175); margin-bottom: 0.5em; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Current Email</p>
+                            <p style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold; margin: 0; word-break: break-all;">${user.email || 'Not set'}</p>
                         </div>
                         
-                        <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none;"></div>
-                        <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none;"></div>
+                        <form id="changeEmailForm" style="display: flex; flex-direction: column; gap: 1.2em;">
+                            <div class="form-group">
+                                <label for="newEmail" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">New Email Address</label>
+                                <input 
+                                    type="email" 
+                                    id="newEmail" 
+                                    name="newEmail" 
+                                    required
+                                    style="width: 100%; padding: 0.7em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                    placeholder="Enter new email address"
+                                >
+                            </div>
+                            
+                            <div id="errorMessage" style="color: #ef4444; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+                            <div id="successMessage" style="color: #10b981; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+                            
+                            <div style="display: flex; gap: 1em; margin-top: 0.5em;">
+                                <button type="submit" id="sendVerificationBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+                                    ✉️ Send Verification Email
+                                </button>
+                                <button type="button" id="cancelBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+                                    ✕ Cancel
+                                </button>
+                            </div>
+                        </form>
                         
-                        <div style="display: flex; gap: 1em; margin-top: 1em;">
-                            <button type="submit" id="sendVerificationBtn" class="btn" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                                Send Verification Email
-                            </button>
-                            <button type="button" id="cancelBtn" class="btn btn-back" style="flex: 1; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                                Cancel
-                            </button>
+                        <div style="margin-top: 2em; padding: 1em; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                            <h4 style="color: #3b82f6; margin-bottom: 0.5em; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em;">ℹ️ How it works</h4>
+                            <p style="color: rgb(156 163 175); font-size: 0.85em; margin: 0; line-height: 1.5;">
+                                We'll send a verification code to your new email address. You'll need to enter this code to confirm the change.
+                            </p>
                         </div>
-                    </form>
-                    
-                    <div style="margin-top: 2em; padding: 1em; background: rgb(55 65 81); border-radius: 8px; border-left: 4px solid #3b82f6;">
-                        <h4 style="color: #3b82f6; margin-bottom: 0.5em;">ℹ️ How it works</h4>
-                        <p style="color: rgb(209 213 219); font-size: 0.9em; margin: 0;">
-                            We'll send a verification code to your new email address. 
-                            You'll need to enter this code to confirm the change.
-                        </p>
                     </div>
                 </div>
             </div>
@@ -163,55 +170,64 @@ export async function renderChangeEmailPage(): Promise<void> {
                 renderApp();
             });
         }
+
+        // Attach user nav dropdown listeners
+        attachUserNavListeners();
     };
 
-    const renderVerificationStep = () => {
+    const renderVerificationStep = async () => {
+        const userNavHTML = await createUserNav();
         root.innerHTML = `
-            <div class="profile-container">
-                <div class="profile-card" style="max-width: 500px; margin: 0 auto;">
-                    <h2 style="text-align: center; margin-bottom: 2em;">Verify Email Address</h2>
+            <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+                ${userNavHTML}
+                <div class="grid-anim"></div>
+                <div class="glass-card" style="padding: 2em; width:100%;">
+                    <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Verify Email Address</h2>
                     
-                    <div style="background: rgb(31 41 55); padding: 1.5em; border-radius: 8px; margin-bottom: 2em; text-align: center;">
-                        <p style="color: rgb(209 213 219); margin-bottom: 0.5em;">Verification email sent to:</p>
-                        <p style="color: rgb(229 231 235); font-size: 1.1em; font-weight: bold;">${pendingEmail}</p>
-                    </div>
-                    
-                    <form id="verificationForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                        <div class="form-group">
-                            <label for="verificationCode" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Verification Code</label>
-                            <input 
-                                type="text" 
-                                id="verificationCode" 
-                                name="verificationCode" 
-                                required
-                                maxlength="6"
-                                style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1.2em; text-align: center; letter-spacing: 0.2em;"
-                                placeholder="123456"
-                            >
-                            <p style="color: rgb(156 163 175); font-size: 0.8em; margin-top: 0.5em; text-align: center;">
-                                Enter the 6-digit code from your email
+                    <div style="max-width: 600px; margin: 0 auto;">
+                        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1.2em; border-radius: 8px; margin-bottom: 2em; text-align: center;">
+                            <p style="color: rgb(156 163 175); margin-bottom: 0.5em; font-size: 0.85em;">Verification email sent to:</p>
+                            <p style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold; margin: 0; word-break: break-all;">${pendingEmail}</p>
+                        </div>
+                        
+                        <form id="verificationForm" style="display: flex; flex-direction: column; gap: 1.2em;">
+                            <div class="form-group">
+                                <label for="verificationCode" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Verification Code</label>
+                                <input 
+                                    type="text" 
+                                    id="verificationCode" 
+                                    name="verificationCode" 
+                                    required
+                                    maxlength="6"
+                                    style="width: 100%; padding: 0.7em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1.2em; text-align: center; letter-spacing: 0.2em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                    placeholder="123456"
+                                >
+                                <p style="color: rgb(156 163 175); font-size: 0.8em; margin-top: 0.5em; text-align: center;">
+                                    Enter the 6-digit code from your email
+                                </p>
+                            </div>
+                            
+                            <div id="errorMessage" style="color: #ef4444; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+                            <div id="successMessage" style="color: #10b981; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+                            
+                            <div style="display: flex; gap: 1em; margin-top: 0.5em;">
+                                <button type="submit" id="verifyEmailBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+                                    ✓ Verify Email
+                                </button>
+                                <button type="button" id="backToEmailBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+                                    ← Back
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div style="margin-top: 2em; padding: 1em; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3);">
+                            <h4 style="color: #f59e0b; margin-bottom: 0.5em; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em;">⏰ Time Limit</h4>
+                            <p style="color: rgb(156 163 175); font-size: 0.85em; margin: 0; line-height: 1.5;">
+                                The verification code will expire in 15 minutes. If you didn't receive the email, check your spam folder.
                             </p>
                         </div>
-                        
-                        <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none;"></div>
-                        <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none;"></div>
-                        
-                        <div style="display: flex; gap: 1em; margin-top: 1em;">
-                            <button type="submit" id="verifyEmailBtn" class="btn" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                                Verify Email
-                            </button>
-                            <button type="button" id="backToEmailBtn" class="btn btn-back" style="flex: 1; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                                Back
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <div style="margin-top: 2em; padding: 1em; background: rgb(55 65 81); border-radius: 8px; border-left: 4px solid #f59e0b;">
-                        <h4 style="color: #f59e0b; margin-bottom: 0.5em;">⏰ Time Limit</h4>
-                        <p style="color: rgb(209 213 219); font-size: 0.9em; margin: 0;">
-                            The verification code will expire in 15 minutes. 
-                            If you didn't receive the email, check your spam folder.
-                        </p>
                     </div>
                 </div>
             </div>
@@ -279,6 +295,9 @@ export async function renderChangeEmailPage(): Promise<void> {
                 renderEmailStep();
             });
         }
+
+        // Attach user nav dropdown listeners
+        attachUserNavListeners();
     };
 
     // Initialize with email step

@@ -34,31 +34,26 @@ export async function render4PlayerGame(): Promise<void> {
     const user = authService.getCurrentUser();
     
     root.innerHTML = `
-        <div class="neon-grid">
+
+    <!-- Fixed Debug Panel - Top Left -->
+        <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(0, 255, 255, 0.3); border-radius: 8px; padding: 10px; font-size: 0.85rem; max-width: 300px;">
+            <div style="margin-bottom: 8px; color: #0ff; font-weight: bold; border-bottom: 1px solid rgba(0, 255, 255, 0.3); padding-bottom: 5px;">Debug Panel</div>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;">
+                <div>Status: <span id="gameStatus" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
+                <div>WebSocket: <span id="wsStatus" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
+                <div>FPS: <span id="fpsCounter" style="color: #ff0; font-weight: bold;">0</span></div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button id="startBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Start Game</button>
+                <button id="pauseBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Pause Game</button>
+                <button id="endBtn" class="btn btn-neon danger" style="padding: 5px 10px; font-size: 0.8rem;">End Game</button>
+                <button id="reconnectBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Reconnect WebSocket</button>
+                <button id="tournamentsBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Tournaments</button>
+            </div>
+        </div>
+        <div class="neon-grid" style="padding: 0; ">
             <div class="grid-anim"></div>
             <div class="glass-card" style="max-width: 1200px; width: 100%;">
-
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 class="title-neon" style="font-size: 2.5rem;">4-Player Pong</h1>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div>Status: <span id="gameStatus" class="status-text" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
-                        <div>WebSocket: <span id="wsStatus" class="ws-status" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
-                        <div>FPS: <span id="fpsCounter" class="fps-text" style="color: #ff0; font-weight: bold;">0</span></div>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <button id="startBtn" class="btn btn-neon primary">Start Game</button>
-                        <button id="pauseBtn" class="btn btn-neon accent">Pause Game</button>
-                        <button id="endBtn" class="btn btn-neon danger">End Game</button>
-                        <button id="reconnectBtn" class="btn btn-neon primary">Reconnect WebSocket</button>
-                        <button id="tournamentsBtn" class="btn btn-neon accent">Tournaments</button>
-                    </div>
-                </div>
 
                 <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
                     <div class="player-names" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
