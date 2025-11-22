@@ -20,6 +20,7 @@ import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
+import { initBackgroundBalls, showBackgroundBalls, hideBackgroundBalls } from './utils/backgroundBalls';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
@@ -27,11 +28,23 @@ let currentRoomId: string | null = null;
 export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
 
 // Centralized routing handler
+let isHandlingRoute = false;
 async function handleRouting(): Promise<void> {
+  if (isHandlingRoute) {
+    console.log('⚠️ Already handling route, skipping');
+    return;
+  }
+  
+  isHandlingRoute = true;
   const path = window.location.pathname;
+  console.log('🔍 handleRouting called for:', path);
 
-
-  if (!publicPages.includes(path)) {
+  // Skip verification check if already on verify-email page
+  if (path === '/verify-email') {
+    console.log('✅ On verify-email page, skipping checks');
+    isHandlingRoute = false;
+    // Don't return here, continue to render the page
+  } else if (!publicPages.includes(path)) {
     await authService.whenReady(); 
     const user = await authService.getCurrentUser();
     
@@ -39,17 +52,24 @@ async function handleRouting(): Promise<void> {
       console.log('User not authenticated, redirecting to login');
       if (path !== '/ping-pong') {
         history.pushState({ page: 'pingPong' }, '', '/ping-pong');
+        isHandlingRoute = false;
         window.dispatchEvent(new PopStateEvent('popstate'));
       }
+      isHandlingRoute = false;
       return;
     }
     
     const needsVerification = authService.isEmailVerificationNeeded();
-    if (needsVerification) {
+    console.log('🔍 Routing check:', { path, needsVerification, user: !!user });
+    if (needsVerification && path !== '/verify-email') {
+      console.log('📧 Redirecting to verify-email');
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+      isHandlingRoute = false;
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }
+  } else {
+    isHandlingRoute = false;
   }
 
   // Handle /join/:roomId URLs (path-based routing)
@@ -119,6 +139,8 @@ async function handleRouting(): Promise<void> {
     default:
       setCurrentPage('landing');
   }
+  
+  isHandlingRoute = false;
   renderApp();
 }
 
@@ -127,6 +149,15 @@ export async function renderApp(): Promise<void> {
 
   if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame') {
     cleanupLobby();
+  }
+
+  // Show/hide background balls based on page type
+  // Hide on game pages, show on all other pages
+  // Do this BEFORE rendering the page content
+  if (page === '2PGame' || page === '4PGame' || page === 'lobby') {
+    hideBackgroundBalls();
+  } else {
+    showBackgroundBalls();
   }
 
   switch (page) {
@@ -217,6 +248,15 @@ window.addEventListener('popstate', async () => {
 // Entry point with SSR support
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('App starting with SSR support...');
+  
+  // Initialize background balls (will be shown/hidden based on page in renderApp)
+  initBackgroundBalls();
+  
+  // Check initial page and hide balls if on game page
+  const path = window.location.pathname;
+  if (path === '/2PGame' || path === '/4PGame' || path === '/lobby') {
+    hideBackgroundBalls();
+  }
   
   // Always derive the page from URL routing to support deep links like /join/:roomId
   if (window.__INITIAL_STATE__) {

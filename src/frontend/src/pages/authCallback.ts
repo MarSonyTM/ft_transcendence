@@ -33,10 +33,14 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
         await authService.fetchUserProfile();
 
         
-        // Redirect to dashboard after short delay
+        // Redirect based on email verification status
         console.log("it logged in")
         setTimeout(() => {
-            history.pushState({ page: '' }, '', '/');
+            if (needEmailVerification === 'true') {
+                history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+            } else {
+                history.pushState({ page: 'landing' }, '', '/');
+            }
             window.dispatchEvent(new PopStateEvent('popstate'));
         }, 2000);
     } else {

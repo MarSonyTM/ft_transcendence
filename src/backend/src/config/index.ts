@@ -26,6 +26,13 @@ if (!EMAIL_USER || !EMAIL_PASSWORD) {
 	throw new Error('Missing environment variables, please add the .env file inside the backend folder ');
 }
 
+// Debug: Log Google OAuth config
+console.log('🔑 Google OAuth Configuration Loaded:');
+console.log('  CLIENT_ID:', GOOGLE_CLIENT_ID);
+console.log('  CLIENT_SECRET:', GOOGLE_CLIENT_SECRET ? '***' + GOOGLE_CLIENT_SECRET.slice(-4) : 'NOT SET');
+console.log('  REDIRECT_URI:', GOOGLE_REDIRECT_URI);
+console.log('  FRONTEND_URL:', FRONTEND_URL);
+
 export { 
 	JWT_SECRET,
 	GOOGLE_CLIENT_ID,

@@ -394,6 +394,11 @@ async function userRoutes(
   });
 
   // Google OAuth routes
+  console.log('🔑 Google OAuth Config:');
+  console.log('  CLIENT_ID:', GOOGLE_CLIENT_ID);
+  console.log('  CLIENT_SECRET:', GOOGLE_CLIENT_SECRET ? '***' + GOOGLE_CLIENT_SECRET.slice(-4) : 'NOT SET');
+  console.log('  REDIRECT_URI:', GOOGLE_REDIRECT_URI);
+  
   const googleClient = new OAuth2Client(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
@@ -512,7 +517,7 @@ async function userRoutes(
       });
 
       // Redirect to frontend with token
-      const frontendUrl = FRONTEND_URL || "http://localhost:5173";
+      const frontendUrl = (FRONTEND_URL || "http://localhost:5173").replace(/\/$/, '');
       reply.redirect(
         `${frontendUrl}/auth/callback?token=${token}&success=true&email=${email}${
           needEmailVerification ? "&needEmailVerification=true" : ""
@@ -520,7 +525,7 @@ async function userRoutes(
       );
     } catch (error) {
       fastify.log.error(error);
-      const frontendUrl = FRONTEND_URL || "http://localhost:5173";
+      const frontendUrl = (FRONTEND_URL || "http://localhost:5173").replace(/\/$/, '');
       reply.redirect(
         `${frontendUrl}/auth/callback?success=false&error=Authentication failed`
       );
