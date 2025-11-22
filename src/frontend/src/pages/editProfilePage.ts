@@ -242,7 +242,8 @@ export async function renderEditProfilePage(): Promise<void> {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
-                    avatar: avatarValue
+                    // Only update avatar if a new value is provided, otherwise keep existing
+                    avatar: avatarValue && avatarValue.length > 0 ? avatarValue : user.avatar
                 };
                 
                 const result = await updateUserProfile(updateData);
