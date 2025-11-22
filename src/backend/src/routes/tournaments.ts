@@ -119,7 +119,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = +tournamentId;
 			if (isNaN(tId) || tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			const t = await tournamentManager.getTournament(tId);
+			const t = tournamentManager.getTournament(tId);
 			if (!t)
 				return reply.status(404).send({ success: false, message: 'Tournament not found' });
 			return reply.send({ success: true, data: t.players });
@@ -141,12 +141,14 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				return reply.status(401).send({ error: 'Not authenticated' });
 			let success;
 			if (id === '-')
-				success = await tournamentManager.addPlayerToTournament(tId, name, tpt);
+				success = tournamentManager.addPlayerToTournament(tId, name, tpt);
 			else
-				success = await tournamentManager.addPlayerToTournament(tId, name, tpt, +id);
+				success = tournamentManager.addPlayerToTournament(tId, name, tpt, +id);
 			if (!success)
 				return reply.status(400).send({ error: 'Failed to add player to tournament' });
-			const t = await tournamentManager.getTournament(tId);
+			const t = tournamentManager.getTournament(tId);
+			if (!t) return reply.status(400).send({ error: 'Failed to get tournament' });
+			console.debug('After adding player-> all players:', t?.players);
 			return { success: true, tournament: t && publicTournamentShape(t) };
 		} catch (error) {
 			fastify.log.error(error);

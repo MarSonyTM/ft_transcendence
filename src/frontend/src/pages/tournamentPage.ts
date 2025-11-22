@@ -409,7 +409,8 @@ function updateReadyUI(match: TournamentMatch, target?: HTMLButtonElement, pId?:
 async function togglePlayerReady(t: Tournament, m: TournamentMatch, playerId: number, button: HTMLButtonElement | null): Promise<void> {
     if (!button) return;
     console.log('[Tournament] togglePlayerReady invoked for', playerId);
-    let p = t.players.find(pl => pl.id === playerId);
+	console.debug('ALL PLAYERS:', t.players, 'IN THIS MATCH:', t.curM!.p1, t.curM!.p2);
+	let p = t.players.find(pl => pl.id === playerId);
     if (!p) {
         console.error('[Tournament] Player not found in tournament:', playerId, 'all Players in match:', m.p1, m.p2);
         return;

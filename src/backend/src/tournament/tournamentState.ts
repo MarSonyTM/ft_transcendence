@@ -9,9 +9,9 @@ export class TournamentState {
 	createdAt: string = new Date().toISOString();
 
 	players: TournamentPlayer[] = [];
-	matches:  number[] = [];
+	matches:  TournamentMatch[] = [];
 	currentQueue:TournamentMatch[] = [];
-	history: string[] = []; // simple log of events
+	history: string[] = [];
 
 	constructor(base: Tournament) {
 		this.tournamentId = base.id;
