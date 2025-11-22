@@ -1,6 +1,7 @@
 import { getCurrentUser, setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
+import { authService } from '../utils/auth';
 
 interface LeaderboardUser {
     username: string;
@@ -59,9 +60,8 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
         if (!response.ok) {
             console.error('Failed to fetch leaderboard:', response.status);
             // Fallback: calculate from current user only
-            const currentUser = localStorage.getItem('currentUser');
-            if (!currentUser) return [];
-            const user = JSON.parse(currentUser);
+            const user = await authService.getCurrentUser();
+            if (!user) return [];
             const total = (user.gamesWon || 0) + (user.gamesLost || 0);
             const winRate = total > 0 ? ((user.gamesWon || 0) / total) * 100 : 0;
             return [{
@@ -132,31 +132,52 @@ export async function renderLeaderboardPage(): Promise<void> {
     const userNavHTML = await createUserNav();
 
     root.innerHTML = `
-        ${userNavHTML}
-        <div class="neon-grid" style="display: flex; flex-direction: column; align-items: center; gap: 2em;">
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+            ${userNavHTML}
             <div class="grid-anim"></div>
-            <div class="glass-card" style="max-width: 1200px; width: 100%;">
-                <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Leaderboard</h2>
+            <div class="glass-card" style="padding: 2.5em; width:100%;">
+                <h2 class="title-neon" style="text-align: center; margin-bottom: 2em;">Leaderboard</h2>
                 
-                <div class="games-section">
-                    <h3>Current Leader</h3>
-                    ${leader ? `
-                        <div style="background: rgba(59, 130, 246, 0.1); padding: 1em; border-radius: 8px; margin-top: 0.5em;">
-                            <p style="font-size: 1.5em; font-weight: bold; color: rgb(229 231 235); margin: 0 0 0.3em 0;">
-                                🏆 ${leader.username}
-                            </p>
-                            <p style="color: rgb(156 163 175); margin: 0; font-size: 0.9em;">
-                                ${leader.gamesWon} wins • ${leader.gamesLost} losses • ${leader.winRate.toFixed(1)}% win rate
-                            </p>
+                <!-- Desktop Layout: Top Players + Recent Games in one row -->
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 3em; align-items: start; margin-bottom: 2.5em;">
+                    
+                    <!-- Left Column: Top Players -->
+                    <div style="min-width: 380px;">
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.5em 0; text-transform: uppercase; letter-spacing: 0.05em;">🏆 Top Players</h3>
+                        <div style="display: flex; flex-direction: column; gap: 0.8em;">
+                            ${leaderboard.slice(0, 10).map((player, index) => {
+                                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`;
+                                const bgColor = index === 0 ? 'rgba(255, 215, 0, 0.1)' : 
+                                               index === 1 ? 'rgba(192, 192, 192, 0.1)' : 
+                                               index === 2 ? 'rgba(205, 127, 50, 0.1)' : 
+                                               'rgba(255, 255, 255, 0.03)';
+                                const borderColor = index === 0 ? 'rgba(255, 215, 0, 0.3)' : 
+                                                   index === 1 ? 'rgba(192, 192, 192, 0.3)' : 
+                                                   index === 2 ? 'rgba(205, 127, 50, 0.3)' : 
+                                                   'rgba(255, 255, 255, 0.1)';
+                                return `
+                                    <div style="background: ${bgColor}; border: 1px solid ${borderColor}; padding: 0.9em; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                                        <div style="display: flex; align-items: center; gap: 0.8em;">
+                                            <span style="font-size: 1.2em; min-width: 2em; text-align: center;">${medal}</span>
+                                            <div>
+                                                <p style="font-weight: 600; color: rgb(229 231 235); margin: 0; font-size: 1.05em;">${player.username}</p>
+                                                <p style="color: rgb(156 163 175); margin: 0; font-size: 0.8em;">${player.gamesWon}W - ${player.gamesLost}L</p>
+                                            </div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <p style="font-weight: 700; color: rgb(59 130 246); margin: 0; font-size: 1.1em;">${player.winRate.toFixed(0)}%</p>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                            ${leaderboard.length === 0 ? '<p style="color: rgb(156 163 175); text-align: center; padding: 2em;">No players yet</p>' : ''}
                         </div>
-                    ` : `
-                        <p style="color: rgb(156 163 175);">No games played yet</p>
-                    `}
-                </div>
-
-                <div class="games-section" style="margin-top: 2em;">
-                    <h3>Past Games (${sortedGames.length})</h3>
-                    <div id="gamesScrollContainer" style="max-height: 300px; overflow-y: auto; margin-top: 0.5em; padding-right: 0.5em;">
+                    </div>
+                    
+                    <!-- Right Column: Recent Games -->
+                    <div style="padding: 0 1em;">
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.5em 0; text-transform: uppercase; letter-spacing: 0.05em;">🎮 Recent Games (${sortedGames.length})</h3>
+                        <div id="gamesScrollContainer" style="max-height: 500px; overflow-y: auto; padding-right: 0.5em;">
                         ${sortedGames.length > 0 ? `
                             <div style="display: flex; flex-direction: column; gap: 0.8em;">
                                 ${sortedGames.map((game, index) => {
@@ -336,11 +357,15 @@ export async function renderLeaderboardPage(): Promise<void> {
                         ` : `
                             <p style="color: rgb(156 163 175); text-align: center; padding: 2em;">No games played yet</p>
                         `}
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button id="backToLandingBtn" class="btn btn-back" style="font-size: 1em; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 0.65em 1.8em; cursor: pointer; font-weight: 500; transition: all 0.3s ease;">← Home</button>
+                </div>
             </div>
-            
-            <button id="backToLandingBtn" class="btn btn-back glass-card" style="position: relative; z-index: 10; padding: 0.9em 1.6em; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04)); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">Back to Home</button>
         </div>
 
         <style>
@@ -362,8 +387,6 @@ export async function renderLeaderboardPage(): Promise<void> {
     `;
 
     const backBtn = document.getElementById('backToLandingBtn');
-    attachUserNavListeners();
-    
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             history.pushState({ page: 'landing' }, '', '/');
@@ -371,4 +394,7 @@ export async function renderLeaderboardPage(): Promise<void> {
             renderApp();
         });
     }
+
+    // Attach user nav dropdown listeners
+    attachUserNavListeners();
 }

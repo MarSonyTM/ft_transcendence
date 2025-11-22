@@ -1,5 +1,9 @@
-html, body { height: 100%; }
-body { overflow-x: hidden; }
+html, body { 
+  height: 100%; 
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,8 +21,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 1.25rem; /* p-5 */
+  box-sizing: border-box;
 }
 
 /* Neon grid background overlay */
@@ -259,8 +266,24 @@ h3 {
   display: flex; 
   flex-direction: column; 
   align-items: center; 
-  justify-content: center; 
-  height: 80vh;
+  justify-content: flex-start; 
+  min-height: auto;
+}
+
+/* Reduce body padding for landing page */
+body:has(.neon-grid.landing-tight) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Remove min-height for landing page to eliminate bottom space */
+.neon-grid.landing-tight {
+  min-height: auto !important;
+}
+
+.action-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(59,130,246,0.2) inset;
 }
 
 .login-container {

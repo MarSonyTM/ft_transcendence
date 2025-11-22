@@ -17,7 +17,7 @@ export interface WebSocketMessage extends SharedWebSocketMessage {
 
 export type AppPage = 'landing' | 'login' | 'game' | 'gameSelect' | 'profile' | 
     'lobby' | 'authCallback' | 'register' | 'join' | 'friends' | '2PGame' | '4PGame' | 
-    'tempLogin' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'leaderboard' | 'pingPong';
+    'temp-login' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'leaderboard' | 'pingPong';
 
 declare global {
     interface Window {

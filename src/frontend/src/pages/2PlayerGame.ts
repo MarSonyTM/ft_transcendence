@@ -31,42 +31,52 @@ export async function render2PlayerGame(): Promise<void> {
     const user = authService.getCurrentUser();
     
     root.innerHTML = `
-        <div class="neon-grid">
+        <!-- Fixed Debug Panel - Top Left -->
+        <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(0, 255, 255, 0.3); border-radius: 8px; padding: 10px; font-size: 0.85rem; max-width: 300px;">
+            <div style="margin-bottom: 8px; color: #0ff; font-weight: bold; border-bottom: 1px solid rgba(0, 255, 255, 0.3); padding-bottom: 5px;">Debug Panel</div>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;">
+                <div>Status: <span id="gameStatus" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
+                <div>WebSocket: <span id="wsStatus" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
+                <div>FPS: <span id="fpsCounter" style="color: #ff0; font-weight: bold;">0</span></div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button id="startBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Start Game</button>
+                <button id="pauseBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Pause Game</button>
+                <button id="endBtn" class="btn btn-neon danger" style="padding: 5px 10px; font-size: 0.8rem;">End Game</button>
+                <button id="reconnectBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Reconnect WebSocket</button>
+                <button id="tournamentsBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Tournaments</button>
+            </div>
+        </div>
+
+        <div class="neon-grid" style="padding-top: 0;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="max-width: 1200px; width: 100%;">
 
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <h1 class="title-neon" style="font-size: 2.5rem;">Pong Game</h1>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px;">
-                        <div>Status: <span id="gameStatus" class="status-text" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
-                        <div>WebSocket: <span id="wsStatus" class="ws-status" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
-                        <div>FPS: <span id="fpsCounter" class="fps-text" style="color: #ff0; font-weight: bold;">0</span></div>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 15px;">
-                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                        <button id="startBtn" class="btn btn-neon primary">Start Game</button>
-                        <button id="pauseBtn" class="btn btn-neon accent">Pause Game</button>
-                        <button id="endBtn" class="btn btn-neon danger">End Game</button>
-                        <button id="reconnectBtn" class="btn btn-neon primary">Reconnect WebSocket</button>
-                        <button id="tournamentsBtn" class="btn btn-neon accent">Tournaments</button>
-                    </div>
-                </div>
-
-                <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
-                    <div class="player-names" style="margin-bottom: 10px;">
-                        <span id="player1Name" class="player1-name" style="color: #0ff; font-weight: bold; font-size: 1.2rem;">${players[0].username}</span>
-                        <span class="vs-text" style="color: #fff; margin: 0 15px; font-weight: bold;">VS</span>
-                        <span id="player2Name" class="player2-name" style="color: #ff0; font-weight: bold; font-size: 1.2rem;">${players[1].username}</span>
-                    </div>
-                    <div class="score-container" style="font-size: 3rem; font-weight: bold; color: #fff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
-                        <span id="player1score" class="player1-score">0</span>
-                        <span class="score-separator" style="margin: 0 20px;">-</span>
-                        <span id="player2score" class="player2-score">0</span>
+                <div style="text-align: center; position: relative; padding-top: 20px;">
+                    <button id="backToLandingBtn" class="btn btn-neon danger" style="position: absolute; left: 0; top: 20px;">← Back to Home</button>
+                    
+                    <!-- Elegant Player & Score Display -->
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 20px;">
+                        <!-- Player 1 -->
+                        <div style="flex: 1; max-width: 250px; text-align: right;">
+                            <div id="player1Name" style="color: #0ff; font-size: 1.3rem; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);">
+                                ${players[0].username}
+                            </div>
+                        </div>
+                        
+                        <!-- Score Display -->
+                        <div style="display: flex; align-items: center; gap: 20px;">
+                            <span id="player1score" style="font-size: 4rem; font-weight: 700; color: #0ff; text-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4); min-width: 70px; text-align: center;">0</span>
+                            <span style="font-size: 2rem; color: rgba(255, 255, 255, 0.4); font-weight: 300;">:</span>
+                            <span id="player2score" style="font-size: 4rem; font-weight: 700; color: #ff0; text-shadow: 0 0 20px rgba(255, 255, 0, 0.8), 0 0 40px rgba(255, 255, 0, 0.4); min-width: 70px; text-align: center;">0</span>
+                        </div>
+                        
+                        <!-- Player 2 -->
+                        <div style="flex: 1; max-width: 250px; text-align: left;">
+                            <div id="player2Name" style="color: #ff0; font-size: 1.3rem; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);">
+                                ${players[1].username}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -78,10 +88,6 @@ export async function render2PlayerGame(): Promise<void> {
                     <p style="color: #0ff; font-weight: bold; margin: 5px 0;">${players[0].username}: W / S keys</p>
                     ${pongGame.hasLocal ? '<p style="color: #0ff; font-weight: bold; margin: 5px 0;">Local Player: O / L keys</p>' : ''}
                     <p style="color: #ff6b00; font-style: italic; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
-                </div>
-
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
                 </div>
 
                 <hr style="border-color: rgba(255, 255, 255, 0.2); margin: 20px 0;">
@@ -186,7 +192,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
     
     const user = authService.getCurrentUser();
     
-    if (!user && localStorage.getItem('isGuest') != 'true') {
+    if (!user) {
         console.error('No authenticated user for room game');
         return;
     }

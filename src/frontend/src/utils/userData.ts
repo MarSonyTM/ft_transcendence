@@ -9,12 +9,6 @@ export interface UserData {
 
 export function getUserData(): UserData {
     const username = getCurrentUser() || 'Guest';
-    const storedData = localStorage.getItem(`userProfile_${username}`);
-  
-    if (storedData) {
-        return JSON.parse(storedData);
-    }
-  
     return {
         username: username,
         gamesPlayed: 0,
@@ -32,7 +26,5 @@ export function updateUserStats(won: boolean): void {
         userData.gamesWon++;
     } else {
         userData.gamesLost++;
-    }
-  
-    localStorage.setItem(`userProfile_${username}`, JSON.stringify(userData));
+    }  
 }
