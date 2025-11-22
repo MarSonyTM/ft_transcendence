@@ -131,38 +131,43 @@ class TournamentManager {
 		}
 	}
 
-	createMatchRoom(match: TournamentMatch): string | null {
+	createMatchRoom(match: TournamentMatch): boolean {
 		try {
 			if (!match.p1) {
 				console.error('Cannot create room: match has no player 1');
-				return null;
+				return false;
 			}
-			const room = gameRoomManager.createRoom(
+			match.room = gameRoomManager.createRoom(
 				match.p1.id.toString(),
 				match.p1.name!,
 				2
 			);
+			if (!match.room) {
+				console.error('Failed to create game room for match:', match.id);
+				return false;
+			}
 			if (match.p2 && !match.isBye) {
 				const joinResult = gameRoomManager.joinRoom(
-					room.roomId,
+					match.room.roomId,
 					match.p2.id.toString(),
 					match.p2.name!,
 					match.p2.tpt === 'ai',
 					match.p2.isReady,
-					false,
-					match.p2.tpt === 'ai' ? 'normal' : undefined
+					match.p2.tpt === 'local',
+					'normal'
 				);
 				if (!joinResult.success) {
 					console.error('Failed to join player 2 to room:', joinResult.message);
-					return null;
+					return false;
 				}
 			}
-			this.matchRooms.set(match.id, room.roomId);
-			console.log(`Created room ${room.roomId} for match ${match.id}`);
-			return room.roomId;
+			this.matchRooms.set(match.id, match.room.roomId);
+			db.updateMatch({ id: match.id, room: match.room });
+			console.log(`Created room ${match.room.roomId} for match ${match.id}`);
+			return true;
 		} catch (error) {
 			console.error('Failed to create match room:', error);
-			return null;
+			return false;
 		}
 	}
 
@@ -396,7 +401,7 @@ class TournamentManager {
 		}
 	}
 
-	startMatch(tournamentId: number, matchId: number): TournamentMatch | null {
+	prepareMatch(tournamentId: number, matchId: number): TournamentMatch | null {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
@@ -416,35 +421,37 @@ class TournamentManager {
 				console.log('Waiting for players to be ready...');
 				return null;
 			}
-			const roomId = this.createMatchRoom(t.curM);
-			if (!roomId) {
+
+			if (!this.createMatchRoom(t.curM)) return null;
+			t.curM = db.getMatchById(matchId);
+			if (!t || !t.curM || !t.curM.room || !t.curM.room.roomId) {
 				console.error('Failed to create match room');
 				return null;
 			}
-			if (!this.createPongGame(tournamentId)) {
-				console.error('Failed to create pong game');
-				return null;
-			}
-			t = db.getTournamentById(tournamentId);
-			if (!t || !t.curM) {
-				console.error('Failed to retrieve tournament after game creation');
-				return null;
-			}
-			broadcastGameStartToMatch(t.curM.id, t.curM.gameId!);
-			broadcastCountdownToMatch(t.curM.id);
-			setTimeout(async () => {
-				try {
-					if (!t || !t.curM) return;
-					t.curM.status = 'active';
-					t.curM.startedAt = new Date().toISOString();
-					t = db.updateTournament(tournamentId, { curM: t.curM });
-					if (!t) throw new Error('Failed to update tournament');
-					broadcastTournamentState(tournamentId);
-					console.log(`Match ${matchId} started`);
-				} catch (error) {
-					console.error('Error in match start timeout:', error);
-				}
-			}, 1500);
+			// if (!this.createPongGame(tournamentId)) {
+			// 	console.error('Failed to create pong game');
+			// 	return null;
+			// }
+			// t = db.getTournamentById(tournamentId);
+			// if (!t || !t.curM) {
+			// 	console.error('Failed to retrieve tournament after game creation');
+			// 	return null;
+			// }
+			// broadcastGameStartToMatch(t.curM.id, t.curM.gameId!);
+			// broadcastCountdownToMatch(t.curM.id);
+			// setTimeout(async () => {
+			// 	try {
+			// 		if (!t || !t.curM) return;
+			// 		t.curM.status = 'active';
+			// 		t.curM.startedAt = new Date().toISOString();
+			// 		t = db.updateTournament(tournamentId, { curM: t.curM });
+			// 		if (!t) throw new Error('Failed to update tournament');
+			// 		broadcastTournamentState(tournamentId);
+			// 		console.log(`Match ${matchId} started`);
+			// 	} catch (error) {
+			// 		console.error('Error in match start timeout:', error);
+			// 	}
+			// }, 1500);
 			return t.curM;
 		} catch (error) {
 			console.error('startMatch error:', error);
@@ -520,17 +527,17 @@ class TournamentManager {
 		}
 	}
 
-	toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): boolean {
+	toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number, isReady: boolean): boolean {
 		try {
 			console.debug('INSIDE toggleMatchPlayerReady');
 			let t = db.getTournamentById(tournamentId);
 			if (!t || !t.curM || t.curM.id !== matchId) return false;
 			if (t.curM.p1 && t.curM.p1.id === playerId) {
-				t.curM.p1.isReady = !t.curM.p1.isReady;
+				t.curM.p1.isReady = isReady;
 				console.debug(`Player ${playerId} ready state toggled to ${t.curM.p1.isReady}`);
 				db.updatePlayer({ id: playerId, isReady: t.curM.p1.isReady });
 			} else if (t.curM.p2 && t.curM.p2.id === playerId) {
-				t.curM.p2.isReady = !t.curM.p2.isReady;
+				t.curM.p2.isReady = isReady;
 				console.debug(`Player ${playerId} ready state toggled to ${t.curM.p2.isReady}`);
 				db.updatePlayer({ id: playerId, isReady: t.curM.p2.isReady });
 			}
@@ -539,7 +546,7 @@ class TournamentManager {
 				t.curM.status = 'ready';
 			t.curM = db.updateMatch({id: t.curM.id, status: t.curM.status, p1: t.curM.p1, p2: t.curM.p2});
 			if (!t.curM) throw new Error('Failed to update match');
-			t = db.updateTournament(t.curM.id, { curM: t.curM });
+			t = db.updateTournament(t.id, { curM: t.curM });
 			if (!t) throw new Error('Failed to update tournament');
 			broadcastTournamentState(tournamentId);
 			return true;
@@ -565,55 +572,55 @@ class TournamentManager {
 		return gs;
 	}
 
-	private createPongGame(tournamentId: number): boolean {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t || !t.curM) return false;
-			if (!t.curM.gameId) {
-				const game = database.games.createGame({ mode: '2P', difficulty: 'normal' });
-				if (!game) {
-					console.error('Failed to create game');
-					return false;
-				}
-				t.curM.gameId = game.id;
-				t = db.updateTournament(t.id, { curM: t.curM });
-				if (!t || !t.curM) throw new Error('Failed to update tournament');
-			}
-			if (!t.curM.p1 || !t.curM.p2) {
-				console.error('Match missing players');
-				return false;
-			}
-			if (!t.curM.gameId) {
-				console.error('Match missing gameId');
-				return false;
-			}
-			let gamestate: GameState | undefined = database.gameState.createGameState({ gameId: t.curM.gameId });
-			const players: Player[] = [
-				{ id: t.curM.p1.id, name: t.curM.p1.name, pos: 70, score: 0 } as Player,
-				{ id: t.curM.p2.id, name: t.curM.p2.name, pos: 70, score: 0 } as Player
-			];
-			gamestate = database.gameState.updateGameStateByGameId(t.curM.gameId, { players });
-			if (!gamestate) {
-				console.error('Failed to create game state');
-				return false;
-			}
-			gamestate = this.hydrateGameState(gamestate);
-			if (!Array.isArray(gamestate.players)) {
-				console.error('Invalid gameState.players shape');
-				return false;
-			}
-			const engine = new BaseGameEngine(gamestate);
-			if (t.curM.p1.tpt === 'ai') engine.setPlayerAI(1, true);
-			if (t.curM.p2.tpt === 'ai') engine.setPlayerAI(2, true);
-			activeGames.set(t.curM.gameId, engine);
-			engine.startGame();
-			console.log(`Pong game ${t.curM.gameId} created for match ${t.curM.id}`);
-			return true;
-		} catch (error) {
-			console.error('createPongGame error:', error);
-			return false;
-		}
-	}
+	// private createPongGame(tournamentId: number): boolean {
+	// 	try {
+	// 		let t = db.getTournamentById(tournamentId);
+	// 		if (!t || !t.curM) return false;
+	// 		if (!t.curM.gameId) {
+	// 			const game = database.games.createGame({ mode: '2P', difficulty: 'normal' });
+	// 			if (!game) {
+	// 				console.error('Failed to create game');
+	// 				return false;
+	// 			}
+	// 			t.curM.gameId = game.id;
+	// 			t = db.updateTournament(t.id, { curM: t.curM });
+	// 			if (!t || !t.curM) throw new Error('Failed to update tournament');
+	// 		}
+	// 		if (!t.curM.p1 || !t.curM.p2) {
+	// 			console.error('Match missing players');
+	// 			return false;
+	// 		}
+	// 		if (!t.curM.gameId) {
+	// 			console.error('Match missing gameId');
+	// 			return false;
+	// 		}
+	// 		let gamestate: GameState | undefined = database.gameState.createGameState({ gameId: t.curM.gameId });
+	// 		const players: Player[] = [
+	// 			{ id: t.curM.p1.id, name: t.curM.p1.name, pos: 70, score: 0 } as Player,
+	// 			{ id: t.curM.p2.id, name: t.curM.p2.name, pos: 70, score: 0 } as Player
+	// 		];
+	// 		gamestate = database.gameState.updateGameStateByGameId(t.curM.gameId, { players });
+	// 		if (!gamestate) {
+	// 			console.error('Failed to create game state');
+	// 			return false;
+	// 		}
+	// 		gamestate = this.hydrateGameState(gamestate);
+	// 		if (!Array.isArray(gamestate.players)) {
+	// 			console.error('Invalid gameState.players shape');
+	// 			return false;
+	// 		}
+	// 		const engine = new BaseGameEngine(gamestate);
+	// 		if (t.curM.p1.tpt === 'ai') engine.setPlayerAI(1, true);
+	// 		if (t.curM.p2.tpt === 'ai') engine.setPlayerAI(2, true);
+	// 		activeGames.set(t.curM.gameId, engine);
+	// 		engine.startGame();
+	// 		console.log(`Pong game ${t.curM.gameId} created for match ${t.curM.id}`);
+	// 		return true;
+	// 	} catch (error) {
+	// 		console.error('createPongGame error:', error);
+	// 		return false;
+	// 	}
+	// }
 
 	/* ================================================== */
 	/* Utility Methods                                     */

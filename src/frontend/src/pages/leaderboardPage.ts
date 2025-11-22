@@ -18,13 +18,13 @@ interface GameResult {
 }
 
 interface Player {
-    id: string;
-    username: string;
-    isReady: boolean;
-    isAI?: boolean;
-    isLocal: boolean;
-    difficulty?: string;
-    socketId?: string;
+  id: string;
+  username: string;
+  isReady: boolean;
+  isAI?: boolean;
+  isLocal: boolean;
+  difficulty?: string;
+  socketId?: string;
 }
 
 function getApiEndpoint(): string {

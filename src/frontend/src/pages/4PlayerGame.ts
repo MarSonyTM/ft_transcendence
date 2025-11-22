@@ -53,13 +53,13 @@ export async function render4PlayerGame(): Promise<void> {
         </div>
         
         <div class="player-info">
-            <span id="player1Name" class="player1-name">${players[0].name}</span>
+            <span id="player1Name" class="player1-name">${players[0].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">${players[1].name}</span>
+            <span id="player2Name" class="player2-name">${players[1].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player3Name" class="player3-name">${players[2].name}</span>
+            <span id="player3Name" class="player3-name">${players[2].username}</span>
             <span class="vs-text">vs</span> 
-            <span id="player4Name" class="player4-name">${players[3].name}</span>
+            <span id="player4Name" class="player4-name">${players[3].username}</span>
         </div>
         <div class="score-container">
             <span id="player1score" class="player1-score">0</span> 

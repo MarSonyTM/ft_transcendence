@@ -50,7 +50,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         return; // Allow public GET for leaderboard
     }
 
-  // Check prefix matches for public route patterns
+    // Check prefix matches for public route patterns
     const publicPrefixes = [
         '/assets/',
         '/api/room',

@@ -1,3 +1,5 @@
+import { GameRoom } from "../game/gameRoom";
+
 export type TPT = 'host' | 'ai' | 'local' | 'remote';
 export const TPTMap: Array<TPT> = ['host', 'ai', 'local', 'remote'];
 
@@ -26,6 +28,7 @@ export interface TournamentMatch {
 	id: number;
 	tournamentId: number;
 	gameId?: number;
+	room?: GameRoom | null;
 	status: MatchStatus;
 	isBye: boolean;
 	p1?: TournamentPlayer;

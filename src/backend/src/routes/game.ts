@@ -601,6 +601,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     return;
                 }
             }
+            
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
@@ -731,7 +732,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-let gamePlayers = database.players.getPlayers(gameId);
+            let gamePlayers = database.players.getPlayers(gameId);
             console.log(`📊 Players from database: ${gamePlayers.length}`);
             
             if (gamePlayers.length === 0) {
@@ -827,13 +828,6 @@ let gamePlayers = database.players.getPlayers(gameId);
             
             database.games.updateGame(gameId, updateData);
             
-            // Clean up active game if exists
-            const gameEngine = activeGames.get(gameId);
-            if (gameEngine) {
-                gameEngine.endGame();
-                activeGames.delete(gameId);
-            }
-
             return {
                 success: true,
                 message: 'Winner recorded successfully',

@@ -1,6 +1,6 @@
 export interface Player {
     id: string;
-    name: string;
+    username: string;
     isReady: boolean;
     avatar?: string;
     isAI?: boolean;

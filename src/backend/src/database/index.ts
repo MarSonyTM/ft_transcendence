@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { Player, GameState } from '../../../shared/gameTypes';
 import { Tournament, TournamentMatch, TournamentPlayer } from '../types/index';
 
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
@@ -25,16 +24,41 @@ export interface User {
 
 export interface Game {
     id: number;
-    status?: string;
     mode: string;
-    points: any[];             
-    players: Player[];         
-    createdAt: string;
-    startedAt: string;// | null;
-    endedAt: string | null;
     winner: Player | null;   
+    players: Player[];         
+    points: any[];             
     difficulty: string;
+    createdAt: string;
+    status?: string;
+    startedAt?: string;
+    endedAt?: string;
     winnerId?: number;
+}
+
+export interface Player {
+    id: number;
+    name: string;
+    gameId: number;
+    pos: number;
+    score: number;
+    connectionStatus: string;
+    lastActivity: string;
+}
+
+export interface GameState {
+    id: number;
+    gameId: number;
+    players: Player[];
+    
+    ballPosX: number;
+    ballPosY: number;
+    ballVelX: number;
+    ballVelY: number;
+    
+    mode: string;
+    lastContact: number;
+    lastActivity: string;
 }
 
 export interface Friend {
@@ -299,60 +323,60 @@ class GameDatabaseManager {
         winnerId: number;
         players: any; 
         points: any;
-    }>): Game | undefined {
-        const fields: string[] = [];
-        const values: any[] = [];
-        
-        if (gameData.status) {
-            fields.push('status = ?');
-            values.push(gameData.status);
-        }
-        
-        if (gameData.startedAt) {
-            fields.push('startedAt = ?');
-            values.push(gameData.startedAt);
-        }
-        
-        if (gameData.endedAt) {
-            fields.push('endedAt = ?');
-            values.push(gameData.endedAt);
-        }
-        
-        if (gameData.winnerId !== undefined) {
-            fields.push('winnerId = ?');
-            values.push(gameData.winnerId);
-        }
+      }>): Game | undefined {
+    const fields: string[] = [];
+    const values: any[] = [];
+    
+    if (gameData.status) {
+        fields.push('status = ?');
+        values.push(gameData.status);
+    }
+    
+    if (gameData.startedAt) {
+        fields.push('startedAt = ?');
+        values.push(gameData.startedAt);
+    }
+    
+    if (gameData.endedAt) {
+        fields.push('endedAt = ?');
+        values.push(gameData.endedAt);
+    }
+    
+    if (gameData.winnerId !== undefined) {
+        fields.push('winnerId = ?');
+        values.push(gameData.winnerId);
+    }
 
-        if (gameData.players !== undefined) {
-            fields.push('players = ?');
-            values.push(typeof gameData.players === 'string' ? gameData.players : JSON.stringify(gameData.players));
-        }
+    if (gameData.players !== undefined) {
+        fields.push('players = ?');
+        values.push(typeof gameData.players === 'string' ? gameData.players : JSON.stringify(gameData.players));
+    }
 
-        if (gameData.points !== undefined) {
-            fields.push('points = ?');
-            values.push(typeof gameData.points === 'string' ? gameData.points : JSON.stringify(gameData.points));
-        }
-        
-        if (fields.length === 0) {
-            return this.getGameById(id);
-        }
-        
-        values.push(id);
-        
-        const stmt = this.db.prepare(`
-            UPDATE games 
-            SET ${fields.join(', ')} 
-            WHERE id = ?
-        `);
-        
-        const result = stmt.run(...values);
-        
-        if (result.changes === 0) {
-            return undefined;
-        }
-        
+    if (gameData.points !== undefined) {
+        fields.push('points = ?');
+        values.push(typeof gameData.points === 'string' ? gameData.points : JSON.stringify(gameData.points));
+    }
+    
+    if (fields.length === 0) {
         return this.getGameById(id);
     }
+    
+    values.push(id);
+    
+    const stmt = this.db.prepare(`
+        UPDATE games 
+        SET ${fields.join(', ')} 
+        WHERE id = ?
+    `);
+    
+    const result = stmt.run(...values);
+    
+    if (result.changes === 0) {
+        return undefined;
+    }
+    
+    return this.getGameById(id);
+}
 
     deleteGame(id: number): boolean {
         const stmt = this.db.prepare('DELETE FROM games WHERE id = ?');
@@ -1305,21 +1329,21 @@ export class DatabaseManager extends BaseDatabaseManager {
 
     private initializeUsersTable() {
         const createUsersTable = `
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            firstName TEXT NOT NULL,
-            lastName TEXT NOT NULL,
-            email TEXT UNIQUE,
-            username TEXT UNIQUE,
-            password TEXT,
-            avatar TEXT,
-            googleId TEXT UNIQUE,
-            emailVerified BOOLEAN DEFAULT FALSE,
-            gamesWon INTEGER DEFAULT 0,
-            gamesLost INTEGER DEFAULT 0,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                firstName TEXT NOT NULL,
+                lastName TEXT NOT NULL,
+                email TEXT UNIQUE,
+                username TEXT UNIQUE,
+                password TEXT,
+                avatar TEXT,
+                googleId TEXT UNIQUE,
+                emailVerified BOOLEAN DEFAULT FALSE,
+                gamesWon INTEGER DEFAULT 0,
+                gamesLost INTEGER DEFAULT 0,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
         `;
         
         this.db.exec(createUsersTable);
@@ -1374,7 +1398,6 @@ export class DatabaseManager extends BaseDatabaseManager {
                 ballVelX INTEGER NOT NULL DEFAULT 0,
                 ballVelY INTEGER NOT NULL DEFAULT 0,
                 mode TEXT NOT NULL DEFAULT '2P',
-                players JSON DEFAULT '[]',
                 lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
             )

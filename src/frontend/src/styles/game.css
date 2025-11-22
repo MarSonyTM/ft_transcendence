@@ -76,6 +76,14 @@
 	font-weight: 700;
 }
 
+.left-score {
+  color: rgb(248 113 113);
+}
+
+.right-score {
+  color: rgb(96 165 250);
+}
+
 .score-separator {
 	color: rgb(156 163 175);
 	margin: 0 1rem;
@@ -101,4 +109,12 @@
 
 .disconnected {
 	color: rgb(248 113 113);
+}
+
+.controls-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem; /* gap-3 */
+  margin-bottom: 1.5rem; /* mb-6 */
+  justify-content: center;
 }

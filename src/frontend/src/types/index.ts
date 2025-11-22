@@ -1,3 +1,6 @@
+import { Player, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
+import { GameRoom } from "../utils/roomState";
+
 export type AppPage = 
     'landing' | 'login' | 'register' | 'gameSelect' | 'tempLogin' | 'leaderboard' | 'friends' |
     'profile' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'authCallback' |
@@ -49,13 +52,13 @@ export interface TournamentPlayer {
 export interface TournamentMatch {
     id?: number;
     tournamentId: number;
+    roomId?: string;
+    room: GameRoom;
     gameId?: number;
     status: MatchStatus;
     isBye?: boolean;
     p1?: TournamentPlayer;
     p2?: TournamentPlayer;
-    playerId1?: number;
-    playerId2?: number;
     winnerId: number | null;
     round: number;
     roundIdx: number;
@@ -76,6 +79,15 @@ export interface Tournament {
     createdAt?: string;
     startedAt?: string;
     endedAt?: string;
+}
+
+export interface GameState extends SharedGameState {
+  players: Player[];
+}
+
+export interface WebSocketMessage extends SharedWebSocketMessage {
+  state?: GameState;
+  players?: Player[];
 }
 
 declare global {

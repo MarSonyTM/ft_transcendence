@@ -448,7 +448,7 @@ function renderLobby(root: HTMLElement): void {
 			${players.map(player => `
 			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
 				<div>
-				  <span style="color: rgb(229 231 235);">${player.name}</span>
+				  <span style="color: rgb(229 231 235);">${player.username}</span>
 				  ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
 				  ${player.id === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
 				</div>

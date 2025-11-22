@@ -19,7 +19,6 @@ import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
 import { renderTournamentPage, cleanupTournamentPage } from './pages/tournamentPage';
-import { renderSetup } from './pages/tournamentLobbyPage';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;

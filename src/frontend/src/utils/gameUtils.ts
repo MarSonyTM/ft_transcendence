@@ -42,7 +42,7 @@ export function endGame(pongGame: PongGame) {
             const winner = room.players[winnerId - 1];
             if (winner) {
                 winnerIdStr = winner.id;
-                winnerNameStr = winner.name;
+                winnerNameStr = winner.username;
             } else {
                 winnerIdStr = winnerId.toString();
                 winnerNameStr = `Player ${winnerId}`;
@@ -79,7 +79,7 @@ export function endGame(pongGame: PongGame) {
                 let didWin = false;
                 if (room && Array.isArray(room.players)) {
                     const winnerPlayer = room.players[winnerId - 1];
-                    didWin = !!winnerPlayer && (winnerPlayer.name === user.username);
+                    didWin = !!winnerPlayer && (winnerPlayer.username === user.username);
                 } else {
                     didWin = (winnerId === 1);
                 }

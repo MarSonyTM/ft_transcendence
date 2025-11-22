@@ -33,11 +33,11 @@ async function roomRoutes(fastify: FastifyInstance) {
   
     // Create a new room
     fastify.post('/api/room/create', async (
-        request: FastifyRequest<{ Body: CreateRoomBody }>, 
-        reply: FastifyReply
-    ) => {
+            request: FastifyRequest<{ Body: CreateRoomBody }>, 
+            reply: FastifyReply
+        ) => {
         try {
-        const { hostId, hostUsername, maxPlayers = 2 } = request.body;
+            const { hostId, hostUsername, maxPlayers = 2 } = request.body;
 
             if (!hostId || !hostUsername) {
                 return reply.code(400).send({
@@ -91,7 +91,7 @@ async function roomRoutes(fastify: FastifyInstance) {
             Body: JoinRoomBody;
         }>,
         reply: FastifyReply
-    ) => {
+        ) => {
         try {
             const { roomId } = request.params;
             const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
@@ -317,10 +317,11 @@ async function roomRoutes(fastify: FastifyInstance) {
               
                         return {
                             id: playerId,
-                            name: roomPlayer.name,
+                            name: roomPlayer.username,
                             gameId: gameId,
-                            isReady: roomPlayer.isReady,
                             pos: gameMode === '4P' ? 160 : 70,
+                            material: null,
+                            color: { r: 1, g: 1, b: 1 },
                             score: 0,
                             connectionStatus: 'connected',
                             lastActivity: new Date().toISOString()
@@ -328,7 +329,6 @@ async function roomRoutes(fastify: FastifyInstance) {
                     });
 
                     const initialGameState: GameState = {
-                        id: 0,
                         gameId: gameId,
                         players: players,
                         ballPosX: 200,
@@ -375,7 +375,7 @@ async function roomRoutes(fastify: FastifyInstance) {
         }
     });
 
-  // End the current game and reset room to waiting for a fresh start
+    // End the current game and reset room to waiting for a fresh start
     fastify.post('/api/room/:roomId/end', async (request, reply) => {
         const { roomId } = request.params as { roomId: string };
         const room = gameRoomManager.getRoom(roomId);

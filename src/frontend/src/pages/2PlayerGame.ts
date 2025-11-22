@@ -4,9 +4,7 @@ import { authService } from '../utils/auth';
 import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
-import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
-// import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
-// import { getCurrentMatch } from '../utils/tournamentState';
+import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 
 export let pongGame: PongGame | null = null;
 
@@ -53,9 +51,9 @@ export async function render2PlayerGame(): Promise<void> {
         
         <div class="player-info">
             <div class="player-names">
-                <span id="player1Name" class="player1-name">${players[0].name}</span>
+                <span id="player1Name" class="player1-name">${players[0].username}</span>
                 <span class="vs-text">vs</span> 
-                <span id="player2Name" class="player2-name">${players[1].name}</span>
+                <span id="player2Name" class="player2-name">${players[1].username}</span>
             </div>
             <div class="score-container">
                 <span id="player1score" class="player1-score">0</span> 
@@ -67,8 +65,8 @@ export async function render2PlayerGame(): Promise<void> {
             <canvas id="renderCanvas"></canvas>
         </div>
         <div class="controls-info">
-            <p style="color: #60a5fa; font-weight: bold;">${players[0].name} W / S</p>
-            ${pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Local Player - O/L</p>' : ''}
+            <p style="color: #60a5fa; font-weight: bold;">${players[0].username} W / S</p>
+            ${pongGame.hasLocal ? '<p style="color: #60a5fa; font-weight: bold;">Local PLayer - O/L</p>' : ''}
         </div>
         <button id="backToLandingBtn" class="btn btn-back">${room?.roomId?.startsWith('tournament-') ? 'Back to Tournament' : 'Back to Home'}</button>
 

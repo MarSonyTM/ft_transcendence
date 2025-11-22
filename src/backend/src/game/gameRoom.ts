@@ -1,6 +1,6 @@
 interface Player {
     id: string;
-    name: string;
+    username: string;
     isReady: boolean;
     isAI?: boolean;
     isLocal: boolean;
@@ -31,7 +31,7 @@ class GameRoomManager {
         return result;
     }
 
-  // Create a new game room
+    // Create a new game room
     createRoom(hostId: string, hostUsername: string, maxPlayers: number = 2): GameRoom {
         const roomId = this.generateRoomId();
       
@@ -40,7 +40,7 @@ class GameRoomManager {
             hostId,
             players: [{
                 id: hostId,
-                name: hostUsername,
+                username: hostUsername,
                 isReady: true,
                 isAI: false,
                 isLocal: false
@@ -85,7 +85,7 @@ class GameRoomManager {
 
         room.players.push({
             id: playerId,
-            name: username,
+            username,
             isReady: isReady,
             isAI: isAI,
             isLocal: isLocal,

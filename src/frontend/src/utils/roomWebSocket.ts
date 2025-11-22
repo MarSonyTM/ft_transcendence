@@ -156,12 +156,6 @@ export class RoomWebSocketManager {
                 }
                 break;
 
-            case 'playerJoined':
-                if (message.room && this.config.onRoomState) {
-                    this.config.onRoomState(message.room);
-                }
-                break;
-
             case 'score':
                 if (this.config.onScore) {
                     this.config.onScore({

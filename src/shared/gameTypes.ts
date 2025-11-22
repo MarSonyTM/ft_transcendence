@@ -10,7 +10,6 @@ export interface Player {
 
 // Core game state structure
 export interface GameState {
-  id?: number;
   gameId?: number;
   players: any[];
   ballPosX: number;
