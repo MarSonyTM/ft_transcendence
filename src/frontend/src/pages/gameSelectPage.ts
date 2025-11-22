@@ -3,7 +3,7 @@ import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
-export async function renderGameSelectPage(): Promise<void> {
+export async async function renderGameSelectPage(): Promise<Promise<void>> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
@@ -54,11 +54,20 @@ export async function renderGameSelectPage(): Promise<void> {
         });
     }
 
-    const backBtn = document.getElementById('backToLandingBtn');
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            history.pushState({ page: 'landing' }, '', '/');
-            setCurrentPage('landing');
+    const leaderboardBtn = document.getElementById('leaderboardBtn');
+    if (leaderboardBtn) {
+        leaderboardBtn.addEventListener('click', () => {
+            history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
+            setCurrentPage('leaderboard');
+            renderApp();
+        });
+    }
+
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+            history.pushState({ page: 'profile' }, '', '/profile');
+            setCurrentPage('profile');
             renderApp();
         });
     }

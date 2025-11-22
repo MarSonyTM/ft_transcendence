@@ -778,6 +778,13 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                     actualUserId = player.id;
                                     console.log(`   ✅ Found user by ID ${player.id}`);
                                 }
+                            } else if (player.id && typeof player.id === 'number') {
+                                // Try using player.id for real players
+                                const userById = database.users.getUserById(player.id);
+                                if (userById) {
+                                    actualUserId = player.id;
+                                    console.log(`   ✅ Found user by ID ${player.id}`);
+                                }
                             }
                             
                             return {
