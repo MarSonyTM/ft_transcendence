@@ -1,4 +1,3 @@
-import { get } from 'http';
 import { TPT, TPTmap, Tournament } from '../types';
 import { setCurrentPage } from '../utils/globalState';
 import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
@@ -83,7 +82,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			listEl.innerHTML = activeT.players.map((p: any) => {
 				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}</span>
 				<button class="btn btn-remove" data-player-name="${p.name}" data-player-type="${p.tpt}"
-				style="${p.tpt === 'host' ?  'display: none' : ''}">Remove</button></li>`;
+				style="${p.tpt === 'host' ?  'display: none' : ''}">X</button></li>`;
 			}).join('');
 		}
 		const startBtn = document.getElementById('startBtn') as HTMLButtonElement | null;
@@ -165,13 +164,13 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 				console.error('[Tournament] No active tournament');
 				return;
 			}
-			if (activeT.currentMatch === null) {
-				activeT.currentMatch = await loadCurrentMatch();
-				console.debug('[Tournament] Current match set to:', activeT.currentMatch);
+			if (activeT.curM === null) {
+				activeT.curM = await loadCurrentMatch();
+				console.debug('[Tournament] Current match set to:', activeT.curM);
 			}
 			console.debug('[Tournament] Rendering tournament page');
 			setCurrentTournament(activeT);
-			setCurrentMatch(activeT.currentMatch!);
+			setCurrentMatch(activeT.curM!);
 			renderTournamentPage();
 		}
 	});

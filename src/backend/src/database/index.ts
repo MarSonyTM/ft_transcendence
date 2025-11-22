@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { Player, GameState } from '../../../shared/gameTypes';
-import { Tournament, TournamentMatch, TournamentPlayer, TPT, TPTMap, MatchStatus, MSMap, TournamentStatus, TSMap } from '../types';
+import { Tournament, TournamentMatch, TournamentPlayer } from '../types/index';
 
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'database', 'transcendence.db');
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
@@ -845,220 +845,6 @@ class UsernameChangeDatabaseManager {
     }
 }
 
-// class TournamentDatabaseManager {
-//     private db: Database.Database;
-
-//     constructor(database: Database.Database) {
-//         this.db = database;
-//     }
-
-//     // //returns updated & hydrated tournament
-//     // update(t: Partial<Tournament>): Tournament {
-//     //     const tx = this.db.transaction(() => {
-//     //         let dbt: Tournament;
-//     //         if (t.id)
-//     //             dbt = this.db.prepare('SELECT * FROM tournaments WHERE id = ?').get(t.id) as Tournament;
-//     //         else
-//     //             dbt = this.createTournament(t);
-
-//     //         // Update tournaments scalars/JSON snapshots directly
-//     //         this.updateTournament(dbt.id, {
-//     //             status: t.status,
-//     //             round: t.round,
-//     //             championId: t.championId,
-//     //             startedAt: t.startedAt,
-//     //             endedAt: t.endedAt,
-//     //             matchQueue: t.matchQueue,
-//     //             currentMatch: t.currentMatch
-//     //         });
-
-//     //         if (t.players) this.updateAllPlayers(dbt.id, t.players);
-
-//     //         if (t.allMatches) this.updateAllMatches(dbt.id, t.allMatches);
-            
-//     //         return this.getTournamentById(dbt.id);
-//     //     });
-//     //     return this.hydrateTournament(tx());
-//     // }
-
-// /* ---------------------- TOURNAMENTS ---------------------- */    
-//     createTournament(data: Partial<Tournament>): Tournament {
-//         const fields: string[] = [];
-//         const values: any[] = [];
-
-//         console.debug('AHHH');
-//         for (const key of Object.keys(data) as (keyof Tournament)[]) {
-//             const v = data[key];
-//             if (v !== undefined) {
-//                 fields.push(key);
-//                 const value = (key === 'players' || key === 'allMatches' || key === 'matchQueue' || key === 'currentMatch')
-//                     ? JSON.stringify(v)
-//                     : v;
-//                 values.push(value);
-//             }
-//         }
-
-//         let rowId: number;
-//         if (fields.length === 0) {
-//             const result = this.db.prepare('INSERT INTO tournaments DEFAULT VALUES').run();
-//             rowId = result.lastInsertRowid as number;
-//         } else {
-//             const placeholders = fields.map(() => '?').join(', ');
-//             const sql = `INSERT INTO tournaments (${fields.join(', ')}) VALUES (${placeholders})`;
-//             const result = this.db.prepare(sql).run(...values);
-//             rowId = result.lastInsertRowid as number;
-//         }
-//         return this.getTournamentById(rowId);
-//     }
-
-//     deleteTournament(id: number): void {
-//         this.db.prepare('DELETE FROM tournaments WHERE id = ?').run(id);
-//     }
-
-//     getTournamentById(id: number): Tournament {
-//         let x = this.db.prepare('SELECT * FROM tournaments WHERE id = ?').get(id) as Tournament;
-//         return x;
-//     }
-
-//     getAllTournaments(): Tournament[] {
-//         return this.db.prepare('SELECT * FROM tournaments ORDER BY createdAt DESC').all() as Tournament[];
-//     }
-
-//     updateTournament(id: number, data: Partial<Tournament>): Tournament {
-//         if (!this.getTournamentById(id)) throw new Error('Tournament not found');
-//         for (const key of Object.keys(data) as (keyof Tournament)[]) {
-//             if (data[key] !== undefined) {
-//                 const value = (key === 'players' || key === 'allMatches' || key === 'matchQueue' || key === 'currentMatch')
-//                     ? JSON.stringify(data[key])
-//                     : data[key];
-//                 this.db.prepare(`UPDATE tournaments SET ${key} = ? WHERE id = ?`).run(value, id);
-//             }
-//         }
-//         return this.getTournamentById(id);
-//     }
-
-//     /* ---------------------- TOURNAMENT PLAYERS ---------------------- */
-//     createPlayer(p: Partial<TournamentPlayer>): TournamentPlayer {
-//         if (p.tournamentId === undefined) throw new Error('tournamentId is required to create a tournament player');
-//         if (p.tpt === undefined) throw new Error('tpt is required to create a tournament player');
-
-//         const fields: string[] = [];
-//         const values: any[] = [];
-//         for (const key of Object.keys(p) as (keyof TournamentPlayer)[]) {
-//             const v = p[key];
-//             if (v !== undefined) {
-//                 fields.push(key);
-//                 values.push(typeof v === 'boolean' ? (v ? 1 : 0) : v);
-//             }
-//         }
-//         const placeholders = fields.map(() => '?').join(', ');
-//         const sql = `INSERT INTO t_players (${fields.join(', ')}) VALUES (${placeholders})`;
-//         const result = this.db.prepare(sql).run(...values);
-//         return this.getPlayerById(result.lastInsertRowid as number);
-//     }
-    
-//     deletePlayer(id: number): void {
-//         this.db.prepare('DELETE FROM t_players WHERE id = ?').run(id);
-//     }
-    
-//     getPlayerById(id: number): TournamentPlayer {
-//         return this.db.prepare('SELECT * FROM t_players WHERE id = ?').get(id) as TournamentPlayer;
-//     }
-
-//     getAllPlayers(tId: number): TournamentPlayer[] {
-//         return this.db.prepare('SELECT * FROM t_players WHERE tournamentId = ?').all(tId) as TournamentPlayer[]; 
-//     }
-    
-//     updatePlayer(data: Partial<TournamentPlayer>): TournamentPlayer {
-//         if (!data.id) throw new Error('Player ID is required for update');
-        
-//         for (const key of Object.keys(data) as (keyof TournamentPlayer)[]) {
-//             if (data[key] !== undefined)
-//                 this.db.prepare(`UPDATE t_players SET ${key} = ? WHERE id = ?`).run(
-//                     typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key],
-//                     data.id
-//                 );
-//         }
-//         return this.getPlayerById(data.id);
-//     }
-
-//     updateAllPlayers(data: TournamentPlayer[]): void {
-//         data.forEach((p) => {
-//             this.updatePlayer(p);
-//         });
-//     }
-
-// /* ---------------------- TOURNAMENT MATCHES ---------------------- */
-//     createMatch(data: Partial<TournamentMatch>): TournamentMatch {
-//         if (!data.tournamentId) throw new Error('tournamentId is required to create a match');
-//         const fields: string[] = [];
-//         const values: any[] = [];
-
-//         for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
-//             if (data[key] !== undefined) {
-//                 fields.push(key);
-//                 if (key === 'p1' || key === 'p2') {
-//                     values.push(JSON.stringify(data[key]));
-//                 } else {
-//                     const v = data[key];
-//                     values.push(typeof v === 'boolean' ? (v ? 1 : 0) : v);
-//                 }
-//             }
-//         }
-//         const placeholders = fields.map(() => '?').join(', ');
-//         const sql = `INSERT INTO t_matches (${fields.join(', ')}) VALUES (${placeholders})`;
-//         const result = this.db.prepare(sql).run(...values);
-//         return this.getMatchById(result.lastInsertRowid as number);
-//     }
-    
-//     deleteMatch(id: number): void {
-//         this.db.prepare('DELETE FROM t_matches WHERE id = ?').run(id);
-//     }
-
-//     getMatchById(id: number): TournamentMatch {
-//         const match = this.db.prepare('SELECT * FROM t_matches WHERE id = ?').get(id) as TournamentMatch;
-//         if (match) {
-//             if (typeof match.p1 === 'string')
-//                 match.p1 = match.p1 ? JSON.parse(match.p1) : undefined;
-//             if (typeof match.p2 === 'string')
-//                 match.p2 = match.p2 ? JSON.parse(match.p2) : undefined;
-//         }
-//         return match;
-//     }
-
-//     getAllMatches(tId: number): TournamentMatch[] {
-//         const matches = this.db.prepare('SELECT * FROM t_matches WHERE tournamentId = ? ORDER BY id').all(tId) as TournamentMatch[];
-//         return matches.map(m => {
-//             if (typeof m.p1 === 'string')
-//                 m.p1 = m.p1 ? JSON.parse(m.p1) : undefined;
-//             if (typeof m.p2 === 'string')
-//                 m.p2 = m.p2 ? JSON.parse(m.p2) : undefined;
-//             return m;
-//         });
-//     }
-
-//     updateMatch(data: Partial<TournamentMatch>): TournamentMatch {
-//         if (!data.id) throw new Error('Match ID is required for update');
-        
-//         for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
-//             if (data[key] !== undefined) {
-//                 const value = (key === 'p1' || key === 'p2')
-//                     ? JSON.stringify(data[key])
-//                     : (typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key]);
-//                 this.db.prepare(`UPDATE t_matches SET ${key} = ? WHERE id = ?`).run(value, data.id);
-//             }
-//         }
-//         return this.getMatchById(data.id);
-//     }
-
-//     updateAllMatches(data: TournamentMatch[]): void {
-//         data.forEach((m) => {
-//             this.updateMatch(m);
-//         });
-//     }
-
-// }
-
 class TournamentDatabaseManager {
     private db: Database.Database;
 
@@ -1164,29 +950,20 @@ class TournamentDatabaseManager {
         if (!t) return null;
         
         try {
-            if (typeof t.players === 'string') {
+            if (typeof t.players === 'string')
                 t.players = JSON.parse(t.players);
-            }
-            if (typeof t.allMatches === 'string') {
+            if (typeof t.allMatches === 'string')
                 t.allMatches = JSON.parse(t.allMatches);
-            }
-            if (typeof t.matchQueue === 'string') {
+            if (typeof t.matchQueue === 'string')
                 t.matchQueue = JSON.parse(t.matchQueue);
-            }
-            if (typeof t.curM === 'string') {
+            if (typeof t.curM === 'string')
                 t.curM = JSON.parse(t.curM);
-            }
-
             const players = this.getAllPlayers(t.id);
-            if (players.length > 0) {
+            if (players.length > 0)
                 t.players = players;
-            }
-
             const matches = this.getAllMatches(t.id);
-            if (matches.length > 0) {
+            if (matches.length > 0)
                 t.allMatches = matches;
-            }
-
             return t;
         } catch (error) {
             console.error('Error hydrating tournament:', error);
@@ -1197,8 +974,10 @@ class TournamentDatabaseManager {
     /* ---------------------- TOURNAMENT PLAYERS ---------------------- */
     createPlayer(p: Partial<TournamentPlayer>): TournamentPlayer | null {
         try {
-            if (p.tournamentId === undefined) throw new Error('tournamentId is required to create a tournament player');
-            if (p.tpt === undefined) throw new Error('tpt is required to create a tournament player');
+            if (p.tournamentId === undefined)
+                throw new Error('tournamentId is required to create a tournament player');
+            if (p.tpt === undefined)
+                throw new Error('tpt is required to create a tournament player');
 
             const fields: string[] = [];
             const values: any[] = [];
@@ -1212,7 +991,6 @@ class TournamentDatabaseManager {
             const placeholders = fields.map(() => '?').join(', ');
             const sql = `INSERT INTO t_players (${fields.join(', ')}) VALUES (${placeholders})`;
             const result = this.db.prepare(sql).run(...values);
-            
             return this.hydratePlayer(this.getPlayerById(result.lastInsertRowid as number));
         } catch (error) {
             console.error('Error creating player:', error);
@@ -1252,19 +1030,17 @@ class TournamentDatabaseManager {
     
     updatePlayer(data: Partial<TournamentPlayer>): TournamentPlayer | null {
         try {
-            if (!data.id) throw new Error('Player ID is required for update');
-            
-            if (!this.getPlayerById(data.id)) return null;
+            if (!data.id)
+                throw new Error('Player ID is required for update');
+            if (!this.getPlayerById(data.id))
+                return null;
             
             for (const key of Object.keys(data) as (keyof TournamentPlayer)[]) {
                 if (data[key] !== undefined) {
-                    this.db.prepare(`UPDATE t_players SET ${key} = ? WHERE id = ?`).run(
-                        typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key],
-                        data.id
-                    );
+                    this.db.prepare(`UPDATE t_players SET ${key} = ? WHERE id = ?`)
+                        .run(typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key], data.id);
                 }
             }
-            
             return this.hydratePlayer(this.getPlayerById(data.id));
         } catch (error) {
             console.error('Error updating player:', error);
@@ -1283,11 +1059,9 @@ class TournamentDatabaseManager {
 
     hydratePlayer(player: TournamentPlayer | null): TournamentPlayer | null {
         if (!player) return null;
-        
         try {
-            if (typeof player.eliminated === 'number') {
+            if (typeof player.eliminated === 'number')
                 player.eliminated = player.eliminated === 1;
-            }
             return player;
         } catch (error) {
             console.error('Error hydrating player:', error);
@@ -1298,17 +1072,17 @@ class TournamentDatabaseManager {
     /* ---------------------- TOURNAMENT MATCHES ---------------------- */
     createMatch(data: Partial<TournamentMatch>): TournamentMatch | null {
         try {
-            if (!data.tournamentId) throw new Error('tournamentId is required to create a match');
-            
+            if (!data.tournamentId)
+                throw new Error('tournamentId is required to create a match');
             const fields: string[] = [];
             const values: any[] = [];
 
             for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
                 if (data[key] !== undefined) {
                     fields.push(key);
-                    if (key === 'p1' || key === 'p2') {
+                    if (key === 'p1' || key === 'p2')
                         values.push(JSON.stringify(data[key]));
-                    } else {
+                    else {
                         const v = data[key];
                         values.push(typeof v === 'boolean' ? (v ? 1 : 0) : v);
                     }
@@ -1317,7 +1091,6 @@ class TournamentDatabaseManager {
             const placeholders = fields.map(() => '?').join(', ');
             const sql = `INSERT INTO t_matches (${fields.join(', ')}) VALUES (${placeholders})`;
             const result = this.db.prepare(sql).run(...values);
-            
             return this.hydrateMatch(this.getMatchById(result.lastInsertRowid as number));
         } catch (error) {
             console.error('Error creating match:', error);
@@ -1357,19 +1130,18 @@ class TournamentDatabaseManager {
 
     updateMatch(data: Partial<TournamentMatch>): TournamentMatch | null {
         try {
-            if (!data.id) throw new Error('Match ID is required for update');
-            
-            if (!this.getMatchById(data.id)) return null;
+            if (!data.id)
+                throw new Error('Match ID is required for update');
+            if (!this.getMatchById(data.id))
+                return null;
             
             for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
                 if (data[key] !== undefined) {
-                    const value = (key === 'p1' || key === 'p2')
-                        ? JSON.stringify(data[key])
+                    const value = (key === 'p1' || key === 'p2') ? JSON.stringify(data[key])
                         : (typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key]);
                     this.db.prepare(`UPDATE t_matches SET ${key} = ? WHERE id = ?`).run(value, data.id);
                 }
             }
-            
             return this.hydrateMatch(this.getMatchById(data.id));
         } catch (error) {
             console.error('Error updating match:', error);
@@ -1388,14 +1160,11 @@ class TournamentDatabaseManager {
 
     hydrateMatch(match: TournamentMatch | null): TournamentMatch | null {
         if (!match) return null;
-        
         try {
-            if (typeof match.p1 === 'string') {
+            if (typeof match.p1 === 'string')
                 match.p1 = match.p1 ? JSON.parse(match.p1) : undefined;
-            }
-            if (typeof match.p2 === 'string') {
+            if (typeof match.p2 === 'string')
                 match.p2 = match.p2 ? JSON.parse(match.p2) : undefined;
-            }
             return match;
         } catch (error) {
             console.error('Error hydrating match:', error);
@@ -1759,24 +1528,24 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
         this.db.exec(createTArchiveT);
 
-        const createMatchSummaryT = `
-            CREATE TABLE IF NOT EXISTS t_match_summaries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                matchId INTEGER NOT NULL,
-                player1Id INTEGER,
-                player2Id INTEGER,
-                winnerId INTEGER,
-                loserId INTEGER,
-                createdAt DATETIME,
-                startedAt DATETIME,
-                endedAt DATETIME,
-                FOREIGN KEY (player1Id) REFERENCES t_players(id) ON DELETE SET NULL,
-                FOREIGN KEY (player2Id) REFERENCES t_players(id) ON DELETE SET NULL,
-                FOREIGN KEY (winnerId) REFERENCES t_players(id) ON DELETE SET NULL,
-                FOREIGN KEY (loserId) REFERENCES t_players(id) ON DELETE SET NULL
-            )
-        `;
-        this.db.exec(createMatchSummaryT);
+        // const createMatchSummaryT = `
+        //     CREATE TABLE IF NOT EXISTS t_match_summaries (
+        //         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        //         matchId INTEGER NOT NULL,
+        //         player1Id INTEGER,
+        //         player2Id INTEGER,
+        //         winnerId INTEGER,
+        //         loserId INTEGER,
+        //         createdAt DATETIME,
+        //         startedAt DATETIME,
+        //         endedAt DATETIME,
+        //         FOREIGN KEY (player1Id) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (player2Id) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (winnerId) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (loserId) REFERENCES t_players(id) ON DELETE SET NULL
+        //     )
+        // `;
+        // this.db.exec(createMatchSummaryT);
         this.createTriggers();
     }
     

@@ -1,4 +1,14 @@
-import { getApiEndpoint } from "../types";
+import { getApiEndpoint, TournamentPlayer } from "../types/index";
+
+export interface TournamentArchiveEntry {
+	tournamentId: number;
+	players: TournamentPlayer[];//maybe simplify?
+	matches: any[];//maybe simplify?
+	champion: TournamentPlayer | null;
+	createdAt: string;
+	startedAt?: string;
+	endedAt?: string;
+}
 
 async function fetchTournamentList(): Promise<any[]> {
 	try {

@@ -1,268 +1,259 @@
-import { API_BASE } from '../config';
-
 interface TournamentWebSocketConfig {
-	tournamentId: string;
-	playerId: string;
-	onConnect?: (scope: 'tournament') => void;
-	onDisconnect?: (scope: 'tournament') => void;
-	onTournamentState?: (tournament: any) => void;
-	onMatchState?: (match: any) => void;
-	onMatchEnd?: (data: { matchId: string; winnerId: string | null }) => void;
-	onGameState?: (state: any) => void;
-	onPlayerMove?: (playerId: string, position: number) => void;
-	onPlayerReady?: (playerId: string) => void;
-	onPlayerDisconnected?: (data: { playerId: string; scope: 'tournament' }) => void;
-	onPlayerJoined?: (data: { playerId: string; scope: 'tournament'; tournament?: any; match?: any }) => void;
-	onScore?: (matchId: string, scores: any) => void;
-	onGameStart?: (gameId: number) => void;
-	onCountdown?: () => void;
-	onGameEnd?: (data: { winnerId: string; winnerSeat?: string; winnerName?: string; matchId: string }) => void;
-	onError?: (error: Error, scope: 'tournament') => void;
-	onTournamentEnd?: (tournamentId: string) => void;
+    tournamentId: string;
+    matchId: string;
+    playerId: string;
+    onConnect?: () => void;
+    onDisconnect?: () => void;
+    onTournamentState?: (tournament: any) => void;
+    onMatchState?: (match: any) => void;
+    onPlayerDisconnected?: (playerId: string) => void;
+    onTournamentStart?: (tournamentId: string) => void;
+    onTournamentEnd?: (tournamentId: string) => void;
+    onGameStart?: (matchId: string, gameId: number) => void;
+    onGameEnd?: (data: { matchId: string; winnerId: string }) => void;
+    onMatchEnd?: (data: { matchId: string; winnerId: string | null }) => void;
+    onError?: (error: Error) => void;
 }
-
-type ScopedWS = {
-	ws: WebSocket | null;
-	reconnectAttempts: number;
-	intentionalClose: boolean;
-	heartbeatInterval: number | null;
-};
 
 export class TournamentWebSocketManager {
-	private tournamentCfg: TournamentWebSocketConfig;
-	private tournamentWS: ScopedWS = { ws: null, reconnectAttempts: 0, intentionalClose: false, heartbeatInterval: null };
+    private ws: WebSocket | null = null;
+    private tconfig: TournamentWebSocketConfig;
+    private reconnectAttempts: number = 0;
+    private maxReconnectAttempts: number = 5;
+    private reconnectDelay: number = 2000;
+    private heartbeatInterval: number | null = null;
+    private isIntentionalClose: boolean = false;
 
-	private readonly maxReconnectAttempts = 5;
-	private readonly baseReconnectDelay = 2000; // ms
-	private readonly heartbeatMs = 30000;
+    constructor(tconfig: TournamentWebSocketConfig) {
+        this.tconfig = tconfig;
+    }
 
-  	private currentMatchId: string | null = null;
+    connect(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            try {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
+                const wsUrl = `${wsProtocol}//${wsHost}/api/tournament/${this.tconfig.tournamentId}/ws?playerId=${this.tconfig.playerId}`;
+                console.log('Connecting to tournament WebSocket:', wsUrl);
+                this.ws = new WebSocket(wsUrl);
 
-	constructor(cfg: TournamentWebSocketConfig) {
-		this.tournamentCfg = cfg;
-	}
+                this.ws.onopen = () => {
+                    console.log('WebSocket connected to tournament:', this.tconfig.tournamentId);
+                    this.reconnectAttempts = 0;
+                    this.startHeartbeat();
+                    if (this.tconfig.onConnect)
+                        this.tconfig.onConnect();
+                    resolve();
+                };
 
-	// ---------- Public API ----------
-	disconnectAll(): void { this.disconnectTournament(); }
+                this.ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        this.handleMessage(message);
+                    } catch (error) {
+                        console.error('Error parsing WebSocket message:', error);
+                    }
+                };
 
-	connectTournament(): Promise<void> { return this.openChannel('tournament'); }
-	disconnectTournament(): void { this.closeChannel('tournament'); }
-	isTournamentConnected(): boolean { return this.tournamentWS.ws?.readyState === WebSocket.OPEN; }
-	requestTournamentState(): void { this.send('tournament', { type: 'requestState' }); }
-	stopTournament(): void { this.send('tournament', { type: 'stop' }); }
+                this.ws.onclose = (event) => {
+                    console.log('WebSocket disconnected:', event.code, event.reason);
+                    this.stopHeartbeat();
+                    if (this.tconfig.onDisconnect)
+                        this.tconfig.onDisconnect();
+                    if (!this.isIntentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
+                        this.reconnectAttempts++;
+                        console.log(`Reconnecting... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                        setTimeout(() => {
+                            this.connect().catch(console.error);
+                        }, this.reconnectDelay * this.reconnectAttempts);
+                    }
+                };
 
-	async connectMatch(cfg: { matchId: string }): Promise<void> {
-		this.currentMatchId = cfg.matchId;
-		this.requestMatchState();
-	}
-	disconnectMatch(): void { /* no-op on single channel */ }
-	isMatchConnected(): boolean { return this.isTournamentConnected(); }
-	requestMatchState(): void { this.send('tournament', { type: 'requestMatchState' }); }
-	sendReady(): void { this.send('tournament', { type: 'ready' }); }
-	sendMove(position: number): void { this.send('tournament', { type: 'move', position }); }
-	sendKeyState(key: string, pressed: boolean, isGuest?: boolean): void { this.send('tournament', { type: 'keyState', key, pressed, isGuest }); }
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    if (this.tconfig.onError)
+                        this.tconfig.onError(new Error('WebSocket connection error'));
+                    reject(error);
+                };
 
-	// ---------- Internal: Open / Close Channels ----------
-	private openChannel(scope: 'tournament'): Promise<void> {
-		return new Promise((resolve, reject) => {
-			try {
-				const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-				let apiUrl: URL;
-				try {
-					apiUrl = new URL(API_BASE);
-				} catch {
-					apiUrl = new URL(`${window.location.protocol}//${window.location.hostname}:3000`);
-				}
-				const host = apiUrl.host;
+                setTimeout(() => {
+                    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+                        console.error('WebSocket connection timeout after 5 seconds');
+                        if (this.ws)
+                            this.ws.close();
+                        reject(new Error('WebSocket connection timeout'));
+                    }
+                }, 5000);
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                reject(error);
+            }
+        });
+    }
 
-				const url = `${wsProtocol}//${host}/api/tournament/${this.tournamentCfg.tournamentId}/ws?playerId=${this.tournamentCfg.playerId}`;
-				const bucket = this.tournamentWS;
-				bucket.intentionalClose = false;
-				bucket.ws = new WebSocket(url);
+    private handleMessage(message: any): void {
+        switch (message.type) {
+            case 'connected':
+                console.log('Connected to tournament:', message.tournamentId);
+                break;
 
-				bucket.ws.onopen = () => {
-					bucket.reconnectAttempts = 0;
-					this.startHeartbeat(scope);
-					this.tournamentCfg.onConnect?.('tournament');
-					resolve();
-				};
+            case 'pong':
+                break;
 
-				bucket.ws.onmessage = (ev) => {
-				try {
-					const msg = JSON.parse(ev.data);
-					this.handleMessage(scope, msg);
-				} catch (e) {
-					console.error('[tournamentWS] parse error', e);
-				}
-				};
+            case 'tournamentState':
+                if (this.tconfig.onTournamentState)
+                    this.tconfig.onTournamentState(message.tournament);
+                break;
+            
+            case 'tournamentStart':
+                if (this.tconfig.onTournamentStart)
+                    this.tconfig.onTournamentStart(message.tournamentId);
+                break;
 
-				bucket.ws.onclose = () => {
-					this.stopHeartbeat(scope);
-					this.tournamentCfg.onDisconnect?.('tournament');
-					if (!bucket.intentionalClose && bucket.reconnectAttempts < this.maxReconnectAttempts) {
-						bucket.reconnectAttempts++;
-						const delay = this.baseReconnectDelay * bucket.reconnectAttempts;
-						setTimeout(() => this.openChannel(scope).catch(() => {}), delay);
-					}
-				};
+            case 'tournamentEnd':
+                if (this.tconfig.onTournamentEnd)
+                    this.tconfig.onTournamentEnd(message.tournamentId);
+                break;
+            
+            case 'matchState':
+                if (this.tconfig.onMatchState)
+                    this.tconfig.onMatchState(message.match);
+                break;
 
-				bucket.ws.onerror = () => {
-					this.tournamentCfg.onError?.(new Error('WebSocket error'), 'tournament');
-				};
+            case 'gameStart':
+                if (this.tconfig.onGameStart) {
+                    const matchId = message.matchId || this.tconfig.matchId;
+                    this.tconfig.onGameStart(matchId, message.gameId);
+                }
+                break;
+            
+            case 'gameEnd':
+                if (this.tconfig.onGameEnd) {
+                    const winnerId = message.winner || message.winnerId;
+                    const matchId = message.matchId || this.tconfig.matchId;
+                    this.tconfig.onGameEnd({ 
+                        matchId: String(matchId), 
+                        winnerId: String(winnerId) 
+                    });
+                }
+                break;
+            
+            case 'matchEnd':
+                if (this.tconfig.onMatchEnd) {
+                    const winnerId = message.winnerId != null ? String(message.winnerId) : null;
+                    const matchId = String(message.matchId || this.tconfig.matchId || '');
+                    this.tconfig.onMatchEnd({ matchId, winnerId });
+                }
+                break;
+            
+            case 'playerDisconnected':
+                if (this.tconfig.onPlayerDisconnected)
+                    this.tconfig.onPlayerDisconnected(message.playerId);
+                break;
+            
+            case 'playerJoined':
+                if (message.tournament && this.tconfig.onTournamentState)
+                    this.tconfig.onTournamentState(message.tournament);
+                break;
 
-				setTimeout(() => {
-					if (bucket.ws && bucket.ws.readyState !== WebSocket.OPEN) {
-						try { bucket.ws.close(); } catch {}
-						reject(new Error(`WebSocket ${scope} connection timeout`));
-					}
-				}, 5000);
-			} catch (err) {
-				reject(err);
-			}
-		});
-	}
+            default:
+                console.log('Unknown message type:', message.type);
+                break;
+        }
+    }
 
-	private closeChannel(scope: 'tournament'): void {
-		const bucket = this.tournamentWS;
-		bucket.intentionalClose = true;
-		this.stopHeartbeat(scope);
-		if (bucket.ws) bucket.ws.close(1000, 'Client disconnect');
-		bucket.ws = null;
-	}
+    requestState(): void {
+        this.send({ type: 'requestState' });
+    }
 
-	// ---------- Heartbeat ----------
-	private startHeartbeat(scope: 'tournament') {
-		const bucket = this.tournamentWS;
-		bucket.heartbeatInterval = window.setInterval(() => {
-			if (bucket.ws && bucket.ws.readyState === WebSocket.OPEN)
-				this.send(scope, { type: 'ping', ts: Date.now() });
-		}, this.heartbeatMs);
-	}
+    requestMatchState(): void {
+        this.send({ type: 'requestMatchState' });
+    }
 
-	private stopHeartbeat(_scope: 'tournament') {
-		const bucket = this.tournamentWS;
-		if (bucket.heartbeatInterval) {
-			clearInterval(bucket.heartbeatInterval);
-			bucket.heartbeatInterval = null;
-		}
-	}
+    sendReady(isReady: boolean): void {
+        this.send({ type: 'ready', isReady });
+    }
 
-	// ---------- Sending ----------
-	private send(_scope: 'tournament', payload: any): void {
-		const bucket = this.tournamentWS;
-		if (!bucket.ws || bucket.ws.readyState !== WebSocket.OPEN) return;
-		try {
-			bucket.ws.send(JSON.stringify(payload));
-		} catch (e) {
-			console.error('[tournamentWS] send error', e);
-		}
-	}
+    sendMove(position: number): void {
+        this.send({ type: 'move', position });
+    }
 
-	// ---------- Message Routing ----------
-	private handleMessage(_scope: 'tournament', message: any): void {
-		switch (message?.type) {
-		case 'connected':
-			this.tournamentCfg.onConnect?.('tournament');
-			break;
-		case 'disconnected':
-			this.tournamentCfg.onDisconnect?.('tournament');
-			break;
-		case 'pong':
-			break;
-		case 'countdown': {
-			this.tournamentCfg.onCountdown?.();
-			break;
-		}
-		case 'gameStart': {
-			if (typeof message.gameId === 'number')
-				this.tournamentCfg.onGameStart?.(message.gameId);
-			break;
-		}
-		case 'gameEnd': {
-			this.tournamentCfg.onGameEnd?.({
-				winnerId: message.winner || message.winnerId,
-				winnerSeat: message.winnerSeat,
-				winnerName: message.winnerName,
-				matchId: message.matchId || this.currentMatchId || ''
-			});
-			break;
-		}
-		case 'score': {
-			const scores = {
-				scorePlayer1: message.scorePlayer1,
-				scorePlayer2: message.scorePlayer2
-			};
-			const matchId = message.matchId || this.currentMatchId || '';
-			this.tournamentCfg.onScore?.(matchId, scores);
-			break;
-		}
-		case 'playerJoined': {
-			this.tournamentCfg.onPlayerJoined?.({
-				playerId: message.playerId,
-				scope: 'tournament',
-				tournament: message.tournament,
-				match: message.match,
-			});
-			break;
-		}
-		case 'playerDisconnected': {
-			this.tournamentCfg.onPlayerDisconnected?.({ playerId: message.playerId, scope: 'tournament' });
-			break;
-		}
-		case 'tournamentState': {
-			this.tournamentCfg.onTournamentState?.(message.tournament);
-			break;
-		}
-		case 'matchEnd': {
-			const winnerId = message.winnerId != null ? String(message.winnerId) : null;
-			const matchId = String(message.matchId || this.currentMatchId || '');
-			this.tournamentCfg.onMatchEnd?.({ matchId, winnerId });
-			break;
-		}
-		case 'matchState': {
-			this.tournamentCfg.onMatchState?.(message.match);
-			break;
-		}
-		case 'gameState': {
-			this.tournamentCfg.onGameState?.(message.state);
-			break;
-		}
-		case 'playerReady': {
-			this.tournamentCfg.onPlayerReady?.(message.playerId);
-			break;
-		}
-		case 'playerMove': {
-			this.tournamentCfg.onPlayerMove?.(message.playerId, message.position);
-			break;
-		}
-		case 'tournamentEnd': {
-			this.tournamentCfg.onTournamentEnd?.(message.tournamentId);
-			break;
-		}
-		default:
-			// Unknown / ignore
-			break;
-		}
-	}
+    sendKeyState(key: string, pressed: boolean): void {
+        this.send({ type: 'keyState', key, pressed });
+    }
+
+    private send(message: any): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        console.warn('Tournament WS not open, dropping message:', message);
+        return;
+    }
+    try {
+        this.ws.send(JSON.stringify(message));
+    } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+    }
 }
 
-// ----------- Singleton Helpers -----------
-let globalTournamentWS: TournamentWebSocketManager | null = null;
+    private startHeartbeat(): void {
+        this.heartbeatInterval = window.setInterval(() => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN)
+                this.send({ type: 'ping', ts: Date.now() });
+        }, 30000);
+    }
 
-export function initTournamentWebSocket(cfg: TournamentWebSocketConfig): TournamentWebSocketManager {
-	if (globalTournamentWS)
-		globalTournamentWS.disconnectAll();
-	globalTournamentWS = new TournamentWebSocketManager(cfg);
-	return globalTournamentWS;
+    private stopHeartbeat(): void {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+    }
+
+    disconnect(): void {
+        this.isIntentionalClose = true;
+        this.stopHeartbeat();
+        if (this.ws) {
+            this.ws.close(1000, 'Client disconnect');
+            this.ws = null;
+        }
+    }
+
+    isConnected(): boolean {
+        return this.ws?.readyState === WebSocket.OPEN;
+    }
+
+    getState(): string {
+        if (!this.ws) return 'DISCONNECTED';
+        switch (this.ws.readyState) {
+            case WebSocket.CONNECTING:
+                return 'CONNECTING';
+            case WebSocket.OPEN:
+                return 'OPEN';
+            case WebSocket.CLOSING:
+                return 'CLOSING';
+            case WebSocket.CLOSED:
+                return 'CLOSED';
+            default:
+                return 'UNKNOWN';
+        }
+    }
+}
+
+let globalTWS: TournamentWebSocketManager | null = null;
+
+export function initTournamentWebSocket(tconfig: TournamentWebSocketConfig): TournamentWebSocketManager {
+    if (globalTWS)
+        globalTWS.disconnect();
+    globalTWS = new TournamentWebSocketManager(tconfig);
+    return globalTWS;
 }
 
 export function getTournamentWebSocket(): TournamentWebSocketManager | null {
-  	return globalTournamentWS;
+    return globalTWS;
 }
 
 export function disconnectTournamentWebSocket(): void {
-	if (globalTournamentWS) {
-		globalTournamentWS.disconnectAll();
-		globalTournamentWS = null;
-	}
+    if (globalTWS) {
+        globalTWS.disconnect();
+        globalTWS = null;
+    }
 }

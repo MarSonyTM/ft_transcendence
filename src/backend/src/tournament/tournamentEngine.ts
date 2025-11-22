@@ -1,51 +1,51 @@
-// import { TournamentState } from './tournamentState';
-// import { tournamentManager as TManager } from './tournamentManager';
-// import { broadcastToTournament } from '../websocket/tournamentHandler';
+import { TournamentState } from './tournamentState';
+import { tournamentManager as TManager } from './tournamentManager';
+import { broadcastToTournament } from '../websocket/tournamentHandler';
 
-// export class TournamentEngine {
-// 	private state: TournamentState;
-// 	private tickTimer: NodeJS.Timeout | null = null;
-// 	private readonly TICK_MS = 1000;
+export class TournamentEngine {
+	private state: TournamentState;
+	private tickTimer: NodeJS.Timeout | null = null;
+	private readonly TICK_MS = 1000;
 
-// 	constructor(state: TournamentState) {
-// 		this.state = state;
-// 	}
+	constructor(state: TournamentState) {
+		this.state = state;
+	}
 
-// 	public start(): void {
-// 		if (this.tickTimer) return;
-// 		this.broadcastState();
-// 		this.loop();
-// 	}
+	public start(): void {
+		if (this.tickTimer) return;
+		this.broadcastState();
+		this.loop();
+	}
 
-// 	public stop(): void {
-// 		if (this.tickTimer) {
-// 			clearTimeout(this.tickTimer);
-// 			this.tickTimer = null;
-// 		}
-// 	}
+	public stop(): void {
+		if (this.tickTimer) {
+			clearTimeout(this.tickTimer);
+			this.tickTimer = null;
+		}
+	}
 
-// 	public getCurrentState(): TournamentState {
-// 		return this.state;
-// 	}
+	public getCurrentState(): TournamentState {
+		return this.state;
+	}
 
-// 	private loop = async () => {
-// 		const next = await TManager.getCurrentMatch(this.state.tournamentId);
-// 		if (next) {
-// 			broadcastToTournament(this.state.tournamentId, {
-// 				type: 'nextMatch',
-// 				matchId: next.id,
-// 				round: next.round,
-// 				roundIdx: next.roundIdx
-// 			});
-// 		}
-// 		this.broadcastState();
-// 		this.tickTimer = setTimeout(this.loop, this.TICK_MS);
-// 	};
+	private loop = async () => {
+		const next = await TManager.getCurrentMatch(this.state.tournamentId);
+		if (next) {
+			broadcastToTournament(this.state.tournamentId, {
+				type: 'nextMatch',
+				matchId: next.id,
+				round: next.round,
+				roundIdx: next.roundIdx
+			});
+		}
+		this.broadcastState();
+		this.tickTimer = setTimeout(this.loop, this.TICK_MS);
+	};
 
-// 	private broadcastState(): void {
-// 		broadcastToTournament(this.state.tournamentId, {
-// 			type: 'tournamentState',
-// 			tournament: this.state.toPublicJSON()
-// 		});
-// 	}
-// }
+	private broadcastState(): void {
+		broadcastToTournament(this.state.tournamentId, {
+			type: 'tournamentState',
+			tournament: this.state.toPublicJSON()
+		});
+	}
+}

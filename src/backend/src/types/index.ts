@@ -1,5 +1,3 @@
-import { BaseGameEngine } from '../game/gameEngine';
-
 export type TPT = 'host' | 'ai' | 'local' | 'remote';
 export const TPTMap: Array<TPT> = ['host', 'ai', 'local', 'remote'];
 
@@ -11,6 +9,7 @@ export const TSMap: Array<TournamentStatus> = ['setup', 'active', 'completed', '
 
 export interface Tournament {
 	id: number;
+	hostId?: number;
 	status: TournamentStatus;
 	players: TournamentPlayer[];
 	allMatches: TournamentMatch[];

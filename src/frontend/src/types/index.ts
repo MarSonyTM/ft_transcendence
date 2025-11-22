@@ -35,7 +35,6 @@ export const TPTmap: Map<TPT, string> = new Map<TPT, string>([
 
 export interface TournamentPlayer {
     id?: number;
-    // playerId: number;
     tournamentId: number;
     tpt: TPT;
     name?: string;
@@ -49,8 +48,6 @@ export interface TournamentPlayer {
 
 export interface TournamentMatch {
     id?: number;
-    // matchId: number;
-    // matchRoomId?: number; // Alias for backward compatibility
     tournamentId: number;
     gameId?: number;
     status: MatchStatus;
@@ -69,28 +66,16 @@ export interface TournamentMatch {
 
 export interface Tournament {
     id?: number;
-    // tournamentId: number;
     status: TournamentStatus;
-    players: Array<TournamentPlayer>;//TournamentPlayer[];
-    allMatches: Array<TournamentMatch>;//TournamentMatch[];
-    currentMatch: TournamentMatch | null;
-    matchQueue?: Array<number>;//TournamentMatch[];
+    players: Array<TournamentPlayer>;
+    allMatches: Array<TournamentMatch>;
+    curM: TournamentMatch | null;
+    matchQueue?: Array<number>;
     championId: number | null;
     round?: number;
     createdAt?: string;
     startedAt?: string;
     endedAt?: string;
-}
-
-export interface TournamentArchiveEntry {
-	tournamentId: number;
-	status: TournamentStatus;
-	players: Array<TournamentPlayer>;//TournamentPlayer[];
-	matches: Array<TournamentMatch>;//TournamentMatch[];
-	championId: number | null;
-	createdAt: string;
-	startedAt?: string;
-	finishedAt?: string;
 }
 
 declare global {
