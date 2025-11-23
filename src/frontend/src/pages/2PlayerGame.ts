@@ -8,6 +8,7 @@ import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen
 import { toggleTournaments } from '../tournament';
 
 export let pongGame: PongGame | null = null;
+let keyboardCleanup: (() => void) | null = null;
 
 export async function render2PlayerGame(): Promise<void> {
     const room = getCurrentRoom();
@@ -92,6 +93,10 @@ export async function render2PlayerGame(): Promise<void> {
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
+            if (keyboardCleanup) {
+                keyboardCleanup();
+            }
+            
             if (pongGame) {
                 cleanupGame(pongGame);
                 endGame(pongGame);
@@ -181,7 +186,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         return;
     }
     
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     
     if (!user) {
         console.error('No authenticated user for room game');
@@ -254,16 +259,40 @@ async function initRoomBasedGame(room: any): Promise<void> {
 
 // Setup keyboard controls
 function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+    // Clean up any existing handlers first!
+    if (keyboardCleanup) {
+        console.log('🧹 Cleaning up old keyboard handlers');
+        keyboardCleanup();
+    }
+
     const keys: { [key: string]: boolean } = {};
     const hasLocal = pongGame && pongGame.hasLocal;
-    
     const gameMode = getCurrentGameMode();
-
-    console.log('Setting up controls:', { 
+    
+    // DEBUG: Check what's in the room
+    const room = getCurrentRoom();
+    const user = authService.getCurrentUser();
+    
+    console.log('🔍 DEBUG Setup Controls:', { 
         playerId,
+        userFromAuth: user,
+        roomPlayers: room?.players,
         hasLocal,
         gameMode
     });
+    
+    // Verify this player is in the room
+    if (room) {
+        const playerInRoom = room.players.find((p: any) => p.id === playerId);
+        if (!playerInRoom) {
+            console.error('❌ Player NOT found in room!', {
+                lookingFor: playerId,
+                availablePlayers: room.players.map((p: any) => p.id)
+            });
+        } else {
+            console.log('✅ Player found in room:', playerInRoom);
+        }
+    }
     
     const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);
 
@@ -272,18 +301,14 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
         const wasPressed = keys[key];
         keys[key] = true;
         
-        // Only send on key state CHANGE
         if (!wasPressed && movementKeys.has(key)) {
             e.preventDefault();
             
-            // Check if this is a local guest key (o/l)
             const isGuestKey = ['o', 'l'].includes(key);
             
             if (isGuestKey && hasLocal) {
-                // Send as guest/local player
                 ws.sendKeyState(key, true, true);
             } else if (!isGuestKey) {
-                // Send as main player
                 ws.sendKeyState(key, true, false);
             }
         }
@@ -306,6 +331,13 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
+
+    keyboardCleanup = () => {
+        document.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keyup', handleKeyUp);
+        console.log('✅ Keyboard handlers removed for', playerId);
+        keyboardCleanup = null;
+    };
 }
 
 
@@ -331,7 +363,7 @@ function syncGameStateFromRoom(state: any): void {
 }
 
 // Update remote player position
-function updateRemotePlayerPosition(playerId: string, position: number): void {
+async function updateRemotePlayerPosition(playerId: string, position: number): Promise<void> {
     if (!pongGame || !pongGame.gameState) return;
     
     const room = getCurrentRoom();
@@ -339,7 +371,7 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
     if (!room) 
         return;
     
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
     
     if (playerId === currentPlayerId) 

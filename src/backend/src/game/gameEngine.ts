@@ -262,7 +262,7 @@ export class BaseGameEngine {
         // Update user statistics for all players
         gamePlayers.forEach((player: any) => {
             // Only update stats for registered users (not AI or local players)
-            if (!player.isAI && player.playerId && player.playerId > 0 && player.playerId < 1000) {
+            if (!player.isAI && !player.isLocal && player.playerId && player.playerId > 0 && player.playerId < 1000) {
                 const user = database.users.getUserById(player.playerId);
                 if (user) {
                     // Check if this player won
@@ -412,22 +412,27 @@ export class BaseGameEngine {
 
             if (this.gameState.players[playerId - 1].pos !== undefined) {
                 if (is2P && playerId === 2) {
+                    // 2-Player Mode: Player 2 (right side, vertical movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
                     const maxYPos = this.maxY - this.paddleHeight;
-                    if (keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                    // Accept both w/s (remote player) and o/l (local player) keys
+                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s'] || keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
                     if (newPos !== this.gameState.players[playerId - 1].pos) {
                         this.gameState.players[playerId - 1].pos = newPos;
                     }
                 } else if (!is2P && (playerId === 2 || playerId === 4)) {
+                    // 4-Player Mode: Players 2 & 4 (top & bottom sides, horizontal movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
                     const maxXPos = this.maxX - this.paddleHeight;
-                    if (keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
+                    // Accept both w/s (remote player) and o/l (local player) keys
+                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s'] || keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
                     if (newPos !== this.gameState.players[playerId - 1].pos) {
                         this.gameState.players[playerId - 1].pos = newPos;
                     }
                 } else if (!is2P && playerId === 3) {
+                    // 4-Player Mode: Player 3 (right side, vertical movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
                     const maxYPos = this.maxY - this.paddleHeight;
                     if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);

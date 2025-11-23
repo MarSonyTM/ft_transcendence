@@ -76,7 +76,7 @@ export function renderTempLoginPage(): void {
 
           // Create user data object for localStorage backup
           const userData = {
-            id: 0, // Will be updated from backend
+            id: 69, // Will be updated from backend
             username: result.username || 'Guest',
             email: 'guest@transcendence.com',
             firstName: 'Guest',

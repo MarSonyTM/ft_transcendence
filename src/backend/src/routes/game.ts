@@ -37,43 +37,11 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.get('/', async (request, reply) => {
         try {
             const games = database.games.getAllGames();
-        
-            // Map games and use players from the game object (JSON field)
-            const gamesWithPlayers = games.map(game => {
-                let players = game.players || [];
-                let points = game.points || [];
-                
-                // If players is a string, parse it
-                if (typeof players === 'string') {
-                    try {
-                        players = JSON.parse(players);
-                    } catch (e) {
-                        console.error(`Failed to parse players for game ${game.id}:`, e);
-                        players = [];
-                    }
-                }
-
-                // If points is a string, parse it
-                if (typeof points === 'string') {
-                    try {
-                        points = JSON.parse(points);
-                    } catch (e) {
-                        console.error(`Failed to parse points for game ${game.id}:`, e);
-                        points = [];
-                    }
-                }
-                
-                return {
-                    ...game,
-                    players: players,
-                    points: points
-                };
-            });
             
             return {
                 success: true,
-                count: gamesWithPlayers.length,
-                data: gamesWithPlayers
+                count: games.length,
+                data: games  // ✅ Use games as-is, don't overwrite players field
             };
         } catch (error) {
             fastify.log.error(error);
@@ -108,22 +76,16 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            // Also get players for this game
-            const players = database.players.getPlayers(gameId);
-            
             return {
                 success: true,
-                data: {
-                    ...game,
-                    players
-                }
+                data: game
             };
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
                 success: false,
                 message: 'Failed to fetch game'
-            });
+                });
         }
     });
 
@@ -814,22 +776,30 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Build players data for saving
             // Build the players array with usernames
             const playersData = gamePlayers.map((player: any) => {
-                const user = database.users.getUserById(player.playerId);
-                
                 let displayName = '';
                 
-                if (user) {
-                    // Registered user - use their username
-                    displayName = user.username;
-                } else if (player.name) {
-                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
-                        const difficulty = player.difficulty || 'Normal';
-                        displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
-                    } else {
+                // Special handling for local players (playerId: "local")
+                if (player.playerId === 'local' || player.playerId === 'Local') {
+                    displayName = player.name || 'Local Player';
+                } 
+                // Special handling for AI players
+                else if (player.name && (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot'))) {
+                    const difficulty = player.difficulty || 'Normal';
+                    displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                }
+                // Try to look up registered user
+                else {
+                    const user = database.users.getUserById(player.playerId);
+                    
+                    if (user) {
+                        // Registered user - use their username
+                        displayName = user.username;
+                    } else if (player.name) {
+                        // Fallback to player.name if no user found
                         displayName = player.name;
+                    } else {
+                        displayName = `Player ${player.playerId}`;
                     }
-                } else {
-                    displayName = `Player ${player.playerId}`;
                 }
                 
                 return {
