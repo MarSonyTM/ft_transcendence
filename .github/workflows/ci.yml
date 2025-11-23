@@ -42,5 +42,4 @@ jobs:
 
       - name: Build Docker images
         run: |
-          cd src
           docker compose -f docker-compose.dev.yml build

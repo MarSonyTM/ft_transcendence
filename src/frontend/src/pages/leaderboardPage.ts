@@ -100,6 +100,162 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
     }
 }
 
+function createFullStatisticsView(leaderboard: LeaderboardUser[]): string {
+    if (leaderboard.length === 0) {
+        return `
+            <div style="text-align: center; padding: 3em; color: #9ca3af;">
+                <div style="font-size: 3em; margin-bottom: 0.5em;">🎮</div>
+                <h2 style="color: #fff; margin-bottom: 0.5em;">No Statistics Yet</h2>
+                <p>Play some games to see statistics visualized here!</p>
+            </div>
+        `;
+    }
+
+    // Calculate aggregate stats
+    const totalWins = leaderboard.reduce((sum, p) => sum + p.gamesWon, 0);
+    const totalLosses = leaderboard.reduce((sum, p) => sum + p.gamesLost, 0);
+    const totalGames = totalWins + totalLosses;
+    const avgWinRate = leaderboard.reduce((sum, p) => sum + p.winRate, 0) / leaderboard.length;
+
+    // Top 5 for bar chart
+    const top5 = leaderboard.slice(0, 5);
+    const maxGames = Math.max(...top5.map(p => p.gamesWon + p.gamesLost), 1);
+
+    // Pie chart calculations
+    const winPercentage = totalGames > 0 ? (totalWins / totalGames) * 100 : 0;
+    const lossPercentage = totalGames > 0 ? (totalLosses / totalGames) * 100 : 0;
+    const radius = 100;
+    const circumference = 2 * Math.PI * radius;
+    const winStroke = (winPercentage / 100) * circumference;
+    const lossStroke = (lossPercentage / 100) * circumference;
+
+    return `
+        <!-- Overview Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5em; margin-bottom: 2em;">
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1.5em; border-radius: 8px; text-align: center;">
+                <div style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5em;">Total Games</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #10b981;">${totalGames}</div>
+            </div>
+            
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1.5em; border-radius: 8px; text-align: center;">
+                <div style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5em;">Total Wins</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #3b82f6;">${totalWins}</div>
+            </div>
+            
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1.5em; border-radius: 8px; text-align: center;">
+                <div style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5em;">Total Losses</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #ef4444;">${totalLosses}</div>
+            </div>
+            
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1.5em; border-radius: 8px; text-align: center;">
+                <div style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5em;">Avg Win Rate</div>
+                <div style="font-size: 2.5rem; font-weight: bold; color: #f59e0b;">${avgWinRate.toFixed(1)}%</div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2em; margin-bottom: 2em;">
+            <!-- Pie Chart -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); padding: 2em; border-radius: 8px;">
+                <h3 style="text-align: center; color: #fff; margin-bottom: 1.5em;">Win/Loss Distribution</h3>
+                <div style="position: relative; width: 300px; height: 300px; margin: 0 auto;">
+                    <svg width="300" height="300" viewBox="0 0 300 300" style="transform: rotate(-90deg);">
+                        <circle cx="150" cy="150" r="${radius}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="60"/>
+                        <circle cx="150" cy="150" r="${radius}" fill="none" stroke="#10b981" stroke-width="60"
+                            stroke-dasharray="${winStroke} ${circumference}" stroke-dashoffset="0"
+                            style="transition: stroke-dasharray 1s ease;"/>
+                        <circle cx="150" cy="150" r="${radius}" fill="none" stroke="#ef4444" stroke-width="60"
+                            stroke-dasharray="${lossStroke} ${circumference}" stroke-dashoffset="${-winStroke}"
+                            style="transition: stroke-dasharray 1s ease;"/>
+                    </svg>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                        <div style="font-size: 2.5rem; font-weight: bold; color: #fff;">${totalGames}</div>
+                        <div style="font-size: 0.9rem; color: #9ca3af;">Total Games</div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 2em; margin-top: 1.5em;">
+                    <div style="display: flex; align-items: center; gap: 0.5em;">
+                        <div style="width: 20px; height: 20px; background: #10b981; border-radius: 4px;"></div>
+                        <span style="color: #9ca3af;">Wins: ${totalWins} (${winPercentage.toFixed(1)}%)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5em;">
+                        <div style="width: 20px; height: 20px; background: #ef4444; border-radius: 4px;"></div>
+                        <span style="color: #9ca3af;">Losses: ${totalLosses} (${lossPercentage.toFixed(1)}%)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bar Chart -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); padding: 2em; border-radius: 8px;">
+                <h3 style="text-align: center; color: #fff; margin-bottom: 1.5em;">Performance Comparison</h3>
+                <div style="display: flex; align-items: flex-end; justify-content: center; gap: 4em; height: 250px; padding: 1em;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${totalWins}</div>
+                        <div style="position: relative; width: 80px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden;">
+                            <div style="position: absolute; bottom: 0; width: 100%; height: ${(totalWins / Math.max(totalWins, totalLosses, 1)) * 200}px;
+                                background: linear-gradient(to top, #10b981, #34d399); border-radius: 8px 8px 0 0; transition: height 1s ease;"></div>
+                        </div>
+                        <div style="color: #9ca3af; font-weight: 600;">Wins</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em;">
+                        <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">${totalLosses}</div>
+                        <div style="position: relative; width: 80px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden;">
+                            <div style="position: absolute; bottom: 0; width: 100%; height: ${(totalLosses / Math.max(totalWins, totalLosses, 1)) * 200}px;
+                                background: linear-gradient(to top, #ef4444, #f87171); border-radius: 8px 8px 0 0; transition: height 1s ease;"></div>
+                        </div>
+                        <div style="color: #9ca3af; font-weight: 600;">Losses</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 5 Players Bar Chart -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); padding: 2em; border-radius: 8px;">
+            <h3 style="color: #fff; margin: 0 0 1.5em 0; text-align: center;">📊 Top 5 Players Performance</h3>
+            <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 250px; padding: 0 1em;">
+                ${top5.map((player, index) => {
+                    const winHeight = (player.gamesWon / maxGames) * 200;
+                    const lossHeight = (player.gamesLost / maxGames) * 200;
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                    
+                    return `
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em; flex: 1; max-width: 120px;">
+                            <div style="font-size: 1.2rem;">${medal}</div>
+                            <div style="display: flex; gap: 0.5em; align-items: flex-end; height: 200px;">
+                                <div style="position: relative; width: 35px; height: 200px; background: rgba(16, 185, 129, 0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="position: absolute; bottom: 0; width: 100%; height: ${winHeight}px;
+                                        background: linear-gradient(to top, #10b981, #34d399); border-radius: 4px 4px 0 0; transition: height 1s ease;"></div>
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; 
+                                        font-weight: bold; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.8);">${player.gamesWon}</div>
+                                </div>
+                                <div style="position: relative; width: 35px; height: 200px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="position: absolute; bottom: 0; width: 100%; height: ${lossHeight}px;
+                                        background: linear-gradient(to top, #ef4444, #f87171); border-radius: 4px 4px 0 0; transition: height 1s ease;"></div>
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; 
+                                        font-weight: bold; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.8);">${player.gamesLost}</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 0.85rem; font-weight: 600; color: #fff; text-align: center; max-width: 100px; 
+                                overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${player.username}</div>
+                            <div style="font-size: 0.75rem; color: #9ca3af;">${player.winRate.toFixed(0)}%</div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div style="display: flex; justify-content: center; gap: 2em; margin-top: 1.5em; padding-top: 1em; border-top: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; align-items: center; gap: 0.5em;">
+                    <div style="width: 16px; height: 16px; background: linear-gradient(to top, #10b981, #34d399); border-radius: 3px;"></div>
+                    <span style="color: #9ca3af; font-size: 0.9rem;">Wins</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5em;">
+                    <div style="width: 16px; height: 16px; background: linear-gradient(to top, #ef4444, #f87171); border-radius: 3px;"></div>
+                    <span style="color: #9ca3af; font-size: 0.9rem;">Losses</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 export async function renderLeaderboardPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
@@ -343,6 +499,36 @@ export async function renderLeaderboardPage(): Promise<void> {
                     </div>
                 </div>
                 
+                <!-- Statistics Toggle Section -->
+                <div style="margin-top: 2em; padding-top: 2em; border-top: 2px solid rgba(255,255,255,0.1);">
+                    <button id="toggleStatsBtn" class="btn-neon accent" style="
+                        width: 100%;
+                        padding: 1em;
+                        font-size: 1.1rem;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 0.5em;
+                        background: rgba(59, 130, 246, 0.1);
+                        border: 1px solid rgba(59, 130, 246, 0.3);
+                        transition: all 0.3s ease;
+                    ">
+                        <span id="statsToggleIcon">▼</span>
+                        <span>Show Statistics & Charts</span>
+                    </button>
+                    
+                    <div id="statisticsContainer" style="
+                        max-height: 0;
+                        overflow: hidden;
+                        transition: max-height 0.5s ease, opacity 0.5s ease, margin-top 0.5s ease;
+                        opacity: 0;
+                    ">
+                        <div style="padding-top: 2em;">
+                            ${createFullStatisticsView(leaderboard)}
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Action Buttons -->
                 <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
                     <button id="backToLandingBtn" class="btn btn-back" style="font-size: 1em; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 0.65em 1.8em; cursor: pointer; font-weight: 500; transition: all 0.3s ease;">← Home</button>
@@ -374,6 +560,34 @@ export async function renderLeaderboardPage(): Promise<void> {
             history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();
+        });
+    }
+
+    // Statistics toggle functionality
+    const toggleStatsBtn = document.getElementById('toggleStatsBtn');
+    const statsContainer = document.getElementById('statisticsContainer');
+    const statsToggleIcon = document.getElementById('statsToggleIcon');
+    let statsVisible = false;
+
+    if (toggleStatsBtn && statsContainer && statsToggleIcon) {
+        toggleStatsBtn.addEventListener('click', () => {
+            statsVisible = !statsVisible;
+            
+            if (statsVisible) {
+                // Show statistics
+                statsContainer.style.maxHeight = '3000px';
+                statsContainer.style.opacity = '1';
+                statsContainer.style.marginTop = '2em';
+                statsToggleIcon.textContent = '▲';
+                toggleStatsBtn.querySelector('span:last-child')!.textContent = 'Hide Statistics & Charts';
+            } else {
+                // Hide statistics
+                statsContainer.style.maxHeight = '0';
+                statsContainer.style.opacity = '0';
+                statsContainer.style.marginTop = '0';
+                statsToggleIcon.textContent = '▼';
+                toggleStatsBtn.querySelector('span:last-child')!.textContent = 'Show Statistics & Charts';
+            }
         });
     }
 
