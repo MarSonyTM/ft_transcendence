@@ -12,6 +12,7 @@ export interface CreateUserInput {
     username?: string;
     password?: string;
     avatar?: string;
+    twoFactorEnabled?: boolean;
 }
 
 // Add input validation schemas
@@ -38,7 +39,8 @@ const updateUserSchema = {
         lastName: { type: 'string', minLength: 1, maxLength: 100 },
         email: { type: 'string', format: 'email' }, // Use email format validation
         username: { type: 'string', minLength: 3, maxLength: 50 },
-        avatar: { type: 'string', maxLength: 500 } // Limit length to prevent oversized inputs
+        avatar: { type: 'string', maxLength: 500 }, // Limit length to prevent oversized inputs
+        twoFactorEnabled: { type: 'boolean' }
     },
     additionalProperties: false // Prevent extra fields
 };

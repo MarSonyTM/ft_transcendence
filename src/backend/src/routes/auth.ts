@@ -281,6 +281,182 @@ async function userRoutes(
     }
   });
 
+  // ==== Verify 2FA code ====
+  fastify.post("/verify-2fa", async (request, reply) => {
+    try {
+      const { verificationCode, userId } = request.body as {
+        verificationCode: string;
+        userId?: number;
+      };
+
+      if (!verificationCode || verificationCode.length !== 6) {
+        reply.code(400).send({
+          success: false,
+          message: "Valid 6-digit verification code is required",
+        });
+        return;
+      }
+
+      if (!userId) {
+        reply.code(400).send({
+          success: false,
+          message: "User ID is required",
+        });
+        return;
+      }
+
+      // Get user
+      const user = await database.users.getUserById(userId);
+      if (!user) {
+        reply.code(404).send({
+          success: false,
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Get the most recent pending verification for this user
+      const pendingVerification = database.twoFactorVerifications.getPendingVerification(userId);
+      
+      if (!pendingVerification) {
+        reply.code(400).send({
+          success: false,
+          message: "No pending verification found or code has expired",
+        });
+        return;
+      }
+
+      // Check if the provided code matches the most recent one
+      if (pendingVerification.verificationCode !== verificationCode) {
+        reply.code(400).send({
+          success: false,
+          message: "Invalid verification code",
+        });
+        return;
+      }
+
+      // Verify the code (this will mark it as verified)
+      const verification = database.twoFactorVerifications.verify2FA(
+        verificationCode,
+        userId
+      );
+      
+      if (!verification) {
+        reply.code(400).send({
+          success: false,
+          message: "Failed to verify code",
+        });
+        return;
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: user.id, email: user.email || "", username: user.username || "" },
+        JWT_SECRET!,
+        { expiresIn: "1w" }
+      );
+
+      // Set cookie
+      reply.setCookie('token', token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 604800,
+      });
+
+      const { password, ...userWithoutPassword } = user;
+
+      reply.code(200).send({
+        success: true,
+        message: "2FA verification successful",
+        token,
+        data: userWithoutPassword,
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      reply.code(500).send({
+        success: false,
+        message: "Failed to verify 2FA code",
+      });
+    }
+  });
+
+  // ==== Resend 2FA code ====
+  fastify.post("/resend-2fa", async (request, reply) => {
+    try {
+      const { userId } = request.body as { userId: number };
+
+      if (!userId) {
+        reply.code(400).send({
+          success: false,
+          message: "User ID is required",
+        });
+        return;
+      }
+
+      // Find user by ID
+      const user = await database.users.getUserById(userId);
+      if (!user) {
+        reply.code(404).send({
+          success: false,
+          message: "User not found",
+        });
+        return;
+      }
+
+      // Check if user has 2FA enabled
+      if (!user.twoFactorEnabled) {
+        reply.code(400).send({
+          success: false,
+          message: "2FA is not enabled for this user",
+        });
+        return;
+      }
+
+      // Generate new verification code
+      const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+      // Create new verification request
+      const verification =
+        database.twoFactorVerifications.createVerificationRequest(
+          user.id,
+          verificationCode
+        );
+
+      // Send 2FA email
+      const emailSent = await sendVerificationEmail(
+        user.email,
+        verificationCode,
+        user.username,
+        true // is2FA flag
+      );
+
+      if (!emailSent) {
+        reply.code(500).send({
+          success: false,
+          message: "Failed to send 2FA code",
+        });
+        return;
+      }
+
+      reply.code(200).send({
+        success: true,
+        message: "2FA code sent successfully",
+        data: {
+          verificationId: verification.id,
+          expiresAt: verification.expiresAt,
+        },
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      reply.code(500).send({
+        success: false,
+        message: "Failed to resend 2FA code",
+      });
+    }
+  });
+
   fastify.post("/login", async (request, reply) => {
     try {
       console.log(request.body);
@@ -326,6 +502,42 @@ async function userRoutes(
         });
         return;
       }
+
+      // Check if user has 2FA enabled
+      if (res.twoFactorEnabled) {
+        // Generate 2FA code
+        const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+        // Create verification request
+        const verification =
+          database.twoFactorVerifications.createVerificationRequest(
+            res.id,
+            verificationCode
+          );
+
+        // Send 2FA email
+        const emailSent = await sendVerificationEmail(
+          res.email,
+          verificationCode,
+          res.username,
+          true // is2FA flag
+        );
+
+        // Return response indicating 2FA is required
+        reply.code(200).send({
+          success: false,
+          requires2FA: true,
+          message: "2FA code sent to your email",
+          data: {
+            userId: res.id,
+            email: res.email,
+            username: res.username,
+            emailVerified: res.emailVerified,
+          },
+        });
+        return;
+      }
+
       // check later
       const token = jwt.sign(
         { id: res.id, email: res.email || "", username: res.username || "" },
