@@ -1,5 +1,4 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import path from 'path';
 import websocket from '@fastify/websocket';
 import userRoutes from './routes/users';
 import auth from './routes/auth';
@@ -14,7 +13,6 @@ import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
 import cookie from '@fastify/cookie';
-import { database } from './database';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';

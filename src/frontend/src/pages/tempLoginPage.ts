@@ -67,8 +67,6 @@ export function renderTempLoginPage(): void {
       const username = usernameInput.value.trim() || undefined;
       const result = await createGuestUser(username);
 
-      console.log('Guest user creation result:', result);
-
       if (result.success && result.token) {    
         
         console.log('successfully:', result.success);
@@ -85,7 +83,6 @@ export function renderTempLoginPage(): void {
           gamesLost: 0
         };
         
-        console.log('Setting current user to:', userData);
         await authService.setCurrentUserProfile(userData);
         
         // Show success message
@@ -101,7 +98,7 @@ export function renderTempLoginPage(): void {
         }, 800);
       } else {
         if (guestErrorEl) {
-          const errorMsg = error instanceof Error ? error.message : 'Failed to create guest user';
+          const errorMsg = guestErrorEl instanceof Error ? guestErrorEl.message : 'Failed to create guest user';
           guestErrorEl.innerHTML = `<span style="color: #ef4444;">❌ ${errorMsg}</span>`;
         }
         

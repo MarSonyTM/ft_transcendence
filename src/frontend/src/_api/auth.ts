@@ -170,7 +170,6 @@ export async function createGuestUser(username?: string): Promise<{
     
         return { success: false, error: `Server error (${res.status})` };
     } catch (error) {
-        console.error('Guest user creation error:', error);
         return { 
             success: false, 
             error: error instanceof Error ? error.message : 'Network error' 
