@@ -16,7 +16,6 @@ let pollInterval: number | null = null;
 let lobbyWebSocket: any = null;
 
 export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
-    alert("");
     const root = document.getElementById('app-root');
     if (!root) return;
 

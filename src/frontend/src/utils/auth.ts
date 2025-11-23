@@ -63,10 +63,8 @@ export class AuthService {
    */
   private async initializeAuth(): Promise<void> {
     const path = window.location.pathname;
-    console.log('🔧 initializeAuth called, path:', path);
     // Skip auto-fetch on auth callback page - it will handle auth explicitly
     if (path.includes('/auth/callback')) {
-      console.log('⏭️ Skipping init on auth callback page');
       return;
     }
     await this.fetchUserProfile();
@@ -102,9 +100,7 @@ export class AuthService {
   }
 
   // Fetch user profile from backend
-  async fetchUserProfile(): Promise<UserProfile | null> {
-    console.log('🔍 fetchUserProfile called from:', window.location.pathname);
-    
+  async fetchUserProfile(): Promise<UserProfile | null> {  
 
 
     const path = window.location.pathname;
@@ -115,7 +111,6 @@ export class AuthService {
       return null;
     }
 
-    console.log('📡 Fetching user profile from backend...');
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
       credentials: "include",

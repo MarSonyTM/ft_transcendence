@@ -42,7 +42,6 @@ async function fetchAllGames(): Promise<GameResult[]> {
             throw new Error('Failed to fetch games');
         }
         const result = await response.json();
-        console.log('Games API response:', result);
         
         // Extract the data array from the API response
         return result.data || [];
@@ -73,7 +72,6 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
         }
         
         const result = await response.json();
-        console.log('Leaderboard API response:', result);
         
         // Extract the data array from the API response
         const users = result.data || [];
@@ -212,9 +210,9 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             
                                             // Get winner name - try multiple fields
                                             if (winner) {
-                                                winnerName = winner.username || winner.name || 
+                                                winnerName = winner.username || winner.username || 
                                                     (typeof game.winner === 'string' ? game.winner : null) ||
-                                                    `Player ${winner.id || winner.playerId || '?'}`;
+                                                    `Player ${winner.id || winner.id || '?'}`;
                                             } else if (game.winner) {
                                                 // Fallback to game.winner if it's a string
                                                 winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
@@ -222,8 +220,8 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             
                                             // Get loser name - try multiple fields
                                             if (loser) {
-                                                loserName = loser.username || loser.name || 
-                                                    `Player ${loser.id || loser.playerId || '?'}`;
+                                                loserName = loser.username || 
+                                                    `Player ${loser.id || '?'}`;
                                             } else if (players.length > 0) {
                                                 // If we found winner but not loser, get the other player
                                                 const otherPlayer = players.find((p: any) => {
@@ -232,20 +230,14 @@ export async function renderLeaderboardPage(): Promise<void> {
                                                     return pName && pName !== wName;
                                                 });
                                                 if (otherPlayer) {
-                                                    loserName = otherPlayer.username || otherPlayer.name || 
-                                                        `Player ${otherPlayer.id || otherPlayer.playerId || '?'}`;
+                                                    loserName = otherPlayer.username || otherPlayer.username || 
+                                                        `Player ${otherPlayer.id || '?'}`;
                                                 }
                                             }
                                         } else if (game.winner) {
                                             // Fallback: use game.winner if players array is missing
                                             winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
                                         }
-                                        
-                                        console.log(`[LEADERBOARD] Game #${sortedGames.length - index} - Winner: ${winnerName}, Loser: ${loserName}`, {
-                                            players: players,
-                                            winner: game.winner,
-                                            winnerId: game.winnerId
-                                        });
 
                                         return `
                                             <div style="background: rgba(255, 255, 255, 0.05); padding: 1em; border-radius: 6px; border-left: 3px solid rgb(59 130 246);">
@@ -285,23 +277,13 @@ export async function renderLeaderboardPage(): Promise<void> {
                                                 // game.winner is a username string, not an ID
                                                 winner = game.players.find((p: any) => 
                                                     p.username === game.winner || 
-                                                    p.id === game.winnerId || 
-                                                    p.id?.toString() === game.winnerId?.toString()
+                                                    p.id === game.winner.id || 
+                                                    p.id?.toString() === game.winner.id?.toString()
                                                 );
                                                 losers = game.players.filter((p: any) => 
                                                     p.username !== game.winner && 
-                                                    p.id !== game.winnerId && 
-                                                    p.id?.toString() !== game.winnerId?.toString()
-                                                );
-                                            } else if (game.winnerId) {
-                                                // Try to find by winnerId
-                                                winner = game.players.find((p: any) => 
-                                                    p.id === game.winnerId || 
-                                                    p.id?.toString() === game.winnerId?.toString()
-                                                );
-                                                losers = game.players.filter((p: any) => 
-                                                    p.id !== game.winnerId && 
-                                                    p.id?.toString() !== game.winnerId?.toString()
+                                                    p.id !== game.winner.id && 
+                                                    p.id?.toString() !== game.winner.id?.toString()
                                                 );
                                             } else {
                                                 // Sort by score to find winner
@@ -313,7 +295,7 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             }
                                             // Get winner name
                                             if (winner) {
-                                                winnerName = winner.username || winner.name || `Player ${winner.id}`;
+                                                winnerName = winner.username || `Player ${winner.id}`;
                                             } else if (game.winner) {
                                                 // Fallback to game.winner if it's a string
                                                 winnerName = typeof game.winner === 'string' ? game.winner : 'Unknown';
@@ -322,7 +304,7 @@ export async function renderLeaderboardPage(): Promise<void> {
                                             // Get loser names
                                             if (losers && losers.length > 0) {
                                                 for (let i = 0; i < Math.min(losers.length, 3); i++) {
-                                                    loserNames[i] = losers[i].username || losers[i].name || `Player ${losers[i].id}`;
+                                                    loserNames[i] = losers[i].username || losers[i].username || `Player ${losers[i].id}`;
                                                 }
                                             }
                                         }
