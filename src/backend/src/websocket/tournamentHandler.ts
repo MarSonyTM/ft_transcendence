@@ -96,8 +96,7 @@ function handleTournamentMessage(tournamentId: number, playerId: number, message
 				broadcastToTournament(tournamentId, {
 					type: 'playerReady',
 					playerId,
-					matchId: curM.id,
-					isReady: message.isReady
+					matchId: curM.id
 				});
 			}
 			break;
@@ -158,6 +157,7 @@ function getMatchPlayerNumber(match: any, playerId: number): number {
 }
 
 export function publicTournamentShape(t: any) {
+	t = tournamentManager.hydrateTournament(t);
 	return {
 		id: t.id,
 		status: t.status,
@@ -174,6 +174,13 @@ export function publicTournamentShape(t: any) {
 }
 
 export function publicMatchShape(m: any) {
+	if (m.tournamentId) {
+		let t = tournamentManager.getTournament(m.tournamentId);
+		if (!t) return;
+		t = tournamentManager.hydrateTournament(t);
+		if (!t || !t.curM) return;
+		m = t.curM;
+	}
 	return {
 		id: m.id,
 		tournamentId: m.tournamentId,

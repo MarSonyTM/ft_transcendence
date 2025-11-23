@@ -1135,7 +1135,8 @@ class TournamentDatabaseManager {
     getMatchById(id: number): TournamentMatch | null {
         try {
             const match = this.db.prepare('SELECT * FROM t_matches WHERE id = ?').get(id) as TournamentMatch;
-            return match || null;
+            let m = this.hydrateMatch(match);
+            return m;
         } catch (error) {
             console.error('Error getting match:', error);
             return null;
@@ -1161,7 +1162,7 @@ class TournamentDatabaseManager {
             
             for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
                 if (data[key] !== undefined) {
-                    const value = (key === 'p1' || key === 'p2') ? JSON.stringify(data[key])
+                    const value = (key === 'p1' || key === 'p2' || key === 'room') ? JSON.stringify(data[key])
                         : (typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key]);
                     this.db.prepare(`UPDATE t_matches SET ${key} = ? WHERE id = ?`).run(value, data.id);
                 }
@@ -1189,6 +1190,8 @@ class TournamentDatabaseManager {
                 match.p1 = match.p1 ? JSON.parse(match.p1) : undefined;
             if (typeof match.p2 === 'string')
                 match.p2 = match.p2 ? JSON.parse(match.p2) : undefined;
+            if (typeof match.room === 'string')
+                match.room = match.room ? JSON.parse(match.room) : null;
             return match;
         } catch (error) {
             console.error('Error hydrating match:', error);
@@ -1518,6 +1521,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tournamentId INTEGER NOT NULL,
                 gameId INTEGER,
+                room JSON DEFAULT '{}',
                 status TEXT NOT NULL DEFAULT 'setup',
                 isBye BOOLEAN DEFAULT FALSE,
                 p1 JSON DEFAULT '{}',

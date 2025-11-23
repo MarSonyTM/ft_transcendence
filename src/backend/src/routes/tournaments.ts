@@ -176,11 +176,16 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			if (!p)
 				return reply.status(404).send({ success: false, message: 'Player not found in match' });
 			console.debug(`Toggling ready status for player ${playerId} in match ${matchId} of tournament ${tournamentId}`);
-			const success = tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId, !p.isReady);
+			const success = tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId);
 			if (!success)
 				return reply.status(400).send({ success: false, message: 'Unable to toggle player ready' });
 			m = tournamentManager.getMatch(+matchId);
-			return reply.send({ success: true, data: publicMatchShape(m) });
+			if (!m || !m.tournamentId)
+				return reply.status(404).send({ success: false, message: 'Match not found' });
+			let t = tournamentManager.getTournament(m.tournamentId);
+			if (!t)
+				return reply.status(404).send({ success: false, message: 'Tournament not found' });
+			return reply.send({ success: true, data: publicTournamentShape(t)});
 		} catch (error) {
 			fastify.log.error(error);
 			return reply.status(500).send({ success: false, message: 'Failed to toggle player ready status' });
@@ -318,10 +323,10 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const mId = +matchId;
 			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
 				return reply.code(400).send({ success: false, message: 'invalid id(s)' });
-			const m = tournamentManager.prepareMatch(tId, mId);
-			if (!m)
-				return reply.code(400).send({ success: false, message: 'failed to start match' });
-			return reply.send({ success: true, message: 'match starting soon', match: publicMatchShape(m) });
+			const t = tournamentManager.prepareMatch(tId, mId);
+			if (!t || !t.curM)
+				return reply.code(404).send({ success: false, message: 'failed to get tournament or match' });
+			return reply.send({ success: true, message: 'match starting soon', data: publicMatchShape(t.curM) });
 		} catch (error) {
 			fastify.log.error(error);
 			return reply.status(500).send({ success: false, message: 'Failed to start match' });

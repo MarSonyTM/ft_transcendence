@@ -241,15 +241,15 @@ export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
     }
 }
 
-export async function setEffectiveTournament(tournamentId: number): Promise<Tournament | null> {
+export async function setEffectiveTournament(tournamentId: number): Promise<Tournament> {
     try {
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}`, {
             headers: { 'Authorization': `Bearer ${authService.getToken()}` }
         });
         const json = await resp.json();
-        if (!resp.ok) return null;
+        if (!resp.ok) return null as any;
         const raw = unwrapPayload<any>(json);
-        if (!raw) return null;
+        if (!raw) return null as any;
         const t = normalizeTournament(raw);
         hydrateTournament(t);
         const curM = await loadCurrentMatch();
@@ -261,7 +261,7 @@ export async function setEffectiveTournament(tournamentId: number): Promise<Tour
         return t;
     } catch (error) {
         console.error('setEffectiveTournament error:', error);
-        return null;
+        return null as any;
     }
 }
 

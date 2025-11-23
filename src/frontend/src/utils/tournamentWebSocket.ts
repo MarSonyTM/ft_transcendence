@@ -167,10 +167,12 @@ export class TournamentWebSocketManager {
     }
 
     requestMatchState(): void {
+        console.debug('REQUEST MATCH STATE');
         this.send({ type: 'requestMatchState' });
     }
 
     sendReady(isReady: boolean): void {
+        console.debug('SENDREADY');
         this.send({ type: 'ready', isReady });
     }
 

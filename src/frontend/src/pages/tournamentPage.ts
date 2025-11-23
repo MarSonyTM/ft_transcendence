@@ -17,11 +17,11 @@ import {
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
 import { MatchStatus, MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
-import { getCurrentMatch, getCurrentTournament, hydrateMatch, hydrateTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
+import { getCurrentMatch, getCurrentTournament, hydrateMatch, hydrateTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 import { baby3D } from '../game/game3D';
 import { render2PlayerGame } from './2PlayerGame';
-import { setCurrentRoom } from '../utils/roomState';
+import { getCurrentRoom, setCurrentRoom } from '../utils/roomState';
 
 let activeMatch: PongGame | undefined = undefined;
 let isGameActive = false;
@@ -177,10 +177,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         content.innerHTML = '<p>Waiting for players to be assigned...</p>';
         return;
     }
-    // const p1 = t.players.find(p => p.id === t.curM!.p1!.id);
-    // t.curM.p1 = p1;
-    // const p2 = t.players.find(p => p.id === t.curM!.p2!.id);
-    // t.curM.p2 = p2;
+    
     console.debug('[Tournament] Current Match Players:', t.curM.p1, t.curM.p2);
     const curLabel = `${t.curM.p1.name || '—'} vs ${t.curM.p2.name || '—'}`;
     content.innerHTML = `
@@ -190,7 +187,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         
         <div id="currentMatchBox" class="t-match-controls"></div>
         
-        <div id="tournamentGameContainer" class="t-game-container" style="display: none;">
+        <div id="tournamentGameContainer" class="t-game-container" style="display: block;">
             <div id="pureGameContainer">
                 <h3 class="t-game-title">Live Match</h3>
                 <div class="game-status">
@@ -239,8 +236,8 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
             console.log('[Tournament] No active game to show/hide');
             return;
         }
-        const isVisible = pure.style.display !== 'none';
-        pure.style.display = isVisible ? 'none' : 'block';
+        const isVisible = pure.style.display !== 'block';//TODO
+        pure.style.display = isVisible ? 'block' : 'block';
         btn.textContent = isVisible ? 'Show Game' : 'Hide Game';
     });
 
@@ -270,13 +267,14 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     const box = document.getElementById('currentMatchBox')!;
     if (t.id && t.curM.status === 'completed') {
         box.innerHTML = '<p>Match completed. Loading next match...</p>';
-        if (await waitForNextMatch(t.id))
-            await renderTournamentContent(t);
+        // if (await waitForNextMatch(t.id))
+        await renderTournamentContent(t);
         return;
     }
-    if (t.curM.status === 'active') {
+    if (t.curM.status === 'active' || t.curM.status === 'ready') {
         box.innerHTML = '<p>Match in progress...</p>';
-        await showMatch(t.curM);
+        await showMatch(t);
+        renderTournamentContent(t);
         return;
     }
     // t.curM = await loadCurrentMatch();
@@ -290,7 +288,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     }
     // setCurrentTournament(t);
     // t = setEffectiveTournament(t.id!);
-    console.debug('[Tournament] Rendering match controls for match:', t.curM);
+    // console.debug('[Tournament] Rendering match controls for match:', t.curM);
     // setCurrentMatch(t.curM);
     renderMatchControls(box, t);
     
@@ -301,53 +299,63 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
 function renderMatchControls(box: HTMLElement, t: Tournament): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id)
         return console.debug('No current match or players to render controls for');
+    console.debug('[Tournament] Rendering match controls for match:', t.curM);
+
 
     box.innerHTML = `
         <p class="t-info-bold">Next Match:</p>
         <div class="t-flex" style="gap:.5rem;">
-            <div class="t-flex-1" style="color:#fff;font-weight:bold;">${t.curM.p1?.name || '—'}</div>
-            <div class="t-flex-1" style="color:#fff;font-weight:bold;">${t.curM.p2?.name || '—'}</div>
+            <div class="t-flex-1" style="color:#fff;font-weight:bold;">${t.curM.p1.name || '—'}</div>
+            <div class="t-flex-1" style="color:#fff;font-weight:bold;">${t.curM.p2.name || '—'}</div>
         </div>
         <div style="margin-top:.5rem;">
             <div style="font-size:.9em;color:#fff;opacity:.9;">Match ID: <code>${t.curM.id}</code></div>
         </div>
         <div class="t-flex">
-            <button id="p1ReadyBtn" class="t-flex-1 btn btn-ready" data="">...ready?</button>
-            <button id="p2ReadyBtn" class="t-flex-1 btn btn-ready">...ready?</button>
+            <button id="p1ReadyBtn" class="t-flex-1 btn btn-ready" data-player="${t.curM.p1.id}">...ready?</button>
+            <button id="p2ReadyBtn" class="t-flex-1 btn btn-ready" data-player="${t.curM.p2.id}">...ready?</button>
         </div>
         <div class="t-flex" style="gap:.5rem;margin-top:.5rem;">
             <button id="readyAndStartBtn" class="btn btn-start t-flex-1">Start when both ready</button>
         </div>
     `;
 
-    document.getElementById('p1ReadyBtn')?.addEventListener('click', async (ev) => {
-        if (!t || !t.curM || !t.curM.p1 || !t.curM.p1.id) return console.debug('[Tournament] No Player 1 in current match');
-        const target = ev.target as HTMLButtonElement;
-        // const pidStr = target.getAttribute('data-player');
-        // const pid = pidStr ? Number(pidStr) : NaN;
-        // console.log('[Tournament] Ready button click detected for Player 1 id=', pid);
-        // if (!isNaN(pid)) {
-        await togglePlayerReady(t, t.curM.p1.id, target);
-        // } else {
-            // console.warn('Missing playerId on ready button');
-        // }
+    const p1Btn = document.getElementById('p1ReadyBtn') as HTMLButtonElement;
+    if (!p1Btn) return console.error('Error: button p1');
+    const p2Btn = document.getElementById('p2ReadyBtn') as HTMLButtonElement;
+    if (!p2Btn) return console.error('Error: button p2');
+    const startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement;
+    if (!startBtn) return console.error('Error: startBtn');
+    updateReadyUI(t, {p1Btn, p2Btn, startBtn});
+    
+
+    p1Btn.addEventListener('click', async () => {
+        const target = p1Btn;
+        const pidStr = target.getAttribute('data-player');
+        const pid = pidStr ? Number(pidStr) : NaN;
+        updateReadyUI(t, {p1Btn: target});
+        console.log('[Tournament] Ready button click detected for Player 1 id=', pid);
+        if (!isNaN(pid)) {
+            togglePlayerReady(t, pid, target);
+        } else {
+            console.warn('Missing playerId on ready button');
+        }
     });
 
-    document.getElementById('p2ReadyBtn')?.addEventListener('click', async (ev) => {
-        if (!t || !t.curM || !t.curM.p2 || !t.curM.p2.id) return console.debug('No Player 2 assigned yet');
-        const target = ev.target as HTMLButtonElement;
-        // const pidStr = target.getAttribute('data-player');
-        // const pid = pidStr ? Number(pidStr) : NaN;
-        // console.log('[Tournament] Ready button click detected for Player 2 id=', pid);
-        // if (!isNaN(pid)) {
-        await togglePlayerReady(t, t.curM.p2.id, target);
-        // } else {
-            // console.warn('Missing playerId on ready button');
-        // }
+    p2Btn.addEventListener('click', async () => {
+        const target = p2Btn;
+        const pidStr = target.getAttribute('data-player');
+        const pid = pidStr ? Number(pidStr) : NaN;
+        updateReadyUI(t, {p2Btn: target});
+        console.log('[Tournament] Ready button click detected for Player 2 id=', pid);
+        if (!isNaN(pid)) {
+            togglePlayerReady(t, pid, target);
+        } else {
+            console.warn('Missing playerId on ready button');
+        }
     });
 
-    document.getElementById('readyAndStartBtn')?.addEventListener('click', async (ev) => {
-        const target = ev.target as HTMLButtonElement;
+    startBtn.addEventListener('click', async () => {
         if (!t || !t.curM) return console.debug('[Tournament] No current match to start');
         try {
             const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.curM.id}/start`, {
@@ -362,59 +370,79 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
                 alert(data?.message || `Failed to start (HTTP ${resp.status})`);
                 return;
             }
-            t.curM = data.match as TournamentMatch;
+            t.curM = data.data as TournamentMatch;
             if (!t.curM) {
-                console.error('[Tournament] No data returned after starting match');
+                console.error('[Tournament] No match returned after starting match');
                 return;
             }
+            setCurrentMatch(t.curM);            
+            updateReadyUI(t, {startBtn});
+            if (!tWS) initTWS(t);
+            if (tWS?.isConnected()) tWS.requestState();//tWS.requestMatchState();//
+            await showMatch(t);
             console.log('[Tournament] Match start initiated');
-            // await showMatch(m);
-            updateReadyUI(t, target);
-            if (tWS?.isConnected()) tWS.requestState();//requestMatchState();
         } catch (e) {
             console.error('[Tournament] Failed to start match:', e);
         }
     });
 }
 
-function updateReadyUI(t: Tournament, target: HTMLButtonElement, pId?: number): void {
+function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?: HTMLButtonElement, startBtn?: HTMLButtonElement }): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2) return;
-    if (!pId) {
-        if (t.curM.p1 && t.curM.p2 && target) {
-            const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
-            if (bothReady) target.disabled = false;
-            else target.disabled = true;
-            return;
+    const start = document.getElementById('readyAndStartBtn') as HTMLButtonElement;
+    if (!start) return console.error('Error: startBtn');
+    if (opts.p1Btn) {
+        if (t.curM.p1.tpt === 'ai') {
+            opts.p1Btn.setAttribute("aria-pressed", "true");
+            opts.p1Btn.textContent = 'Ready ✓';
+            opts.p1Btn.disabled = true;
         }
-    } else if (target && (t.curM.p1.id === pId || t.curM.p2.id === pId)) {
-        let p = t.curM.p1.id === pId ? t.curM.p1 : t.curM.p2;
-        if (!p) return;
-        if (p.tpt === 'ai') {
-            // target.ariaPressed = 'true';
-            target.classList.add('.clicked');
-            target.textContent = 'Ready ✓';
-        } else {
-            if (p.isReady) {
-                // target.ariaPressed = 'true';
-                target.classList.add('.clicked');
-                target.textContent = 'Ready ✓';
-            } else {
-                // target.ariaPressed = 'false';
-                target.classList.remove('.clicked');
-                target.textContent = '...ready?';
-            }
+        else if (t.curM.p1.isReady) {
+            opts.p1Btn.setAttribute("aria-pressed", "true");
+            opts.p1Btn.textContent = 'Ready ✓';
+        }
+        else {
+            opts.p1Btn.setAttribute("aria-pressed", "false");
+            opts.p1Btn.textContent = '...ready?';
         }
     }
-    if ((t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady)) {
-        let startBtn = document.getElementById('readyAndStartBtn') as HTMLButtonElement | null;
-        if (startBtn) startBtn.disabled = false;
+    if (opts.p2Btn) {
+        if (t.curM.p2.tpt === 'ai') {
+            opts.p2Btn.setAttribute("aria-pressed", "true");
+            opts.p2Btn.textContent = 'Ready ✓';
+            opts.p2Btn.disabled = true;
+        }
+        else if (t.curM.p2.isReady) {
+            opts.p2Btn.setAttribute("aria-pressed", "true");
+            opts.p2Btn.textContent = 'Ready ✓';
+        }
+        else {
+            opts.p2Btn.setAttribute("aria-pressed", "false");
+            opts.p2Btn.textContent = '...ready?';
+        }
     }
+    if (opts.startBtn) {
+        const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
+        if (bothReady) opts.startBtn.disabled = false;
+        else opts.startBtn.disabled = true;
+    }
+    else if (start) {
+        const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
+        if (bothReady) {
+            start.disabled = false;
+            if (!tWS) console.debug('NO WEBSOCKET');
+            if (tWS) tWS.sendReady(true);
+            t.curM.status = 'ready';
+        }
+        else start.disabled = true;
+    }
+    updateMatchInTournament(t.curM);
+    console.debug('AFTER UPDATE_READY_UI:', t.curM);
 }
 
 async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLButtonElement | null): Promise<void> {
     if (!button) return;
     if (!t || !t.curM) return;
-    console.debug('[Tournament] togglePlayerReady for', playerId);
     try {
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.curM.id}/player/${playerId}/ready`, {
             method: 'POST',
@@ -429,13 +457,16 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
             return;
         }
         const data = await resp.json();
-        t.curM = data.data as TournamentMatch;
-        if (!t.curM || !t.curM.p1 || !t.curM.p2) {
-            console.error('[Tournament] togglePlayerReady received invalid match data:', t.curM);
+        t = data.data as Tournament;
+        if (!t || !t.id)
             return;
-        }
-        updateReadyUI(t, button, playerId);
-        console.debug('ReadyStatus p1: ', t.curM.p1.isReady, 'p2:', t.curM.p2.isReady);
+        t = await setEffectiveTournament(t.id);
+        if (!t || !t.id || !t.curM || !t.curM.p1 || !t.curM.p2) return;
+        if (t.curM.p1.id === playerId)
+            updateReadyUI(t, {p1Btn: button});
+        else if (t.curM.p2.id === playerId)
+            updateReadyUI(t, {p2Btn: button});
+        console.debug('READY_OR_NOT:', t.curM.p1, t.curM.p2);
         if (tWS?.isConnected()) {
             tWS.requestMatchState();
         } else {
@@ -500,7 +531,7 @@ function initTWS(t: Tournament): void {
             if (!t || !t.curM) return;
             t.curM.gameId = gameId;
             t.curM.status = 'active';
-            await showMatch(t.curM);
+            await showMatch(t);
         },
         onGameEnd: async (data) => {
             console.log('Game ended:', data);
@@ -537,10 +568,13 @@ function initTWS(t: Tournament): void {
     tWS.connect().catch(err => console.error('[Tournament] Failed to connect WebSocket:', err));
 }
 
-async function showMatch(match: TournamentMatch): Promise<void> {
-    console.log('[Tournament] Showing match:', match.id);
-    if (!match) return;
-    setCurrentRoom(match.room);
+async function showMatch(t: Tournament): Promise<void> {
+    if (!t || !t.curM) return console.error('No tournament or current Match found');
+    if (!t.curM.room) return console.error('No current room found');
+    console.log('[Tournament] Showing match:', t.curM.id);
+    if (!t.curM) return;
+    setCurrentRoom(t.curM.room);
+    if (getCurrentRoom() != t.curM.room) return console.debug('CURRENMT ROOM NOT MATCH ROOM');
     render2PlayerGame();
     const gameContainer = document.getElementById('tournamentGameContainer');
     if (gameContainer) gameContainer.style.display = 'block';
