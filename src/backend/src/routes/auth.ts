@@ -707,6 +707,12 @@ async function userRoutes(
         guestUsername = `Guest_${randomStr}`;
       }
 
+      const existingUser = await database.users.getUserByUsername(guestUsername);
+
+      if (existingUser && existingUser.username === guestUsername) {
+        guestUsername = `${guestUsername}_${existingUser.id + 1}`;
+      }
+
       // Create a temporary guest user
       const randomPassword = Math.random().toString(36).substring(2, 15);
       const guestUser = await database.users.createUser({
