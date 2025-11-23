@@ -84,9 +84,6 @@ export function renderTempLoginPage(): void {
           gamesWon: 0,
           gamesLost: 0
         };
-
-
-        localStorage.setItem('isGuest', 'true');
         
         console.log('Setting current user to:', userData);
         await authService.setCurrentUserProfile(userData);
