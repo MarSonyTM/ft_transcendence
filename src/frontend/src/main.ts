@@ -18,6 +18,7 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { renderStatsPage } from './pages/statsPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
 import { removePingPongBalls } from './utils/pingPongBalls';
@@ -117,6 +118,9 @@ async function handleRouting(): Promise<void> {
       break;
     case '/leaderboard':
       setCurrentPage('leaderboard');
+      break;
+    case '/stats':
+      setCurrentPage('stats');
       break; 
     case '/ping-pong':
       setCurrentPage('pingPong');
@@ -198,6 +202,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'leaderboard':
       renderLeaderboardPage();
+      break;
+    case 'stats':
+      renderStatsPage();
       break; 
     case 'pingPong':
       renderStartPage();
