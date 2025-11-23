@@ -13,6 +13,14 @@ import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
 import { sendVerificationEmail } from "../config/email";
 import { presenceManager } from '../presence/presenceManager';
+import {
+  sanitizeUsername,
+  sanitizeEmail,
+  sanitizeName,
+  validateEmail as validateEmailFormat,
+  validateUsername,
+  validatePassword
+} from '../utils/sanitization';
 
 // Types
 export interface CreateUserInput {
@@ -52,31 +60,55 @@ async function userRoutes(
   fastify.post("/create", async (request, reply) => {
     try {
       const userData = request.body as CreateUserInput;
-      if (
-        (userData.email?.trim() && !validateEmail(userData.email)) ||
-        !userData.email
-      ) {
+      
+      // ✅ SANITIZE ALL INPUTS (XSS Protection)
+      if (userData.email) userData.email = sanitizeEmail(userData.email);
+      if (userData.username) userData.username = sanitizeUsername(userData.username);
+      if (userData.firstName) userData.firstName = sanitizeName(userData.firstName);
+      if (userData.lastName) userData.lastName = sanitizeName(userData.lastName);
+      
+      // ✅ VALIDATE INPUTS
+      if (!userData.email || !validateEmailFormat(userData.email)) {
         reply.code(400).send({
           success: false,
           message: "Invalid email format or email is required",
         });
         return;
       }
-      if (!userData.username || !userData.password) {
+      
+      if (!userData.username || !validateUsername(userData.username)) {
         reply.code(400).send({
           success: false,
-          message: "username and password are required",
+          message: "Username is required and must be 3-50 alphanumeric characters",
         });
         return;
       }
-      // Basic validation
+      
+      if (!userData.password || !validatePassword(userData.password)) {
+        reply.code(400).send({
+          success: false,
+          message: "Password must be at least 8 characters with letters and numbers",
+        });
+        return;
+      }
+      
       if (!userData.firstName) {
         reply.code(400).send({
           success: false,
-          message: "firstName is required",
+          message: "First name is required",
         });
         return;
       }
+      
+      if (!userData.lastName) {
+        reply.code(400).send({
+          success: false,
+          message: "Last name is required",
+        });
+        return;
+      }
+      
+      // ✅ HASH PASSWORD (Already secure)
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
       userData.password = hashedPassword;
@@ -461,7 +493,9 @@ async function userRoutes(
     try {
       console.log(request.body);
       const userData = request.body as LoginInput;
-      const username = userData.username?.trim() || "";
+      
+      // ✅ SANITIZE INPUTS (XSS Protection)
+      const username = userData.username ? sanitizeUsername(userData.username) : "";
       const password = userData.password || "";
 
       if (!username || !password) {
@@ -472,12 +506,15 @@ async function userRoutes(
         return;
       }
 
-      if (userData.email?.trim() && !validateEmail(userData.email)) {
-        reply.code(400).send({
-          success: false,
-          message: "Invalid email format",
-        });
-        return;
+      if (userData.email) {
+        const sanitizedEmail = sanitizeEmail(userData.email);
+        if (!validateEmailFormat(sanitizedEmail)) {
+          reply.code(400).send({
+            success: false,
+            message: "Invalid email format",
+          });
+          return;
+        }
       }
 
       let res = await database.users.getUserByUsername(username);
