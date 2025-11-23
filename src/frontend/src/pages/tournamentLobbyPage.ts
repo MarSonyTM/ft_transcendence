@@ -2,7 +2,6 @@ import { TPT, TPTmap, Tournament } from '../types';
 import { setCurrentPage } from '../utils/globalState';
 import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
-	getTournament,
 	createTournament,
 	resetTournament,
 	addPlayerToTournament,
@@ -69,10 +68,9 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 
 	const listEl = document.getElementById('playersList') as HTMLUListElement;
 	const rerender = async () => {
-		activeT = getTournament();
+		activeT = getCurrentTournament();
 		if (activeT?.id)
-			await setEffectiveTournament(activeT.id);
-		activeT = getTournament();
+			activeT = await setEffectiveTournament(activeT.id);
 		if (!activeT) return;
 		if (activeT.players.length === 0) {
 			listEl.innerHTML = `<li class="empty">No players yet</li>`;

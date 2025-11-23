@@ -1,7 +1,7 @@
 /* BRACKETS */
 .t-bracket {
-	margin: 0.5rem 0;
-	padding: 0.5rem;
+	margin: 0.5rem 1rem;
+	padding: 0.5rem 1rem;
 	background: rgba(0, 0, 0, 0.2);
 	border-radius: 4px;
 }
@@ -113,22 +113,25 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 	gap: 1rem;
+	align-items: center;
 }
 
 /* MATCH CARD */
 .t-match-card {
 	border-radius: 8px;
+	border: 2px solid #246b9b;
+	background: rgba(35, 118, 167, 0.15);
 	padding: 1rem;
 	position: relative;
 	transition: transform 0.2s;
-	min-width: 200px;
+	min-width: 10vw;
 }
 .t-match-card:hover {
 	transform: translateY(-2px);
 }
 
 .t-match-card.completed {
-	border: 2px solid #4ec274;
+	border: 2px solid #173d24;
 	background: rgba(16, 185, 129, 0.1);
 }
 
@@ -138,7 +141,7 @@
 }
 
 .t-match-card.waiting {
-	border: 2px solid #6b7280;
+	border: 2px solid #948923;
 	background: rgba(107, 114, 128, 0.1);
 }
 
@@ -146,7 +149,7 @@
 	position: absolute;
 	top: 0.5rem;
 	right: 0.5rem;
-	font-size: 0.7em;
+	font-size: 0.75em;
 	font-weight: bold;
 	background: rgba(0, 0, 0, 0.5);
 	padding: 0.25rem 0.5rem;
@@ -209,7 +212,7 @@
 .t-match-status {
 	margin-top: 0.75rem;
 	text-align: center;
-	font-size: 0.75em;
+	font-size: 1.5rem;
 	font-weight: bold;
 	letter-spacing: 0.5px;
 }

@@ -164,10 +164,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			if (isNaN(+tournamentId) || isNaN(+matchId) || isNaN(+playerId)
 				|| +tournamentId <= 0 || +matchId <= 0 || +playerId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
-			const { isReady } = request.body as { isReady: string };
-			if (typeof isReady !== 'string')
-				return reply.status(400).send({ success: false, message: 'isReady is required' });
-			let readyBool: boolean = isReady.toLowerCase() === 'true' ? true : false;
 			let m = tournamentManager.getMatch(+matchId);
 			if (!m)
 				return reply.status(404).send({ success: false, message: 'Match not found' });
@@ -180,7 +176,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			if (!p)
 				return reply.status(404).send({ success: false, message: 'Player not found in match' });
 			console.debug(`Toggling ready status for player ${playerId} in match ${matchId} of tournament ${tournamentId}`);
-			const success = tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId, readyBool);
+			const success = tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId, !p.isReady);
 			if (!success)
 				return reply.status(400).send({ success: false, message: 'Unable to toggle player ready' });
 			m = tournamentManager.getMatch(+matchId);

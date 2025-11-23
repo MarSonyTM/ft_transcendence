@@ -119,9 +119,9 @@ export async function resetTournament(): Promise<void> {
     setCurrentTournament(t);
 }
 
-export function getTournament(): Tournament | null {
-    return getCurrentTournament();
-}
+// export function getTournament(): Tournament | null {
+//     return getCurrentTournament();
+// }
 
 export function setTournament(t: Tournament): void {
     hydrateTournament(t);
