@@ -120,7 +120,7 @@ export async function renderProfilePage(): Promise<void> {
                 
                 <!-- Action Buttons -->
                 <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
-                    <button id="editProfileBtn" class="btn-neon accent" style="font-size: 1.05em;"> Edit Profile </button>
+                    ${userData.firstName == "Guest" && userData.lastName== "User" ? "" :'<button id="editProfileBtn" class="btn-neon accent" style="font-size: 1.05em;"> Edit Profile </button>'}
                     <button id="friendListBtn" class="btn-neon accent" style="font-size: 1em; padding: 0.65em 1.8em; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
                         👥 Friends
                     </button>
