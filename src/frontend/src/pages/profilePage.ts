@@ -21,9 +21,9 @@ export async function renderProfilePage(): Promise<void> {
 
     
     // Fetch fresh user data from server (not cached!)
-    const user = authService.getCurrentUser();
+    const userData = await authService.getCurrentUser();
     
-    if (!user) {
+    if (!userData) {
         root.innerHTML = `
             <div class="neon-grid profile-container" style="width:100%; max-width:980px;">
                 <div class="grid-anim"></div>
@@ -46,31 +46,13 @@ export async function renderProfilePage(): Promise<void> {
         return;
     }
     
-    const userData = isGuest ? {
-        username: user.username || 'Guest',
-        email: user.email || undefined,
-        firstName: user.firstName || 'Guest',
-        lastName: user.lastName || 'User',
-        avatar: user.avatar || undefined,
-        gamesPlayed: 0,
-        gamesWon: 0,
-        gamesLost: 0
-    } : {
-        username: user!.username,
-        email: user!.email,
-        firstName: user!.firstName,
-        lastName: user!.lastName,
-        avatar: user!.avatar || undefined,
-        gamesPlayed: (user!.gamesWon || 0) + (user!.gamesLost || 0),
-        gamesWon: user!.gamesWon || 0,
-        gamesLost: user!.gamesLost || 0
-    };
     
     console.log('[PROFILE] User data:', userData);
     console.log('[PROFILE] Avatar URL:', userData.avatar);
+
+    const gamesPlayed = userData.gamesLost + userData.gamesWon;
     
-    const winRate = userData.gamesPlayed > 0 
-        ? ((userData.gamesWon / userData.gamesPlayed) * 100).toFixed(1) : 0;
+    const winRate = gamesPlayed > 0 ? ((userData.gamesWon / gamesPlayed) * 100).toFixed(1) : 0;
     
 
     const userNavHTML = await createUserNav();
@@ -123,7 +105,7 @@ export async function renderProfilePage(): Promise<void> {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1em; min-width: 320px;">
                         <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1em; text-align: center;">
                             <h3 style="color: rgb(156 163 175); font-size: 0.8em; margin: 0 0 0.5em 0; text-transform: uppercase;">Games Played</h3>
-                            <p style="font-size: 2em; font-weight: bold; color: rgb(209 213 219); margin: 0;">${userData.gamesPlayed}</p>
+                            <p style="font-size: 2em; font-weight: bold; color: rgb(209 213 219); margin: 0;">${gamesPlayed}</p>
                         </div>
                         <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1em; text-align: center;">
                             <h3 style="color: rgb(156 163 175); font-size: 0.8em; margin: 0 0 0.5em 0; text-transform: uppercase;">Win Rate</h3>
@@ -142,6 +124,7 @@ export async function renderProfilePage(): Promise<void> {
                 
                 <!-- Action Buttons -->
                 <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button id="editProfileBtn" class="btn-neon accent" style="font-size: 1.05em;"> Edit Profile </button>
                     <button id="friendListBtn" class="btn-neon accent" style="font-size: 1em; padding: 0.65em 1.8em; border-radius: 8px; font-weight: 500; transition: all 0.3s ease;">
                         👥 Friends
                     </button>
