@@ -1,8 +1,6 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
-import { registerUser } from '../_api/auth.ts';
-import { updateUserProfile } from '../_api/user';
 import { createPingPongBalls } from '../utils/pingPongBalls';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
@@ -99,7 +97,6 @@ export async function renderLandingPage(): Promise<void> {
     const createBtn = document.getElementById('createBtn');
     if (createBtn) {
         createBtn.addEventListener('click', () => {
-            saveAccount();
             renderApp();
         });
     }

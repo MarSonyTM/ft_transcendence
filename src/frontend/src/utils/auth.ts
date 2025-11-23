@@ -1,41 +1,48 @@
-import { publicPages, renderApp } from "../main";
-import { setCurrentPage } from "./globalState";
+import { setCurrentPage, getCurrentUser as getGlobalCurrentUser, setCurrentUser } from './globalState';
+import { renderApp } from '../main';
 import { presenceService } from './presenceService';
 
-const getApiUrl = () =>
-  window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
-const API_URL = getApiUrl();
+export interface UserProfile {
+  id: number;
+  username: string;
+  email?: string;
+  firstName: string;
+  lastName: string;
+  avatar?: string;
+  gamesWon: number;
+  gamesLost: number;
+}
 
 interface DecodedToken {
-  id: string;
+  id: number;
   email: string;
   username: string;
   exp: number;
 }
 
-export interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  avatar?: string;
-  googleId?: string;
-  gamesWon: number;
-  gamesLost: number;
-}
+const API_URL = window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
 
-export class AuthService {
+// Public pages that don't require authentication
+const publicPages = [
+  '/',
+  '/ping-pong',
+  '/login',
+  '/register',
+  '/temp-login',
+  '/auth/callback',
+  '/verify-email',
+  '/landing'
+];
+
+class AuthService {
   private static instance: AuthService;
   private currentUser: UserProfile | null = null;
-  private token: string | null = null;
   private neededEmailVerification: boolean = false;
   private pendingEmailVerification: string | null = null;
-  private initPromise: Promise<void>;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() {
-    // Kick off initialization and keep a handle so callers can await readiness
-    this.initPromise = this.initializeAuth().catch(() => {});
+    this.initPromise = this.initializeAuth();
   }
 
   static getInstance(): AuthService {
@@ -46,16 +53,11 @@ export class AuthService {
   }
 
   /**
-   * Expose a promise that resolves when initial auth check finishes.
-   * Callers can await this to avoid rendering unauthenticated UI briefly
-   * when a valid session exists.
+   * Wait for authentication initialization to complete
    */
-  public async whenReady(): Promise<void> {
-    try {
+  async whenReady(): Promise<void> {
+    if (this.initPromise) {
       await this.initPromise;
-    } catch {
-      // Swallow to avoid bubbling init failures; consumers can still
-      // read isAuthenticated() which will be false on failure.
     }
   }
 
@@ -68,6 +70,7 @@ export class AuthService {
       return;
     }
     await this.fetchUserProfile();
+    this.initPromise = null; // Clear the promise once initialization is complete
   }
 
   /**
@@ -101,35 +104,38 @@ export class AuthService {
 
   // Fetch user profile from backend
   async fetchUserProfile(): Promise<UserProfile | null> {
+    console.log('🔍 fetchUserProfile called from:', window.location.pathname);
     
-    if (localStorage.getItem("isGuest")) {
-      try {
-        const raw = localStorage.getItem("currentUser");
-        const guest = raw ? (JSON.parse(raw) as UserProfile) : null;
-        this.currentUser = guest;
-        return this.currentUser;
-      } catch {
-        return null;
-      }
-    }
-
     const path = window.location.pathname;
-    if (publicPages.includes(path) && !path.includes('/auth/callback')) {
-      return null;
+    // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
+    const hasSession = this.currentUser !== null || localStorage.getItem('isGuest') === 'true';
+
+    if (publicPages.includes(path) && !hasSession) {
+      return null;  // Only skip if no session exists
     }
 
+    console.log('📡 Fetching user profile from backend...');
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
-      credentials: "include",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
       });
 
-
       if (!response.ok) {
         if (response.status === 401) {
-          await this.logout();
+          console.log('❌ 401 Unauthorized - clearing auth state');
+          this.currentUser = null;
+          localStorage.removeItem("isGuest");
+          localStorage.removeItem("currentUser");
+          
+          // Only redirect if not on a public page
+          if (!publicPages.includes(path)) {
+            history.pushState({ page: 'login' }, '', '/login');
+            setCurrentPage('login');
+            await renderApp();
+          }
         } else if (response.status === 403) {
           this.neededEmailVerification = true;
           const data1 = await response.json();
@@ -141,13 +147,20 @@ export class AuthService {
 
       const data = await response.json();
       this.currentUser = data.data;
+      
+      // For guest users, also store in localStorage for quick access
+      if (this.currentUser && localStorage.getItem('isGuest') === 'true') {
+        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+      }
+      
       return this.currentUser;
     } catch (error) {
+      console.error('❌ Error fetching user profile:', error);
       return null;
     }
   }
 
-  // Get current user (from memory or localStorage)
+  // Get current user (from memory or fetch from backend)
   async getCurrentUser(): Promise<UserProfile | null> {
     if (this.currentUser) {
       return this.currentUser;
@@ -170,12 +183,17 @@ export class AuthService {
     } catch (error) {
       console.error("Error during logout:", error);
     }
+    
+    // Clear all state
     this.currentUser = null;
-    setCurrentPage('pingPong');
-    await renderApp();
-    history.pushState({ page: 'pingPong' }, '', '/ping-pong');
     localStorage.removeItem("isGuest");
+    localStorage.removeItem("currentUser");
     presenceService.stopHeartbeat();
+    
+    // Redirect to login
+    history.pushState({ page: 'login' }, '', '/login');
+    setCurrentPage('login');
+    await renderApp();
   }
 
   // Update user stats after game

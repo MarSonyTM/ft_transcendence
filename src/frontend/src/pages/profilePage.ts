@@ -82,7 +82,7 @@ export async function renderProfilePage(): Promise<void> {
                             referrerpolicy="no-referrer" 
                             loading="lazy"
                             style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #3b82f6; object-fit: cover;"
-                            onerror="this.style.display='none'; document.getElementById('avatarError')?.style.display='block';"
+                            onerror="this.style.display='none'; document.getElementById('avatarError').style.display='block';"
                         >
                         <div id="avatarError" style="display: none; color: #ef4444; font-size: 0.85em; margin-top: 0.5em;">
                             ⚠️ Avatar image failed to load

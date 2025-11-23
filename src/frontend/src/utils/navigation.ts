@@ -14,7 +14,7 @@ export async function createUserNav(): Promise<string> {
     }
 
     const isGuest = localStorage.getItem('isGuest') === 'true';
-    const displayName = isGuest ? 'Guest' : (user.username || 'User');
+    const displayName = (user.username || 'User');
 
     return `
         <nav class="user-nav" style="position: fixed; top: 0; right: 0; z-index: 1000; padding: 1em 2em;">

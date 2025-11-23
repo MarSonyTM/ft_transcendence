@@ -142,7 +142,7 @@ function handleRoomMessage(roomId: string, playerId: string, message: any, socke
 
     switch (message.type) {
         case 'ping':
-            const token = localStorage.getItem('authToken');
+            const token = localStorage.getItem('authToken');  //TODO: Add Token
             if (!token) 
                 break;
             const decoded = JSON.parse(atob(token.split('.')[1]));

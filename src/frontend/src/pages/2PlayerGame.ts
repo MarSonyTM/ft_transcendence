@@ -183,7 +183,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
     
     const user = authService.getCurrentUser();
     
-    if (!user && localStorage.getItem('isGuest') != 'true') {
+    if (!user) {
         console.error('No authenticated user for room game');
         return;
     }

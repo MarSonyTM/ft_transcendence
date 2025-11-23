@@ -442,6 +442,7 @@ function renderLobby(root: HTMLElement): void {
   let hasGuest = false;
   let hasLocal = players.some(p => p.id === 'local');
   
+  
 	root.innerHTML = `
 	  <div class="neon-grid">
 		<div class="grid-anim"></div>
@@ -544,7 +545,7 @@ function renderLobby(root: HTMLElement): void {
     `}
 		  
 		  <button id="leaveBtn"
-				  class="btn" style="width: 100%; background: rgb(220 38 38); color: white; border: none;">
+				  class="btn btn-neon" style="width: 100%; background: rgb(220 38 38); color: white; border: none;">
 			Leave Lobby
 		  </button>
 		  

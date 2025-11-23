@@ -180,7 +180,7 @@ class UserDatabaseManager {
         // SQLite binding compatibility: convert undefined -> null, booleans -> 1/0
         const email = userData.email ?? null;
         const username = userData.username ?? null;
-        const avatar = userData.avatar ?? 'https://github.com/Schmitzi/webserv/blob/main/local/images/seahorse.jpg';
+        const avatar = userData.avatar ?? 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg';
         const googleId = userData.googleId ?? null;
         const gamesWon = userData.gamesWon ?? 0;
         const gamesLost = userData.gamesLost ?? 0;

@@ -3,7 +3,7 @@ import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
-export async async function renderGameSelectPage(): Promise<Promise<void>> {
+export async function renderGameSelectPage(): Promise<Promise<void>> {
     const root = document.getElementById('app-root');
     if (!root) return;
     
@@ -18,13 +18,9 @@ export async async function renderGameSelectPage(): Promise<Promise<void>> {
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                 </div>
-                <div style="display:flex; gap:0.8em; justify-content:center; margin-top:1.2em;">
-                    <button id="leaderboardBtn" class="btn-neon accent">Leaderboard</button>
-                    <button id="profileBtn" class="btn-neon accent">Profile</button>
-                </div>
             </div>
         </div>
-`;
+    `;
     
     attachUserNavListeners();
     
