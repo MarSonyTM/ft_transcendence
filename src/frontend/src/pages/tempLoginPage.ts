@@ -9,24 +9,24 @@ export function renderTempLoginPage(): void {
   if (!root) return;
 
   root.innerHTML = `
-    <div class="neon-grid profile-container" style="width:100%; max-width:1800px;">
+    <div class="neon-grid profile-container" style="width:100%; max-width:1800px; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
       <div class="grid-anim"></div>
-      <div class="glass-card" style="max-width: 450px; width: 100%;">
+      <div class="glass-card" style="max-width: 450px; width: 100%; margin: 2em auto;">
         <div style="text-align: center; margin-bottom: 2em;">
           <h1 class="title-neon" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Play as Guest</h1>
           <p style="color: #9ca3af; font-size: 1rem;">Start playing without registration</p>
         </div>
 
         <div class="glass-card" style="padding: 2em; margin-bottom: 1.5em;">
-          <div style="margin-bottom: 1.5em;">
-            <label for="usernameInput" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">
+          <div style="margin-bottom: 1.5em; display: flex; flex-direction: column; align-items: center;">
+            <label for="usernameInput" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem; text-align: center;">
               Choose a username (optional)
             </label>
             <input 
               type="text" 
               id="usernameInput" 
               placeholder="Leave empty for random name"
-              style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+              style="width: 80%; max-width: 350px; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s; text-align: center;"
               onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
               onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
             >
