@@ -1,8 +1,8 @@
-import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
+import { setCurrentGameMode, setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { presenceService } from '../utils/presenceService';
-import { authService, UserProfile } from '../utils/auth';
+import { authService } from '../utils/auth';
 import { 
   Player, 
   GameRoom, 
@@ -16,6 +16,7 @@ let pollInterval: number | null = null;
 let lobbyWebSocket: any = null;
 
 export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
+    alert("");
     const root = document.getElementById('app-root');
     if (!root) return;
 
@@ -35,6 +36,14 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     } else if (!getCurrentRoom()) {
       console.log('[LOBBY] Creating new room');
       await createNewRoom(currentUserId, user?.username || 'Guest');
+    } else {
+      // ✅ ADD THIS: If room already exists (e.g., from cached state), sync game mode
+      const currentRoom = getCurrentRoom();
+      if (currentRoom) {
+        const gameMode = currentRoom.maxPlayers === 4 ? '4P' : '2P';
+        setCurrentGameMode(gameMode);
+        console.log(`✅ [LOBBY] Synced game mode to ${gameMode}`);
+      }
     }
   } catch (error) {
     console.error('[LOBBY] Error setting up room:', error);
@@ -134,6 +143,11 @@ async function joinExistingRoom(roomId: string, userId: string, username: string
   
   if (data.success && data.room) {
     setCurrentRoom(data.room);
+    
+    const gameMode = data.room.maxPlayers === 4 ? '4P' : '2P';
+    setCurrentGameMode(gameMode);
+    console.log(`✅ [JOIN] Set game mode to ${gameMode} based on maxPlayers=${data.room.maxPlayers}`);
+    
     console.log('✅ [JOIN] Joined room:', roomId);
   } else {
     console.log('⚠️ [JOIN] Failed, creating new room instead');
@@ -349,6 +363,11 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       if (room) {
         setCurrentRoom(room);
+        
+        // ✅ ADD THIS: Keep game mode in sync with room updates
+        const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
+        setCurrentGameMode(gameMode);
+        
         const root = document.getElementById('app-root');
         if (root) {
           console.log('[WS] Re-rendering lobby with updated players');

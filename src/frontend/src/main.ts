@@ -38,8 +38,6 @@ async function handleRouting(): Promise<void> {
   if (!isPublicPage) {
     await authService.whenReady(); 
     const user = await authService.getCurrentUser();
-
-    console.log('Current user:', user);
     
     if (!user) {
       console.log('User not authenticated, redirecting to login');
