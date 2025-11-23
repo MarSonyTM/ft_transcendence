@@ -8,12 +8,12 @@ export async function renderStartPage(): Promise<void> {
   if (!root) return;
 
   root.innerHTML = `
-        <div class="neon-grid landing-tight landing-container" style="gap: 1.2em; margin-top: 2.2em; width:100%; max-width: 980px;">
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
           <div class="grid-anim"></div>
-          <div class="glass-card" style="padding:2.2em 2em; text-align:center; width:100%; position: relative;">
+          <div class="glass-card" style=" text-align:center; width:100%; position: relative;">
             <h1 class="main-title title-neon" style="margin-bottom:.25em;">PING PONG</h1>
             <p style="color:#9ca3af; text-align:center; max-width:640px; margin: 0 auto 1em auto;">Welcome to ft_transcendence. Play classic Pong, join rooms, and compete on the leaderboard.</p>
-            <div style="display:flex; gap:0.8em; flex-wrap:wrap; justify-content:center; margin-top: .75em;">
+            <div style="display:flex; gap:0.8em; flex-wrap:wrap; justify-content:center; margin: .75em;">
               <button id="guestBtn" class="btn-neon primary">Play as Guest</button>
               <button id="loginBtn" class="btn-neon accent">Login</button>
               <button id="registerBtn" class="btn-neon accent">Register</button>
