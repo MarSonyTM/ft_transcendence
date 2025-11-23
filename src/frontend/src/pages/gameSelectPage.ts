@@ -19,10 +19,22 @@ export async function renderGameSelectPage(): Promise<Promise<void>> {
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                 </div>
             </div>
+            <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button id="backToLandingBtn" class="btn btn-back" style="font-size: 1em; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 0.65em 1.8em; cursor: pointer; font-weight: 500; transition: all 0.3s ease;">← Home</button>
+                </div>
         </div>
     `;
     
     attachUserNavListeners();
+
+    const backBtn = document.getElementById('backToLandingBtn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            history.pushState({ page: 'landing' }, '', '/');
+            setCurrentPage('landing');
+            renderApp();
+        });
+    }
     
     const oneVsOneBtn = document.getElementById('2PBtn');
     if (oneVsOneBtn) {
