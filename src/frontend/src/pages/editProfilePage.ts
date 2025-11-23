@@ -3,6 +3,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { updateUserProfile, deleteUserAccount } from '../_api/user';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 interface UserProfile {
     id: number;
@@ -81,143 +82,142 @@ export async function renderEditProfilePage(): Promise<void> {
         gamesLost: user.gamesLost || 0
     };
 
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
-        <div class="neon-grid">
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+            ${userNavHTML}
             <div class="grid-anim"></div>
-            <div class="glass-card" style="max-width: 600px; width: 100%;">
+            <div class="glass-card" style="padding: 2em; width:100%;">
 
-                <div style="text-align: center; margin-bottom: 2em;">
-                    <h2 class="title-neon" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Edit Profile</h2>
-                    <p style="color: #9ca3af; font-size: 1rem;">Update your account information and personal details</p>
-                </div>
+                <h2 class="title-neon" style="text-align: center; margin-bottom: 1.2em;">Edit Profile</h2>
 
-                <!-- Account Information Section -->
-                <div class="glass-card" style="margin-bottom: 2em; padding: 1.5em;">
-                    <h3 style="color: white; margin-bottom: 1.5em; text-align: center; font-size: 1.3rem; font-weight: 600;">Account Information</h3>
+                <!-- Desktop Layout: Three Columns -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2em; align-items: start;">
+                    
+                    <!-- Left Column: Account Information + Avatar Preview -->
+                    <div>
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Account Information</h3>
 
-                    <div style="display: flex; flex-direction: column; gap: 1.5em;">
-                        <div style="display: flex; align-items: center; gap: 1em; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 250px;">
-                                <label style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Username</label>
-                                <div style="padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500;">
-                                    ${userData.username}
+                        <!-- Avatar Preview at Top -->
+                        ${userData.avatar ? `
+                            <div style="text-align: center; margin-bottom: 1.2em;">
+                                <img 
+                                    src="${userData.avatar.trim()}" 
+                                    alt="Current Avatar" 
+                                    referrerpolicy="no-referrer"
+                                    style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.5); object-fit: cover;"
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                >
+                                <div style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); display: none; align-items: center; justify-content: center; margin: 0 auto; color: #9ca3af; font-size: 2em;">
+                                    👤
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: flex-end;">
-                                <button type="button" id="changeUsernameBtn" class="btn btn-neon primary" style="padding: 0.75em 1.2em;">
+                        ` : `
+                            <div style="text-align: center; margin-bottom: 1.2em;">
+                                <div style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto; color: #9ca3af; font-size: 2em;">
+                                    👤
+                                </div>
+                            </div>
+                        `}
+
+                        <div style="display: flex; flex-direction: column; gap: 1em;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Username</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500; margin-bottom: 0.5em; font-size: 0.95em;">
+                                    ${userData.username}
+                                </div>
+                                <button type="button" id="changeUsernameBtn" class="btn-neon accent" style="font-size: 0.85em; padding: 0.5em 1em; border-radius: 8px; font-weight: 500; width: 100%;">
                                     Change Username
                                 </button>
                             </div>
-                        </div>
 
-                        <div style="display: flex; align-items: center; gap: 1em; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 250px;">
-                                <label style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Email</label>
-                                <div style="padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Email</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500; margin-bottom: 0.5em; font-size: 0.95em; word-break: break-all;">
                                     ${userData.email || 'Not set'}
                                 </div>
-                            </div>
-                            <div style="display: flex; align-items: flex-end;">
-                                <button type="button" id="changeEmailBtn" class="btn btn-neon primary" style="padding: 0.75em 1.2em;">
+                                <button type="button" id="changeEmailBtn" class="btn-neon accent" style="font-size: 0.85em; padding: 0.5em 1em; border-radius: 8px; font-weight: 500; width: 100%;">
                                     Change Email
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Personal Information Section -->
-                <div class="glass-card" style="margin-bottom: 2em; padding: 1.5em;">
-                    <h3 style="color: white; margin-bottom: 1.5em; text-align: center; font-size: 1.3rem; font-weight: 600;">Personal Information</h3>
-                
-                    <form id="editProfileForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em;">
+                    <!-- Middle Column: Personal Information Form -->
+                    <div>
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Personal Information</h3>
+                    
+                        <form id="editProfileForm" style="display: flex; flex-direction: column; gap: 1em;">
                             <div class="form-group">
-                                <label for="firstName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">First Name</label>
+                                <label for="firstName" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">First Name</label>
                                 <input
                                     type="text"
                                     id="firstName"
                                     name="firstName"
                                     value="${userData.firstName || ''}"
                                     required
-                                    style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
-                                    onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
-                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
                                 >
                             </div>
 
                             <div class="form-group">
-                                <label for="lastName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Last Name</label>
+                                <label for="lastName" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Last Name</label>
                                 <input
                                     type="text"
                                     id="lastName"
                                     name="lastName"
                                     value="${userData.lastName || ''}"
                                     required
-                                    style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
-                                    onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
-                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
                                 >
                             </div>
-                        </div>
 
-                        <div class="form-group">
-                            <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: #9ca3af; font-size: 0.9rem;">Avatar URL (optional)</label>
-                            <input
-                                type="text"
-                                id="avatar"
-                                name="avatar"
-                                value="${userData.avatar || ''}"
-                                placeholder="https://example.com/avatar.jpg or https://robohash.org/..."
-                                style="width: 100%; padding: 0.75em; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
-                                onfocus="this.style.borderColor='rgba(0, 255, 255, 0.5)'; this.style.boxShadow='0 0 10px rgba(0, 255, 255, 0.1)';"
-                                onblur="this.style.borderColor='rgba(255, 255, 255, 0.2)'; this.style.boxShadow='none';"
-                            >
-                            ${userData.avatar ? `
-                                <div style="margin-top: 0.5em; text-align: center;">
-                                    <p style="color: #9ca3af; font-size: 0.85em; margin-bottom: 0.5em;">Preview:</p>
-                                    <img 
-                                        src="${userData.avatar.trim()}" 
-                                        alt="Avatar preview" 
-                                        referrerpolicy="no-referrer"
-                                        style="max-width: 100px; max-height: 100px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2);"
-                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
-                                        onload="this.nextElementSibling.style.display='none';"
-                                    >
-                                    <p style="display: none; color: #ef4444; font-size: 0.85em; margin-top: 0.5em;">⚠️ Image failed to load. Please check the URL.</p>
-                                </div>
-                            ` : ''}
-                        </div>
+                            <div class="form-group">
+                                <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Avatar URL</label>
+                                <input
+                                    type="text"
+                                    id="avatar"
+                                    name="avatar"
+                                    value="${userData.avatar || ''}"
+                                    placeholder="https://example.com/avatar.jpg"
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                >
+                            </div>
 
-                        <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
-                        <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+                            <div id="errorMessage" style="color: #ef4444; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+                            <div id="successMessage" style="color: #10b981; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
 
-                        <div style="display: flex; gap: 1em; margin-top: 1em;">
-                            <button type="submit" id="saveProfileBtn" class="btn btn-neon primary" style="flex: 1;">
-                                Save Changes
-                            </button>
-                            <button type="button" id="cancelBtn" class="btn btn-neon accent" style="flex: 1;">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                
-                <!-- Danger Zone Section -->
-                <div class="glass-card" style="margin-top: 2em; padding: 1.5em; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);">
-                    <h3 style="color: #ef4444; margin-bottom: 1em; text-align: center; font-size: 1.3rem; font-weight: 600;">⚠️ Danger Zone</h3>
-                    <p style="color: rgb(156 163 175); font-size: 0.9em; text-align: center; margin-bottom: 1.5em; line-height: 1.5;">
-                        Deleting your account is permanent and cannot be undone. All your data, including game statistics and friendships, will be lost forever.
-                    </p>
-                    <button id="deleteAccountBtn" class="btn btn-neon danger" style="width: 100%; font-weight: 600;">
-                        🗑️ Delete Account Permanently
-                    </button>
+                            <div style="display: flex; gap: 1em; margin-top: 0.5em;">
+                                <button type="submit" id="saveProfileBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+                                    ✓ Save Changes
+                                </button>
+                                <button type="button" id="cancelBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+                                    ✕ Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Right Column: Danger Zone -->
+                    <div>
+                        <h3 style="color: #ef4444; font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(239, 68, 68, 0.3); padding-bottom: 0.5em;">⚠️ Danger Zone</h3>
+                        <p style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 1em; line-height: 1.5;">
+                            Deleting your account is permanent. All data will be lost forever.
+                        </p>
+                        <button id="deleteAccountBtn" class="btn-neon danger" style="width: 100%; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500;">
+                            🗑️ Delete Account
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    `;
-
-    // Form submission handler
+    `;    // Form submission handler
     const form = document.getElementById('editProfileForm') as HTMLFormElement;
     if (form) {
         form.addEventListener('submit', async (e) => {
@@ -243,7 +243,7 @@ export async function renderEditProfilePage(): Promise<void> {
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
                     // Only update avatar if a new value is provided, otherwise keep existing
-                    avatar: avatarValue && avatarValue.length > 0 ? avatarValue : user.avatar
+                    avatar: avatarValue
                 };
                 
                 const result = await updateUserProfile(updateData);
@@ -358,6 +358,9 @@ export async function renderEditProfilePage(): Promise<void> {
             }
         });
     }
+
+    // Attach user nav dropdown listeners
+    attachUserNavListeners();
 }
 
 async function handleAccountDeletion(): Promise<void> {

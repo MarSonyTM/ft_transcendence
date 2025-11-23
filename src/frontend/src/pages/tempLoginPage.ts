@@ -9,7 +9,7 @@ export function renderTempLoginPage(): void {
   if (!root) return;
 
   root.innerHTML = `
-    <div class="neon-grid">
+    <div class="neon-grid profile-container" style="width:100%; max-width:1800px;">
       <div class="grid-anim"></div>
       <div class="glass-card" style="max-width: 450px; width: 100%;">
         <div style="text-align: center; margin-bottom: 2em;">
@@ -63,66 +63,46 @@ export function renderTempLoginPage(): void {
       addGuestBtn.textContent = 'Creating guest...';
       (addGuestBtn as HTMLButtonElement).disabled = true;
 
-      try {
-        // Get username from input, or undefined if empty (backend will generate random)
-        const username = usernameInput.value.trim() || undefined;
-        const result = await createGuestUser(username);
+      // Get username from input, or undefined if empty (backend will generate random)
+      const username = usernameInput.value.trim() || undefined;
+      const result = await createGuestUser(username);
 
-        if (result.success && result.token) {        
-          console.log('✅ Guest user created successfully');
-          
-          // Mark as guest user FIRST
-          localStorage.setItem('isGuest', 'true');
+      console.log('Guest user creation result:', result);
 
-          // Create user data object for localStorage backup
-          const userData = {
-            id: 69, // Will be updated from backend
-            username: result.username || 'Guest',
-            email: 'guest@transcendence.com',
-            firstName: 'Guest',
-            lastName: 'User',
-            avatar: '',
-            gamesWon: 0,
-            gamesLost: 0
-          };
-          
-          // Store in localStorage as backup
-          localStorage.setItem('currentUser', JSON.stringify(userData));
-          setCurrentUser(result.username || 'Guest');
-          
-          // Wait for the backend to set the cookie and fetch the actual profile
-          console.log('🔄 Fetching guest profile from backend...');
-          await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for cookie to be set
-          
-          const profile = await authService.fetchUserProfile();
-          
-          if (profile) {
-            console.log('✅ Guest profile fetched:', profile);
-            
-            // Show success message
-            if (guestErrorEl) {
-              guestErrorEl.style.color = '#10b981';
-              guestErrorEl.innerHTML = '<span style="color: #10b981;">✓ Welcome! Redirecting...</span>';
-            }
-            
-            // Redirect to landing page
-            setTimeout(() => {
-              history.pushState({ page: 'landing' }, '', '/');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }, 500);
-          } else {
-            throw new Error('Failed to fetch guest profile');
-          }
-        } else {
-          throw new Error(result.error || 'Failed to create guest user');
+      if (result.success && result.token) {    
+        
+        console.log('successfully:', result.success);
+        // Update current user
+        const userData = {
+          id: null,
+          username: result.username || 'Guest',
+          email: 'guest@transcendence.com',
+          firstName: 'Guest',
+          lastName: 'User',
+          avatar: "null",
+          googleId: "null",
+          gamesWon: 0,
+          gamesLost: 0
+        };
+
+
+        localStorage.setItem('isGuest', 'true');
+        
+        console.log('Setting current user to:', userData);
+        await authService.setCurrentUserProfile(userData);
+        
+        // Show success message
+        if (guestErrorEl) {
+          guestErrorEl.style.color = '#10b981';
+          guestErrorEl.innerHTML = '<span style="color: #10b981;">✓ Welcome! Redirecting...</span>';
         }
-      } catch (error) {
-        console.error('❌ Guest creation error:', error);
         
-        // Clear any partial state
-        localStorage.removeItem('isGuest');
-        localStorage.removeItem('currentUser');
-        
+        // Redirect to landing page
+        setTimeout(() => {
+          history.pushState({ page: 'landing' }, '', '/');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }, 800);
+      } else {
         if (guestErrorEl) {
           const errorMsg = error instanceof Error ? error.message : 'Failed to create guest user';
           guestErrorEl.innerHTML = `<span style="color: #ef4444;">❌ ${errorMsg}</span>`;

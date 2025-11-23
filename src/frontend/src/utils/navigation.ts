@@ -13,8 +13,7 @@ export async function createUserNav(): Promise<string> {
         return ''; // No nav for unauthenticated users
     }
 
-    const isGuest = localStorage.getItem('isGuest') === 'true';
-    const displayName = (user.username || 'User');
+    const displayName = user.username || 'User';
 
     return `
         <nav class="user-nav" style="position: fixed; top: 0; right: 0; z-index: 1000; padding: 1em 2em;">
@@ -66,22 +65,6 @@ export async function createUserNav(): Promise<string> {
                     ">
                         👤 Profile
                     </button>
-                    ${!isGuest ? `
-                    <button id="navEditProfileBtn" class="user-menu-item" style="
-                        width: 100%;
-                        text-align: left;
-                        padding: 0.8em 1.2em;
-                        background: transparent;
-                        border: none;
-                        color: #00ffff;
-                        cursor: pointer;
-                        font-size: 0.95em;
-                        transition: background 0.2s ease;
-                        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
-                    ">
-                        ⚙️ Edit Profile
-                    </button>
-                    ` : ''}
                     <button id="navLeaderboardBtn" class="user-menu-item" style="
                         width: 100%;
                         text-align: left;

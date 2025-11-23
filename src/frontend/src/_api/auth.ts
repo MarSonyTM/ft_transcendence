@@ -160,7 +160,7 @@ export async function createGuestUser(username?: string): Promise<{
                 token: data.token,
                 isGuest: data.data?.isGuest || true,
 		        emailVerified : true,
-                error: data.message
+                error: data.message,
             };
         }
     

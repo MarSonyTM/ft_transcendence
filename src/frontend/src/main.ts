@@ -27,6 +27,7 @@ let currentRoomId: string | null = null;
 
 export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification'];
 
+
 // Centralized routing handler
 async function handleRouting(): Promise<void> {
   const path = window.location.pathname;
@@ -37,6 +38,8 @@ async function handleRouting(): Promise<void> {
   if (!isPublicPage) {
     await authService.whenReady(); 
     const user = await authService.getCurrentUser();
+
+    console.log('Current user:', user);
     
     if (!user) {
       console.log('User not authenticated, redirecting to login');
@@ -80,7 +83,7 @@ async function handleRouting(): Promise<void> {
     case '/lobby':
       setCurrentPage('lobby');
       break;
-    case '/gameSelect':
+    case '/game-select':
       setCurrentPage('gameSelect');
       break;
     case '/profile':
@@ -108,8 +111,8 @@ async function handleRouting(): Promise<void> {
     case '/4PGame':
       setCurrentPage('4PGame');
       break;
-    case 'tempLogin':
-        setCurrentPage('tempLogin');
+    case '/temp-login':
+        setCurrentPage('temp-login');
         break;
     case '/verify-email':
       setCurrentPage('verifyEmail');
@@ -189,7 +192,7 @@ export async function renderApp(): Promise<void> {
     case 'friends':
       renderFriendsPage();
       break;
-    case 'tempLogin':
+    case 'temp-login':
       renderTempLoginPage();
       break;
     case 'verifyEmail':

@@ -20,21 +20,19 @@ interface DecodedToken {
   exp: number;
 }
 
-const API_URL = window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
+interface UserProfile {
+  id: string | null;
+  username: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  avatar?: string;
+  googleId?: string;
+  gamesWon: number;
+  gamesLost: number;
+}
 
-// Public pages that don't require authentication
-const publicPages = [
-  '/',
-  '/ping-pong',
-  '/login',
-  '/register',
-  '/temp-login',
-  '/auth/callback',
-  '/verify-email',
-  '/landing'
-];
-
-class AuthService {
+export class AuthService {
   private static instance: AuthService;
   private currentUser: UserProfile | null = null;
   private neededEmailVerification: boolean = false;
@@ -106,6 +104,8 @@ class AuthService {
   async fetchUserProfile(): Promise<UserProfile | null> {
     console.log('🔍 fetchUserProfile called from:', window.location.pathname);
     
+
+
     const path = window.location.pathname;
     // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
     const hasSession = this.currentUser !== null || localStorage.getItem('isGuest') === 'true';
@@ -160,7 +160,11 @@ class AuthService {
     }
   }
 
-  // Get current user (from memory or fetch from backend)
+  async setCurrentUserProfile(user: UserProfile): Promise<void> {
+    this.currentUser = user;
+  }
+
+  // Get current user (from memory or localStorage)
   async getCurrentUser(): Promise<UserProfile | null> {
     if (this.currentUser) {
       return this.currentUser;
@@ -170,6 +174,7 @@ class AuthService {
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
+    console.log("Checking authentication, currentUser:", this.currentUser);
     return this.currentUser !== null;
   }
 
@@ -186,14 +191,9 @@ class AuthService {
     
     // Clear all state
     this.currentUser = null;
-    localStorage.removeItem("isGuest");
-    localStorage.removeItem("currentUser");
-    presenceService.stopHeartbeat();
-    
-    // Redirect to login
-    history.pushState({ page: 'login' }, '', '/login');
-    setCurrentPage('login');
+    setCurrentPage('pingPong');
     await renderApp();
+    history.pushState({ page: 'pingPong' }, '', '/ping-pong');
   }
 
   // Update user stats after game
