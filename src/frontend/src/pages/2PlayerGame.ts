@@ -6,6 +6,7 @@ import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 import { toggleTournaments } from '../tournament';
+import { presenceService } from '../utils/presenceService';
 
 export let pongGame: PongGame | null = null;
 let keyboardCleanup: (() => void) | null = null;
@@ -99,7 +100,7 @@ export async function render2PlayerGame(): Promise<void> {
 
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
-        backBtn.addEventListener('click', () => {
+        backBtn.addEventListener('click', async () => {
             if (keyboardCleanup) {
                 keyboardCleanup();
             }
@@ -108,6 +109,10 @@ export async function render2PlayerGame(): Promise<void> {
                 cleanupGame(pongGame);
                 endGame(pongGame);
             }
+            
+            // Set status back to online when leaving game
+            await presenceService.setOnline();
+            
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
             renderApp();
@@ -144,6 +149,8 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
             if (pongGame) {
+                // Set status to "in game" when starting
+                await presenceService.setInGame();
                 await pongGame.startServerGame();
             }
         });
@@ -163,6 +170,9 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
                 await pongGame.endGame();
             }
             cleanupGame(pongGame);
+            
+            // Set status back to online when ending game
+            await presenceService.setOnline();
         });
     }
 
@@ -187,6 +197,7 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
 }
 
 // Initialize room-based multiplayer game
+// Initialize room-based multiplayer game
 async function initRoomBasedGame(room: any): Promise<void> {
     if (!pongGame) {
         console.error('No pongGame instance');
@@ -210,7 +221,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         gameMode
     });
 
-    // Initialize WebSocket connection to room
+    // FIXED: Pass options as a single object
     pongGame.roomWS = initRoomWebSocket({
         roomId: room.roomId,
         playerId,
@@ -247,12 +258,15 @@ async function initRoomBasedGame(room: any): Promise<void> {
             updateScoreDisplay(scores);
         },
         
-        onGameEnd: (data: any) => {
+        onGameEnd: async (data: any) => {
             console.log('2-player game ended in room, winner:', data);
             const winner = room.players.find((p: any) => p.id === data.winnerId);
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
         
+            // Set status back to online when game ends
+            await presenceService.setOnline();
+            
             showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });

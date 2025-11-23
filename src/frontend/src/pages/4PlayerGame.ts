@@ -6,6 +6,7 @@ import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 import { toggleTournaments } from '../tournament';
+import { presenceService } from '../utils/presenceService';
 
 export let pongGame: PongGame | null = null;
 let keyboardCleanup: (() => void) | null = null;
@@ -99,7 +100,7 @@ export async function render4PlayerGame(): Promise<void> {
 
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
-        backBtn.addEventListener('click', () => {
+        backBtn.addEventListener('click', async () => {
             // Clean up keyboard handlers
             if (keyboardCleanup) {
                 keyboardCleanup();
@@ -109,6 +110,10 @@ export async function render4PlayerGame(): Promise<void> {
                 cleanupGame(pongGame);
                 endGame(pongGame);
             }
+            
+            // Set status back to online when leaving game
+            await presenceService.setOnline();
+            
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
             renderApp();
@@ -145,6 +150,8 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
             if (pongGame) {
+                // Set status to "in game" when starting
+                await presenceService.setInGame();
                 await pongGame.startServerGame();
             }
         });
@@ -164,6 +171,9 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
                 await pongGame.endGame();
             }
             cleanupGame(pongGame);
+            
+            // Set status back to online when ending game
+            await presenceService.setOnline();
         });
     }
 
@@ -244,11 +254,15 @@ async function initRoomBasedGame(room: any): Promise<void> {
             updateScoreDisplay(scores);
         },
         
-        onGameEnd: (data: any) => {
+        onGameEnd: async (data: any) => {
             console.log('4-player game ended in room, winner:', data);
             const winner = room.players.find((p: any) => p.id === data.winnerId);
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
+            
+            // Set status back to online when game ends
+            await presenceService.setOnline();
+            
             showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });
@@ -345,24 +359,28 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 
 
 // Sync game state from room WebSocket
-async function syncGameStateFromRoom(state: any): Promise<void> {
+function syncGameStateFromRoom(state: any): void {
     if (!pongGame || !pongGame.gameState) return;
 
-    const room = getCurrentRoom();
-    const user = await authService.getCurrentUser();
-    const currentPlayerId = user?.id?.toString();
-
-    // Ball position
-    if (state.ballPosX !== undefined) pongGame.gameState.ballPosX = state.ballPosX;
-    if (state.ballPosY !== undefined) pongGame.gameState.ballPosY = state.ballPosY;
-    
-    for (let i = 0; i < 4; i++) {
-        if (state.players && state.players[i] && state.players[i].pos !== undefined)
-            pongGame.gameState.players[i].pos = state.players[i].pos;
-        if (state.players && state.players[i] && state.players[i].score !== undefined)
-            pongGame.gameState.players[i].score = state.players[i].score;
+    // Update ball position
+    if (state.ballPosX !== undefined) {
+        pongGame.gameState.ballPosX = state.ballPosX;
     }
-
+    if (state.ballPosY !== undefined) {
+        pongGame.gameState.ballPosY = state.ballPosY;
+    }
+    
+    // Update all 4 players
+    for (let i = 0; i < 4; i++) {
+        if (state.players && state.players[i]) {
+            if (state.players[i].pos !== undefined) {
+                pongGame.gameState.players[i].pos = state.players[i].pos;
+            }
+            if (state.players[i].score !== undefined) {
+                pongGame.gameState.players[i].score = state.players[i].score;
+            }
+        }
+    }
 }
 
 // Update remote player position
@@ -370,19 +388,18 @@ async function updateRemotePlayerPosition(playerId: string, position: number): P
     if (!pongGame || !pongGame.gameState) return;
     
     const room = getCurrentRoom();
-
-    if (!room) 
-        return;
+    if (!room) return;
     
     const user = await authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
     
-    if (playerId === currentPlayerId) 
-        return;
+    // Don't update our own position
+    if (playerId === currentPlayerId) return;
     
     const playerIndex = room.players.findIndex((p: any) => p.id === playerId);
-    const currentPos = pongGame.gameState.players[playerIndex].pos || position;
-    pongGame.gameState.players[playerIndex].pos = currentPos + (position - currentPos);
+    if (playerIndex !== -1) {
+        pongGame.gameState.players[playerIndex].pos = position;
+    }
 }
 
 // Update score display
