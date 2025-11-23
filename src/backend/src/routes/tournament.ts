@@ -10,6 +10,7 @@ import {
 	TournamentPlayer,
 	TournamentMatchRecord
 } from '../../../shared/tournamentTypes';
+import { sanitizeAlias } from '../utils/sanitization';
 
 interface StartTournamentBody { aliases: string[]; }
 interface ResultBody { winnerAlias?: string; winnerId?: number; }
@@ -84,7 +85,22 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				reply.code(400);
 				return { success: false, message: 'Body must include an aliases array.' };
 			}
-			const state = tournamentManager.startTournament(body.aliases);
+			
+			// ✅ SANITIZE ALL ALIASES (XSS Protection)
+			const sanitizedAliases = body.aliases.map(alias => sanitizeAlias(alias));
+			
+			// Validate aliases
+			if (sanitizedAliases.some(alias => !alias || alias.length < 1 || alias.length > 50)) {
+				reply.code(400);
+				return { success: false, message: 'All aliases must be 1-50 characters' };
+			}
+			
+			if (sanitizedAliases.length < 2) {
+				reply.code(400);
+				return { success: false, message: 'At least 2 players required for tournament' };
+			}
+			
+			const state = tournamentManager.startTournament(sanitizedAliases);
 			return { success: true, data: serializeState(state) };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to start tournament.';
