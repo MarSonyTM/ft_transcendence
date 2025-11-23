@@ -95,6 +95,9 @@ export async function renderProfilePage(): Promise<void> {
                                 👤 ${userData.firstName || ''} ${userData.lastName || ''}
                             </p>
                         ` : ''}
+                        <p style="color: rgb(156 163 175); font-size: 1em; margin: 0.3em 0;">
+                            🔐 Two-Factor Auth: <span style="color: ${userData.twoFactorEnabled ? '#10b981' : '#ef4444'}; font-weight: 600;">${userData.twoFactorEnabled ? 'Enabled ✓' : 'Disabled ✗'}</span>
+                        </p>
                     </div>
                     
                     <!-- Stats Column (Compact Grid) -->

@@ -118,6 +118,31 @@ export function renderLoginPage(): void {
                 submitBtn.textContent = 'Login';
             }
 
+            // Check if 2FA is required
+            if (result.requires2FA) {
+                // Store 2FA pending state
+                if (result.userId && result.username) {
+                    authService.setPending2FAVerification({
+                        userId: result.userId,
+                        username: result.username
+                    });
+                }
+
+                // Show message about 2FA
+                if (errorEl) {
+                    errorEl.style.color = '#f59e0b';
+                    errorEl.style.textAlign = 'left';
+                    errorEl.textContent = 'Two-factor authentication required. Redirecting...';
+                }
+
+                // Redirect to 2FA verification page
+                setTimeout(() => {
+                    history.pushState({ page: 'twoFactorAuth' }, '', '/two-factor-auth');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                }, 1500);
+                return;
+            }
+
             if (result.success) {
                 // Update current user
                 setCurrentUser(result.username || username);

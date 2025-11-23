@@ -12,6 +12,7 @@ interface UserProfile {
     firstName: string;
     lastName: string;
     avatar?: string;
+    twoFactorEnabled?: boolean;
     gamesWon: number;
     gamesLost: number;
 }
@@ -72,12 +73,13 @@ export async function renderEditProfilePage(): Promise<void> {
     }
 
     const userData: UserProfile = {
-        id: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+        id: typeof user.id === 'string' ? parseInt(user.id) : (user.id || 0),
         username: user.username,
         email: user.email || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         avatar: user.avatar || '',
+        twoFactorEnabled: user.twoFactorEnabled || false,
         gamesWon: user.gamesWon || 0,
         gamesLost: user.gamesLost || 0
     };
@@ -190,6 +192,27 @@ export async function renderEditProfilePage(): Promise<void> {
                                 >
                             </div>
 
+                            <div class="form-group">
+                                <label for="twoFactorEnabled" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Two-Factor Authentication</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);">
+                                    <label style="display: flex; align-items: center; gap: 0.8em; cursor: pointer;">
+                                        <input 
+                                            type="checkbox" 
+                                            id="twoFactorEnabled" 
+                                            name="twoFactorEnabled" 
+                                            ${userData.twoFactorEnabled ? 'checked' : ''}
+                                            style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;"
+                                        >
+                                        <span style="color: rgb(229 231 235); font-weight: 500; font-size: 0.95em;">
+                                            Enable Two-Factor Authentication
+                                        </span>
+                                    </label>
+                                </div>
+                                <p style="color: rgb(156 163 175); font-size: 0.75em; margin-top: 0.5em; line-height: 1.4;">
+                                    Two-factor authentication adds an extra layer of security to your account.
+                                </p>
+                            </div>
+
                             <div id="errorMessage" style="color: #ef4444; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
                             <div id="successMessage" style="color: #10b981; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
 
@@ -238,12 +261,14 @@ export async function renderEditProfilePage(): Promise<void> {
             try {
                 const formData = new FormData(form);
                 const avatarValue = (formData.get('avatar') as string)?.trim();
+                const twoFactorCheckbox = document.getElementById('twoFactorEnabled') as HTMLInputElement;
                 const updateData = {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
                     // Only update avatar if a new value is provided, otherwise keep existing
-                    avatar: avatarValue
+                    avatar: avatarValue,
+                    twoFactorEnabled: twoFactorCheckbox?.checked || false
                 };
                 
                 const result = await updateUserProfile(updateData);

@@ -19,6 +19,7 @@ interface UserProfile {
   firstName?: string;
   lastName?: string;
   avatar?: string;
+  twoFactorEnabled?: boolean;
   googleId?: string;
   gamesWon: number;
   gamesLost: number;
@@ -30,6 +31,7 @@ export class AuthService {
   private token: string | null = null;
   private neededEmailVerification: boolean = false;
   private pendingEmailVerification: string | null = null;
+  private pending2FAVerification: { userId: number; username: string } | null = null;
   private initPromise: Promise<void>;
 
   private constructor() {
@@ -206,6 +208,14 @@ export class AuthService {
 
   getPendingEmailVerification(): string | null {
     return this.pendingEmailVerification;
+  }
+
+  setPending2FAVerification(data: { userId: number; username: string } | null): void {
+    this.pending2FAVerification = data;
+  }
+
+  getPending2FAVerification(): { userId: number; username: string } | null {
+    return this.pending2FAVerification;
   }
 }
 
