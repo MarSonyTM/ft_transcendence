@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'database', 'transcendence.db');
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'database.db');
 
 console.log('🗑️  CLEARING ALL DATA FROM DATABASE');
 console.log('Connecting to database at:', DATABASE_PATH);
