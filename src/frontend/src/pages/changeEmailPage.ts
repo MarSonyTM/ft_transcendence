@@ -266,6 +266,7 @@ export async function renderChangeEmailPage(): Promise<void> {
                     if (result.success) {
                         successDiv.textContent = 'Email address updated successfully!';
                         successDiv.style.display = 'block';
+                        authService.setCurrentUserProfile(null);
                         
                         // Redirect to profile page after 2 seconds
                         setTimeout(() => {

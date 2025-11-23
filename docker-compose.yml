@@ -1,7 +1,7 @@
 services:
   backend:
     container_name: backend
-    build: ./backend/.
+    build: ./src/backend/.
     ports:
       - "3000:3000"
     volumes:
@@ -14,7 +14,7 @@ services:
       - transcendence
 
   frontend:
-    build: ./frontend/.  # Uses Dockerfile (nginx)
+    build: ./src/frontend/.  # Uses Dockerfile (nginx)
     container_name: frontend
     ports:
       - "443:443"  # HTTPS
@@ -28,7 +28,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: database/
+      device: src/database/
 
 networks:
   transcendence:

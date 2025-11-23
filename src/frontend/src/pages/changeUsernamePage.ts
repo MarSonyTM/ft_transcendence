@@ -195,6 +195,7 @@ export async function renderChangeUsernamePage(): Promise<void> {
                 if (result.success) {
                     successDiv.textContent = 'Username changed successfully!';
                     successDiv.style.display = 'block';
+                    authService.setCurrentUserProfile(null);
                     
                     // Redirect to profile page after 2 seconds
                     setTimeout(() => {

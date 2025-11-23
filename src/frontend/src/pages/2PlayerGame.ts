@@ -91,9 +91,6 @@ export async function render2PlayerGame(): Promise<void> {
                     <p style="color: #ff6b00; font-style: italic; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
                 </div>
 
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
-                </div>
             </div>
         </div>
     `;

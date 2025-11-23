@@ -140,7 +140,7 @@ export class AuthService {
     }
   }
 
-  async setCurrentUserProfile(user: UserProfile): Promise<void> {
+  async setCurrentUserProfile(user: UserProfile | null): Promise<void> {
     this.currentUser = user;
   }
 
@@ -154,7 +154,6 @@ export class AuthService {
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    console.log("Checking authentication, currentUser:", this.currentUser);
     return this.currentUser !== null;
   }
 

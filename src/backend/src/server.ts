@@ -64,7 +64,6 @@ const start = async (): Promise<void> => {
             });
             
             if (isAllowed) {
-                console.log('✅ Origin allowed:', origin);
                 cb(null, true);
             } else {
                 console.log('❌ Origin blocked:', origin);
