@@ -1,20 +1,12 @@
-import { setCurrentPage, getCurrentUser as getGlobalCurrentUser, setCurrentUser } from './globalState';
-import { renderApp } from '../main';
-import { presenceService } from './presenceService';
+import { publicPages, renderApp } from "../main";
+import { setCurrentPage } from "./globalState";
 
-export interface UserProfile {
-  id: number;
-  username: string;
-  email?: string;
-  firstName: string;
-  lastName: string;
-  avatar?: string;
-  gamesWon: number;
-  gamesLost: number;
-}
+const getApiUrl = () =>
+  window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
+const API_URL = getApiUrl();
 
 interface DecodedToken {
-  id: number;
+  id: string;
   email: string;
   username: string;
   exp: number;
@@ -35,12 +27,14 @@ interface UserProfile {
 export class AuthService {
   private static instance: AuthService;
   private currentUser: UserProfile | null = null;
+  private token: string | null = null;
   private neededEmailVerification: boolean = false;
   private pendingEmailVerification: string | null = null;
-  private initPromise: Promise<void> | null = null;
+  private initPromise: Promise<void>;
 
   private constructor() {
-    this.initPromise = this.initializeAuth();
+    // Kick off initialization and keep a handle so callers can await readiness
+    this.initPromise = this.initializeAuth().catch(() => {});
   }
 
   static getInstance(): AuthService {
@@ -51,11 +45,16 @@ export class AuthService {
   }
 
   /**
-   * Wait for authentication initialization to complete
+   * Expose a promise that resolves when initial auth check finishes.
+   * Callers can await this to avoid rendering unauthenticated UI briefly
+   * when a valid session exists.
    */
-  async whenReady(): Promise<void> {
-    if (this.initPromise) {
+  public async whenReady(): Promise<void> {
+    try {
       await this.initPromise;
+    } catch {
+      // Swallow to avoid bubbling init failures; consumers can still
+      // read isAuthenticated() which will be false on failure.
     }
   }
 
@@ -64,11 +63,13 @@ export class AuthService {
    */
   private async initializeAuth(): Promise<void> {
     const path = window.location.pathname;
+    console.log('🔧 initializeAuth called, path:', path);
+    // Skip auto-fetch on auth callback page - it will handle auth explicitly
     if (path.includes('/auth/callback')) {
+      console.log('⏭️ Skipping init on auth callback page');
       return;
     }
     await this.fetchUserProfile();
-    this.initPromise = null; // Clear the promise once initialization is complete
   }
 
   /**
@@ -108,34 +109,25 @@ export class AuthService {
 
     const path = window.location.pathname;
     // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
-    const hasSession = this.currentUser !== null || localStorage.getItem('isGuest') === 'true';
-
-    if (publicPages.includes(path) && !hasSession) {
-      return null;  // Only skip if no session exists
+    // (Auth callback will call this after setting the token cookie)
+    if (publicPages.includes(path) && !path.includes('/auth/callback')) {
+      console.log('⏭️ Skipping profile fetch on public page:', path);
+      return null;
     }
 
     console.log('📡 Fetching user profile from backend...');
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
-        credentials: "include",
+      credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
       });
 
+
       if (!response.ok) {
         if (response.status === 401) {
-          console.log('❌ 401 Unauthorized - clearing auth state');
-          this.currentUser = null;
-          localStorage.removeItem("isGuest");
-          localStorage.removeItem("currentUser");
-          
-          // Only redirect if not on a public page
-          if (!publicPages.includes(path)) {
-            history.pushState({ page: 'login' }, '', '/login');
-            setCurrentPage('login');
-            await renderApp();
-          }
+          await this.logout();
         } else if (response.status === 403) {
           this.neededEmailVerification = true;
           const data1 = await response.json();
@@ -147,15 +139,8 @@ export class AuthService {
 
       const data = await response.json();
       this.currentUser = data.data;
-      
-      // For guest users, also store in localStorage for quick access
-      if (this.currentUser && localStorage.getItem('isGuest') === 'true') {
-        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-      }
-      
       return this.currentUser;
     } catch (error) {
-      console.error('❌ Error fetching user profile:', error);
       return null;
     }
   }
@@ -188,8 +173,6 @@ export class AuthService {
     } catch (error) {
       console.error("Error during logout:", error);
     }
-    
-    // Clear all state
     this.currentUser = null;
     setCurrentPage('pingPong');
     await renderApp();
