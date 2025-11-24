@@ -1,7 +1,8 @@
-import { setCurrentPage, getCurrentGameMode } from '../utils/globalState';
+import { setCurrentGameMode, setCurrentPage, getCurrentGameMode } from '../utils/globalState';
 import { renderApp } from '../main';
-import { authService } from '../utils/auth';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
+import { presenceService } from '../utils/presenceService';
+import { authService } from '../utils/auth';
 import { 
   getCurrentRoom,
   setCurrentRoom,
@@ -15,14 +16,12 @@ let pollInterval: number | null = null;
 let lobbyWebSocket: any = null;
 
 export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
-  const root = document.getElementById('app-root');
-  if (!root) return;
+    const root = document.getElementById('app-root');
+    if (!root) return;
 
   console.log('[LOBBY] Starting renderLobbyPage, roomIdParam:', roomIdParam);
 
-  const currentUser = authService.getCurrentUser();
-  
-  let user = currentUser;
+  let user = await authService.getCurrentUser();
   if (!user && authService.isAuthenticated()) {
     user = await authService.fetchUserProfile();
   }
@@ -36,6 +35,14 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
     } else if (!getCurrentRoom()) {
       console.log('[LOBBY] Creating new room');
       await createNewRoom(currentUserId, user?.username || 'Guest');
+    } else {
+      // ✅ ADD THIS: If room already exists (e.g., from cached state), sync game mode
+      const currentRoom = getCurrentRoom();
+      if (currentRoom) {
+        const gameMode = currentRoom.maxPlayers === 4 ? '4P' : '2P';
+        setCurrentGameMode(gameMode);
+        console.log(`✅ [LOBBY] Synced game mode to ${gameMode}`);
+      }
     }
   } catch (error) {
     console.error('[LOBBY] Error setting up room:', error);
@@ -47,12 +54,15 @@ export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
   if (!currentRoom) {
     console.error('❌ [LOBBY] No room after setup!');
     root.innerHTML = `
-    <div style="text-align: center; padding: 2em;">
-    <h2 style="color: #f87171;">Failed to setup room</h2>
-    <p>Please try again</p>
-    <button onclick="window.location.href='/'" style="padding: 0.75em 2em; background: rgb(99 102 241); color: white; border: none; border-radius: 8px; cursor: pointer;">
-    Back to Home
-    </button>
+    <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+      <div class="grid-anim"></div>
+      <div class="glass-card" style="max-width: 600px;">
+        <h2 class="title-neon" style="text-align: center; color: #f87171;">Failed to setup room</h2>
+        <p style="text-align: center; color: rgb(156 163 175);">Please try again</p>
+        <button onclick="window.location.href='/'" class="btn btn-neon primary">
+          Back to Home
+        </button>
+      </div>
     </div>
     `;
     return;
@@ -75,12 +85,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
   const gameMode = getCurrentGameMode();
   const maxPlayers = gameMode === '2P' ? 2 : 4;
 
-  const token = authService.getToken();
   const response = await fetch('/api/room/create', {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       hostId: userId,
@@ -116,12 +125,11 @@ async function createNewRoom(userId: string, username: string): Promise<void> {
 async function joinExistingRoom(roomId: string, userId: string, username: string): Promise<void> {
   console.log('[JOIN] Joining room:', roomId);
   
-  const token = authService.getToken();
   const response = await fetch(`/api/room/${roomId}/join`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       playerId: userId,
@@ -134,6 +142,11 @@ async function joinExistingRoom(roomId: string, userId: string, username: string
   
   if (data.success && data.room) {
     setCurrentRoom(data.room);
+    
+    const gameMode = data.room.maxPlayers === 4 ? '4P' : '2P';
+    setCurrentGameMode(gameMode);
+    console.log(`✅ [JOIN] Set game mode to ${gameMode} based on maxPlayers=${data.room.maxPlayers}`);
+    
     console.log('✅ [JOIN] Joined room:', roomId);
   } else {
     console.log('⚠️ [JOIN] Failed, creating new room instead');
@@ -182,12 +195,11 @@ async function startGame(): Promise<void> {
   console.log('Starting game for room:', currentRoom.roomId);
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/start`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ 
         hostId: currentUserId
@@ -326,6 +338,11 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       
       if (room) {
         setCurrentRoom(room);
+        
+        // ✅ ADD THIS: Keep game mode in sync with room updates
+        const gameMode = room.maxPlayers === 4 ? '4P' : '2P';
+        setCurrentGameMode(gameMode);
+        
         const root = document.getElementById('app-root');
         if (root) {
           console.log('[WS] Re-rendering lobby with updated players');
@@ -379,7 +396,14 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
 function renderLobby(root: HTMLElement): void {
 	const currentRoom = getCurrentRoom();
 	if (!currentRoom) {
-	  root.innerHTML = '<div style="color: white; padding: 2em;">Loading room...</div>';
+	  root.innerHTML = `
+	    <div class="neon-grid">
+	      <div class="grid-anim"></div>
+	      <div class="glass-card">
+	        <p style="text-align: center; color: rgb(156 163 175);">Loading room...</p>
+	      </div>
+	    </div>
+	  `;
 	  return;
 	}
 
@@ -411,115 +435,130 @@ function renderLobby(root: HTMLElement): void {
 	const currentPlayer = players.find(p => p.id === currentUserId);
   let hasGuest = false;
   let hasLocal = players.some(p => p.id === 'local');
-
+  
+  
 	root.innerHTML = `
-	  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
-		<div style="background: rgb(55 65 81); border-radius: 12px; padding: 2em; min-width: 450px; max-width: 600px;">
+	  <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+		<div class="grid-anim"></div>
+		<div class="glass-card" style="padding: 2em; width: 100%;">
 		  
-		  <h2 style="font-size: 2.5em; margin: 0 0 1em 0; color: rgb(209 213 219); text-align: center;">Game Lobby</h2>
+		  <h2 class="title-neon" style="text-align: center; margin-bottom: 1.2em;">Game Lobby</h2>
 		  
-		  <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em; text-align: center;">
-			<div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Room ID</div>
-			<div style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold; font-family: monospace;">${currentRoom.roomId}</div>
+		  <!-- Desktop Layout: Two Columns -->
+		  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2em; align-items: start;">
+		    
+		    <!-- Left Column: Room Info & Players -->
+		    <div>
+		      <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Room Information</h3>
+		      
+		      <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1em; margin-bottom: 1.2em; text-align: center;">
+		        <div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Room ID</div>
+		        <div style="color: rgb(229 231 235); font-size: 1.1em; font-weight: bold; font-family: monospace;">${currentRoom.roomId}</div>
+		      </div>
+		      
+		      <div style="margin-bottom: 1.2em;">
+		        <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Join Another Room</label>
+		        <div style="display: flex; gap: 0.5em;">
+		          <input 
+		            id="joinRoomInput" 
+		            type="text"
+		            placeholder="Enter Room ID"
+		            autocomplete="off"
+		            value="${preservedValue}"
+		            style="flex: 1; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-family: monospace; font-size: 0.9em; transition: border-color 0.2s;"
+		            onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+		            onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';">
+		          <button id="joinRoomBtn" style="flex: 0 0 auto; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+		            Join
+		          </button>
+		        </div>
+		      </div>
+		      
+		      <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 1.2em 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">
+		        Players (${players.length}/${maxPlayers}) - ${maxPlayers === 4 ? '4-Player Mode' : '1v1 Mode'}
+		      </h3>
+		      
+		      <div style="display: flex; flex-direction: column; gap: 0.5em;">
+		        ${players.map(player => `
+		          <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 0.75em; display: flex; justify-content: space-between; align-items: center;">
+		            <div>
+		              <span style="color: rgb(229 231 235); font-weight: 500;">${player.username}</span>
+		              ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
+		              ${player.id === currentUserId ? ' <span style="color: rgba(59, 130, 246, 0.8); font-size: 0.85em;">(You)</span>' : ''}
+		            </div>
+		            <div style="display: flex; align-items: center; gap: 0.75em;">
+		              <span style="color: ${player.isReady ? 'rgb(34 197 94)' : 'rgb(156 163 175)'}; font-size: 0.85em; font-weight: 500;">
+		                ${player.isReady ? '✓ Ready' : 'Not Ready'}
+		              </span>
+		              ${player.isAI && isHost ? `
+		                <button class="remove-player-btn" data-player-id="${player.id}"
+		                  style="background: rgba(220, 38, 38, 0.2); color: rgb(248, 113, 113); border: 1px solid rgba(220, 38, 38, 0.5); border-radius: 6px; padding: 0.3em 0.6em; font-size: 0.75em; cursor: pointer; font-weight: 500;">
+		                  Remove
+		                </button>
+		              ` : ''}
+		            </div>
+		          </div>
+		        `).join('')}
+		      </div>
+		    </div>
+		    
+		    <!-- Right Column: Controls & Settings -->
+		    <div>
+		      <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Game Controls</h3>
+		      
+		      ${currentPlayer && !currentPlayer.isAI ? `
+		        <button id="toggleReadyBtn" style="width: 100%; margin-bottom: 1em; font-size: 0.85em; padding: 0.65em 1.2em; border-radius: 8px; font-weight: 500; ${currentPlayer.isReady ? 'background: rgba(156, 163, 175, 0.2); color: rgb(156 163 175); border: 1px solid rgba(156, 163, 175, 0.3);' : 'background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5);'} cursor: pointer;">
+		          ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
+		        </button>
+		      ` : ''}
+		      
+		      ${canAddMore && isHost ? `
+		        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 1.2em; margin-bottom: 1em;">
+		          <h4 style="color: rgb(156 163 175); font-size: 0.85em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em;">Add Players</h4>
+		          
+		          ${!hasLocal ? `
+		            <button id="addLocalBtn" style="width: 100%; margin-bottom: 0.8em; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+		              🎮 Add Local Player (O/L keys)
+		            </button>
+		          ` : ''}
+		          
+		          <div style="margin-top: ${!hasLocal ? '0' : '0.8em'};">
+		            <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">AI Difficulty</label>
+		            <select id="aiDifficulty" 
+		              style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-size: 0.9em; margin-bottom: 0.5em; cursor: pointer; transition: border-color 0.2s;"
+		              onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+		              onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';">
+		              <option value="easy" ${selectedDifficulty === 'easy' ? 'selected' : ''}>Easy - Good for beginners</option>
+		              <option value="normal" ${selectedDifficulty === 'normal' ? 'selected' : ''}>Normal - Balanced challenge</option>
+		              <option value="hard" ${selectedDifficulty === 'hard' ? 'selected' : ''}>Hard - Extremely challenging</option>
+		            </select>
+		            <div style="color: rgb(156 163 175); font-size: 0.75em; font-style: italic; margin-bottom: 0.8em;">
+		              ${selectedDifficulty === 'easy' ? '🟢 Slower reactions, less accurate' : selectedDifficulty === 'normal' ? '🟡 Moderate speed and accuracy' : '🔴 Lightning-fast reactions, perfect accuracy'}
+		            </div>
+		            <button id="addAIBtn" style="width: 100%; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(16, 185, 129, 0.2); color: rgb(16, 185, 129); border: 1px solid rgba(16, 185, 129, 0.5); cursor: pointer;">
+		              🤖 Add AI Opponent
+		            </button>
+		          </div>
+		        </div>
+		      ` : ''}
+		      
+		      ${isHost ? `
+		        <button id="startGameBtn" style="width: 100%; margin-bottom: 0.8em; font-size: 0.85em; padding: 0.65em 1.2em; border-radius: 8px; font-weight: 500; ${canStart ? 'background: rgba(34, 197, 94, 0.2); color: rgb(34, 197, 94); border: 1px solid rgba(34, 197, 94, 0.5); cursor: pointer;' : 'background: rgba(156, 163, 175, 0.1); color: rgb(107, 114, 128); border: 1px solid rgba(156, 163, 175, 0.2); cursor: not-allowed; opacity: 0.5;'}">
+		          ${canStart ? '🎮 Start Game' : `⏳ Need ${minPlayersRequired - players.length} more player(s)...`}
+		        </button>
+		      ` : `
+		        <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 1em; margin-bottom: 0.8em; text-align: center;">
+		          <p style="color: rgb(245, 158, 11); font-size: 0.85em; margin: 0;">
+		            ${canStart ? '⏰ Waiting for host to start...' : `⏳ Waiting for ${minPlayersRequired - players.length} more player(s)...`}
+		          </p>
+		        </div>
+		      `}
+		      
+		      <button id="leaveBtn" style="width: 100%; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(220, 38, 38, 0.2); color: rgb(248, 113, 113); border: 1px solid rgba(220, 38, 38, 0.5); cursor: pointer;">
+		        ← Leave Lobby
+		      </button>
+		    </div>
 		  </div>
-  
-		  <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1.5em;">
-			<div style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 0.5em;">Join Room:</div>
-			<div style="display: flex; gap: 0.5em;">
-			  <input 
-				id="joinRoomInput" 
-				type="text"
-				placeholder="Enter Room ID"
-				autocomplete="off"
-				value="${preservedValue}"
-				style="flex: 1; background: rgb(17 24 39); color: rgb(229 231 235); border: 1px solid rgb(75 85 99); border-radius: 4px; padding: 0.5em; font-family: monospace; font-size: 0.9em; outline: none;">
-			  <button 
-				id="joinRoomBtn" 
-				style="background: rgb(99 102 241); color: white; border: none; border-radius: 4px; padding: 0.5em 1em; cursor: pointer; white-space: nowrap;">
-				Join
-			  </button>
-			</div>
-		  </div>
-  
-		  <div style="margin-bottom: 1.5em;">
-			<h3 style="color: rgb(209 213 219); margin: 0 0 1em 0;">
-        Players (${players.length}/${maxPlayers}) - ${maxPlayers === 4 ? '4-Player Mode' : '1v1 Mode'}
-      </h3>
-			${players.map(player => `
-			  <div style="background: rgb(31 41 55); border-radius: 6px; padding: 0.75em; margin-bottom: 0.5em; display: flex; justify-content: space-between; align-items: center;">
-				<div>
-				  <span style="color: rgb(229 231 235);">${player.username}</span>
-				  ${player.id === currentRoom.hostId ? ' <span style="color: rgb(251 191 36);">👑</span>' : ''}
-				  ${player.id === currentUserId ? ' <span style="color: rgb(99 102 241); font-size: 0.85em;">(You)</span>' : ''}
-				</div>
-				<div style="display: flex; align-items: center; gap: 0.5em;">
-				  <span style="color: ${player.isReady ? 'rgb(34 197 94)' : 'rgb(156 163 175)'}; font-size: 0.9em;">
-					${player.isReady ? '✓ Ready' : 'Not Ready'}
-				  </span>
-				  ${player.isAI && isHost ? `
-					<button class="remove-player-btn" data-player-id="${player.id}"
-							style="background: rgb(220 38 38); color: white; border: none; border-radius: 4px; padding: 0.25em 0.5em; font-size: 0.8em; cursor: pointer;">
-					  Remove
-					</button>
-				  ` : ''}
-				</div>
-			  </div>
-			`).join('')}
-		  </div>
-  
-		  ${currentPlayer && !currentPlayer.isAI ? `
-			<button id="toggleReadyBtn" 
-					style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em;
-						   background: ${currentPlayer.isReady ? 'rgb(107 114 128)' : 'rgb(34 197 94)'}; color: white;">
-			  ${currentPlayer.isReady ? '❌ Not Ready' : '✅ Ready Up'}
-			</button>
-		  ` : ''}
-
-		  ${canAddMore && isHost ? `
-            <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 1em;">
-                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em;">Add Player</div>
-                
-                ${!hasLocal ? '<button id="addLocalBtn" style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer; margin-bottom: 0.75em; background: rgb(34 197 94); color: white;"> 🎮 Add Local Player (O/L keys)</button>' : ''}
-                <div style="color: rgb(156 163 175); font-size: 0.9em; margin-bottom: 0.75em; margin-top: 1em;">AI Opponent Settings</div>
-                <select id="aiDifficulty" 
-                    style="width: 100%; padding: 0.75em; border: 1px solid rgb(75 85 99); border-radius: 8px; font-size: 1em; margin-bottom: 0.75em; background: rgb(31 41 55); color: white;">
-                    <option value="easy" ${selectedDifficulty === 'easy' ? 'selected' : ''}>Easy - Good for beginners</option>
-                    <option value="normal" ${selectedDifficulty === 'normal' ? 'selected' : ''}>Normal - Balanced challenge</option>
-                    <option value="hard" ${selectedDifficulty === 'hard' ? 'selected' : ''}>Hard - Extremely challenging</option>
-                </select>
-                <div style="color: rgb(156 163 175); font-size: 0.8em; font-style: italic; margin-bottom: 0.75em; text-align: center;">
-                    ${selectedDifficulty === 'easy' ? 
-                        '🟢 Slower reactions, less accurate - Perfect for learning the game' : 
-                    selectedDifficulty === 'normal' ? 
-                        '🟡 Moderate speed and accuracy - Good for regular practice' : 
-                        '🔴 Lightning-fast reactions, perfect accuracy - Ultimate challenge'}
-                </div>
-                <button id="addAIBtn" 
-                    style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
-                        background: rgb(99 102 241); color: white;">
-                    🤖 Add AI Opponent
-                </button>
-            </div>
-		  ` : ''}
-		  
-		  ${isHost ? `
-      <button id="startGameBtn"
-              style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; margin-bottom: 0.75em;
-                    background: ${canStart ? 'rgb(22 163 74)' : 'rgb(107 114 128)'}; color: white;
-                    cursor: ${canStart ? 'pointer' : 'not-allowed'}; opacity: ${canStart ? '1' : '0.5'};">
-        ${canStart ? '🎮 Start Game' : `⏳ Need ${minPlayersRequired - players.length} more player(s)...`}
-      </button>
-    ` : `
-      <div style="background: rgb(31 41 55); border-radius: 8px; padding: 1em; margin-bottom: 0.75em; text-align: center; color: rgb(156 163 175);">
-        ${canStart ? 'Waiting for host to start...' : `Waiting for ${minPlayersRequired - players.length} more player(s)...`}
-      </div>
-    `}
-		  
-		  <button id="leaveBtn" 
-				  style="width: 100%; padding: 0.75em; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 500; cursor: pointer;
-						 background: rgb(220 38 38); color: white;">
-			Leave Lobby
-		  </button>
 		  
 		</div>
 	  </div>
@@ -604,12 +643,11 @@ async function toggleReady(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/ready`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });
@@ -641,12 +679,11 @@ async function addAIOpponent(): Promise<void> {
   console.log(`[AI] Adding AI Bot ${aiNumber} to room ${roomId}`);
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: aiId,
@@ -692,12 +729,11 @@ async function addLocalPlayer(): Promise<void> {
   }
   
   try {
-    const token = authService.getToken();
     const joinResponse = await fetch(`/api/room/${roomId}/join`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         playerId: localId,
@@ -726,12 +762,11 @@ async function removePlayer(playerId: string): Promise<void> {
   if (!currentRoom) return;
 
   try {
-    const token = authService.getToken();
     const response = await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId })
     });
@@ -749,12 +784,11 @@ async function leaveRoom(): Promise<void> {
   if (!currentRoom || !currentUserId) return;
 
   try {
-    const token = authService.getToken();
     await fetch(`/api/room/${currentRoom.roomId}/leave`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ playerId: currentUserId })
     });

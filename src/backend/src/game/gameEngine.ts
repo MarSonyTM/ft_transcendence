@@ -1,6 +1,5 @@
 import { get } from "http";
-import { database } from "../database";
-import { GameState } from "../../../shared/gameTypes";
+import { GameState, database, Player } from "../database";
 import { broadcastToGame } from "../websocket/websocketHandler";
 import { AIPongPlayer, AIDifficulty } from "./aiPlayer";
 
@@ -53,7 +52,7 @@ export class BaseGameEngine {
         this.min = 0;
         this.maxX = 400;
         this.maxY = is2P? 200 : 400;
-        this.ballRadius = 5;//TODO check -> balldiameter in 10
+        this.ballRadius = 10;//TODO check -> balldiameter is 10
         this.ballSpeed = 4;
         this.paddleLength = is2P ? 60 : 80;
         this.paddleWidth = 10;
@@ -119,24 +118,172 @@ export class BaseGameEngine {
 
         const scoresArr = this.gameState.players.map(p => p.score || 0);
         const maxScore = Math.max(...scoresArr);
-        const winnerId = scoresArr.findIndex(score => score === maxScore) + 1;
-        const winnerName = `Player ${this.gameState.players[winnerId - 1].name || winnerId}`;
+        const winnerIndex = scoresArr.findIndex(score => score === maxScore);
+        const winnerId = winnerIndex + 1;
+        const winnerName = `Player ${this.gameState.players[winnerIndex]?.name || winnerId}`;
         const orientationToSeat: Record<number, string> = this.gameState.mode === '4P'
             ? { 1: 'left', 2: 'top', 3: 'right', 4: 'bottom' }
             : { 1: 'left', 2: 'right' };
         const winnerPos = orientationToSeat[winnerId] ?? 'unknown';
+
+        // Always use game state players (they have isAI and difficulty info)
+        // Database players don't have this information
+        let gamePlayers: any[] = [];
+        
+        if (this.gameState.players && this.gameState.players.length > 0) {
+            gamePlayers = this.gameState.players.map((player: any, index: number) => {
+                const positionId = index + 1; // 1-based position ID
+                let actualUserId = positionId;
+                
+                // Try to find user by username or name (only for non-AI players)
+                const playerName = player.username || player.name;
+                const isAI = player.isAI || this.isPlayerAI(positionId);
+                
+                if (!isAI && playerName) {
+                    const userByUsername = database.users.getAllUsers().find(
+                        u => u.username === playerName
+                    );
+                    if (userByUsername) {
+                        actualUserId = userByUsername.id;
+                    }
+                }
+                
+                // Also check if player.id is a valid user ID
+                if (!isAI && player.id && typeof player.id === 'number' && player.id > 0 && player.id < 1000) {
+                    const userById = database.users.getUserById(player.id);
+                    if (userById) {
+                        actualUserId = player.id;
+                    }
+                }
+                
+                return {
+                    id: actualUserId,
+                    gameId: this.gameState.gameId,
+                    playerId: actualUserId,
+                    positionId: positionId, // Store position for AI detection
+                    playerPosition: index === 0 ? 'left' : (index === 1 ? 'right' : (index === 2 ? 'top' : 'bottom')),
+                    score: player.score || 0,
+                    connectionStatus: 'connected',
+                    lastActivity: new Date().toISOString(),
+                    pos: player.pos || 0,
+                    name: playerName || `Player ${index + 1}`,
+                    username: playerName,
+                    isAI: isAI,
+                    difficulty: player.difficulty || undefined
+                };
+            });
+        }
+        
+        // Build players data for saving with usernames
+        const playersData = gamePlayers.map((player: any, index: number) => {
+            const positionId = player.positionId || (index + 1); // Use stored positionId or fallback
+            const isAIFromEngine = this.isPlayerAI(positionId);
+            
+            let displayName = '';
+            let playerId = player.playerId;
+            
+            // Check if this player is an AI (check both game engine and player data)
+            const playerIsAI = player.isAI !== undefined ? player.isAI : isAIFromEngine;
+            
+            if (playerIsAI) {
+                // Get difficulty from player data or default to Normal
+                let difficulty = player.difficulty || 'normal';
+                
+                // Capitalize first letter
+                difficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+                displayName = `AI Bot (${difficulty})`;
+                // Use a special ID for AI players (9000 + positionId to avoid conflicts)
+                playerId = 9000 + positionId;
+            } else {
+                // Regular player - check database first
+                const user = database.users.getUserById(player.playerId);
+                
+                if (user) {
+                    displayName = user.username;
+                } else if (player.name) {
+                    // Check if name suggests it's an AI (fallback)
+                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
+                        const difficulty = player.difficulty || 'Normal';
+                        displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                        // Use a special ID for AI players
+                        playerId = 9000 + positionId;
+                    } else {
+                        displayName = player.name;
+                    }
+                } else {
+                    displayName = `Player ${player.playerId}`;
+                }
+            }
+            
+            return {
+                id: playerId.toString(),
+                username: displayName,
+                score: player.score || 0,
+                position: player.playerPosition || 'unknown'
+            };
+        });
+        
+        // Get actual winner user ID and display name
+        const winnerPlayer = gamePlayers[winnerIndex];
+        const winnerPlayerData = playersData[winnerIndex];
+        
+        // For database storage, use the actual user ID (only for non-AI players)
+        const isWinnerAI = winnerPlayer ? winnerPlayer.isAI : false;
+        let actualWinnerId = winnerPlayer ? winnerPlayer.playerId : winnerId;
+        
+        // For AI winners, don't set a winnerId (it would violate foreign key constraint)
+        // Just set the winner name
+        const winnerUser = !isWinnerAI ? database.users.getUserById(actualWinnerId) : null;
+        
+        // Save game data with players and winner
+        const updateData: any = {
+            status: 'finished',
+            endedAt: new Date().toISOString(),
+            players: playersData
+        };
+        
+        // Set winner info based on player type
+        if (winnerUser) {
+            // Real user won - set both winnerId and winner name
+            updateData.winnerId = actualWinnerId;
+            updateData.winner = winnerUser.username;
+        } else if (winnerPlayerData) {
+            // AI or guest won - only set winner name (no winnerId to avoid FK constraint)
+            updateData.winner = winnerPlayerData.username;
+            // Don't set winnerId for AI/guest players
+        } else {
+            // Fallback
+            updateData.winner = winnerName;
+        }
+        
+        database.games.updateGame(this.gameState.gameId, updateData);
+        console.log(`✅ Game ${this.gameState.gameId} ended - Winner: ${updateData.winner}, Players saved: ${playersData.length}`);
+
+        // Update user statistics for all players
+        gamePlayers.forEach((player: any) => {
+            // Only update stats for registered users (not AI or local players)
+            if (!player.isAI && !player.isLocal && player.playerId && player.playerId > 0 && player.playerId < 1000) {
+                const user = database.users.getUserById(player.playerId);
+                if (user) {
+                    // Check if this player won
+                    const didWin = player.positionId === winnerId;
+                    database.users.updateUserStats(player.playerId, didWin);
+                    console.log(`📊 Updated stats for user ${user.username}: ${didWin ? 'WON' : 'LOST'}`);
+                }
+            }
+        });
 
         const gameEndMessage = {
             type: 'gameEnd',
             gameId: this.gameState.gameId,
             mode: this.gameState.mode,
             winner: winnerId,
-            winnerName,
+            winnerName: updateData.winner,
             finalScores: this.gameState.players.map((p, index) => ({
                 playerId: index + 1,
                 score: p.score || 0
             })),
-            message: `🏆 ${winnerName} (${winnerPos}) wins with ${maxScore} points!`
+            message: `🏆 ${updateData.winner} (${winnerPos}) wins with ${maxScore} points!`
         };
 
         this.updateDatabaseState();
@@ -241,7 +388,6 @@ export class BaseGameEngine {
     }
 
     public setPlayerKeyState(playerId: number, key: string, pressed: boolean): void {
-        // Maintain a persistent key map per player instead of overwriting
         if (!this.playerKeyStates.has(playerId)) {
             this.playerKeyStates.set(playerId, {});
         }
@@ -251,46 +397,59 @@ export class BaseGameEngine {
 
     // Process player inputs based on key states
     protected processPlayerInputs(): void {
-        const is2P = this.gameState.mode === '2P';
         this.playerKeyStates.forEach((keys, playerId) => {
-        // for (const [playerId, keys] of this.playerKeyStates.entries()) {
-            // if (this.gameState.players[playerId - 1].pos !== undefined) {
-            if (this.isPlayerAI(playerId)) return;
-            let curPos = this.gameState.players[playerId - 1].pos;
-            if (curPos === undefined || curPos === null) return;
-            let newPos = curPos;
-            let max = (!is2P && playerId % 2 === 0) ? this.maxX - this.paddleLength : this.maxY - this.paddleLength;
+            // if (this.isPlayerAI(playerId)) return;//TODO try
+            // let curPos = this.gameState.players[playerId - 1].pos;
+            // if (curPos === undefined || curPos === null) return;
+            // let newPos = curPos;
+            // let max = (!is2P && playerId % 2 === 0) ? this.maxX - this.paddleLength : this.maxY - this.paddleLength;
 
-            if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-            if (keys['s'] || keys['l']) newPos = Math.min(max, newPos + this.paddleSpeed);
-            if (newPos != curPos) this.updatePlayerPosition(playerId, newPos);
+            // if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+            // if (keys['s'] || keys['l']) newPos = Math.min(max, newPos + this.paddleSpeed);
+            // if (newPos != curPos) this.updatePlayerPosition(playerId, newPos);
+            const is2P = this.gameState.mode === '2P';
+            if ((playerId === 1 || (!is2P && playerId === 3)) && this.gameState.players[playerId - 1].pos !== undefined) {
+                let newPos = this.gameState.players[playerId - 1].pos;
+                const maxYPos = this.maxY - this.paddleLength;
+                if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                if (newPos !== this.gameState.players[playerId - 1].pos) {
+                    this.gameState.players[playerId - 1].pos = newPos;
+                }
+            }
 
-            // if ((playerId === 1 || (!is2P && playerId === 3))) {
-            //     let newPos = this.gameState.players[playerId - 1].pos;
-            //     const maxYPos = this.maxY - this.paddleLength;
-            //     if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-            //     if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-            //     if (newPos !== this.gameState.players[playerId - 1].pos) {
-            //         this.gameState.players[playerId - 1].pos = newPos;
-            //     }
-            // }
-            // else if (is2P && playerId === 2) {
-            //     let newPos = this.gameState.players[playerId - 1].pos;
-            //     const maxYPos = this.maxY - this.paddleLength;
-            //     if (keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-            //     if (keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-            //     if (newPos !== this.gameState.players[playerId - 1].pos) {
-            //         this.gameState.players[playerId - 1].pos = newPos;
-            //     }
-            // } else if (!is2P && (playerId === 2 || playerId === 4)) {
-            //     let newPos = this.gameState.players[playerId - 1].pos;
-            //     const maxXPos = this.maxX - this.paddleLength;
-            //     if (keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-            //     if (keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
-            //     if (newPos !== this.gameState.players[playerId - 1].pos) {
-            //         this.gameState.players[playerId - 1].pos = newPos;
-            //     }
-            // }
+            if (this.gameState.players[playerId - 1].pos !== undefined) {
+                if (is2P && playerId === 2) {
+                    // 2-Player Mode: Player 2 (right side, vertical movement)
+                    let newPos = this.gameState.players[playerId - 1].pos;
+                    const maxYPos = this.maxY - this.paddleLength;
+                    // Accept both w/s (remote player) and o/l (local player) keys
+                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s'] || keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                    if (newPos !== this.gameState.players[playerId - 1].pos) {
+                        this.gameState.players[playerId - 1].pos = newPos;
+                    }
+                } else if (!is2P && (playerId === 2 || playerId === 4)) {
+                    // 4-Player Mode: Players 2 & 4 (top & bottom sides, horizontal movement)
+                    let newPos = this.gameState.players[playerId - 1].pos;
+                    const maxXPos = this.maxX - this.paddleLength;
+                    // Accept both w/s (remote player) and o/l (local player) keys
+                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s'] || keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
+                    if (newPos !== this.gameState.players[playerId - 1].pos) {
+                        this.gameState.players[playerId - 1].pos = newPos;
+                    }
+                } else if (!is2P && playerId === 3) {
+                    // 4-Player Mode: Player 3 (right side, vertical movement)
+                    let newPos = this.gameState.players[playerId - 1].pos;
+                    const maxYPos = this.maxY - this.paddleLength;
+                    if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+                    if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
+                    if (newPos !== this.gameState.players[playerId - 1].pos) {
+                        this.gameState.players[playerId - 1].pos = newPos;
+                    }
+                }
+            }
         });
     }
 
@@ -307,7 +466,6 @@ export class BaseGameEngine {
     }
 
     private initializeGame(): void {
-        console.log('🔍 [DEBUG] initializeGame() called');
         const is2P = this.gameState.mode === '2P';
         
         this.gameState.ballPosX = this.maxX / 2;
@@ -319,16 +477,12 @@ export class BaseGameEngine {
 
         const maxPlayers = is2P ? 2 : 4;
         for (let i = 0; i < maxPlayers; i++) {
-            this.gameState.players[i].pos = (this.maxY + this.min) / 2 - (this.paddleLength / 2);//this.defaultPaddlePos;//
+            this.gameState.players[i].pos = (this.maxY + this.min) / 2 - (this.paddleLength / 2);
             this.gameState.players[i].score = 0;
         }
         
         this.xDir = Math.random() > 0.5 ? 1 : -1;
         this.yDir = Math.random() > 0.5 ? 1 : -1;
-        
-        console.log(`🔍 [DEBUG] Ball initialized at (${this.gameState.ballPosX}, ${this.gameState.ballPosY})`);
-        console.log(`🔍 [DEBUG] Ball direction: xDir=${this.xDir}, yDir=${this.yDir}`);
-        console.log(`🔍 [DEBUG] AI Players: ${Array.from(this.aiPlayers).join(', ') || 'none'}`);
     }
 
     private updateBallPosition(): number {
@@ -346,7 +500,7 @@ export class BaseGameEngine {
         let paddleEnd: number;
 
         // Left collision
-        if (this.xDir < 0 && this.gameState.ballPosX <= this.paddleWidth) {//(this.paddleWidth + this.ballRadius)) {
+        if (this.xDir < 0 && this.gameState.ballPosX <= this.paddleWidth) {
             paddleStart = this.gameState.players[0].pos || 0;
             paddleEnd = paddleStart + this.paddleLength;
 
@@ -367,11 +521,7 @@ export class BaseGameEngine {
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
 
                 this.gameState.ballPosX = this.paddleWidth + this.ballRadius;
-            } //else if (is2P) {
-                // this.updateScoreBoard(2);
-                // return 1;
-            // } 
-            else {
+            } else {
                 if (is2P && this.lastContact === 0) this.lastContact = 2;
                 return this.handleGoal();
             }
@@ -402,7 +552,7 @@ export class BaseGameEngine {
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
                 if (Math.abs(this.xDir) > this.ballSpeed) this.xDir = Math.sign(this.xDir) * this.ballSpeed;
 
-                this.gameState.ballPosY = this.maxY - this.paddleWidth - this.ballRadius;
+                this.gameState.ballPosY = this.paddleWidth + this.ballRadius;
             } else {
                 return this.handleGoal();
             }
@@ -456,7 +606,7 @@ export class BaseGameEngine {
                 this.xDir += (Math.random() - 0.5) * 0.15;
                 if (Math.abs(this.xDir) < 0.4)
                     this.xDir = Math.sign(this.xDir || 1) * 0.4;
-                this.addSpinToBall(this.gameState.ballPosY, paddleStart, paddleEnd, true);
+                this.addSpinToBall(this.gameState.ballPosX, paddleStart, paddleEnd, true);
 
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
                 if (Math.abs(this.xDir) > this.ballSpeed) this.xDir = Math.sign(this.xDir) * this.ballSpeed;
@@ -508,14 +658,19 @@ export class BaseGameEngine {
     }
 
     private broadcastScoreUpdate(): void {
+        const maxPlayers = this.gameState.mode === '2P' ? 2 : 4;
+        const players = [];
+        for (let i = 0; i < maxPlayers; i++) {
+            players.push({
+                score: this.gameState.players[i]?.score || 0
+            });
+        }
+
         const scoreUpdate = {
             type: 'score',
             gameId: this.gameState.gameId,
             mode: this.gameState.mode,
-            scorePlayer1: this.gameState.players[0]?.score || 0,
-            scorePlayer2: this.gameState.players[1]?.score || 0,
-            scorePlayer3: this.gameState.players[2]?.score || 0,
-            scorePlayer4: this.gameState.players[3]?.score || 0,
+            players: players,
             timestamp: Date.now()
         };
 
@@ -595,25 +750,23 @@ export class BaseGameEngine {
         const is2P = this.gameState.mode === '2P';
         let clampedPos: number;
         if (playerId >= 1 && playerId <= (is2P ? 2 : 4) && this.gameState.players[playerId - 1]) {
-            if (is2P || playerId === 1 || playerId === 3)
+            // if (is2P || playerId === 1 || playerId === 3)//TODO try
+            //     clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
+            // else
+            //     clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
+            if (is2P) {
                 clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
-            else
-                clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
-            // const isAI = this.isPlayerAI(playerId);
-            // console.log(`🎮 Position update for Player ${playerId}: ${clampedPos.toFixed(1)} (${isAI ? '🤖 AI' : '👤 Human'})`);
+            } else {
+                if (playerId === 1 || playerId === 3)
+                    clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
+                else
+                    clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
+            }
+            const isAI = this.isPlayerAI(playerId);
 
             this.gameState.players[playerId - 1].pos = clampedPos;
         }
     }
-
-    // private updateScoreBoard(player: number): void {
-    //     if (this.gameState.players[player - 1].score === undefined)
-    //         this.gameState.players[player - 1].score = 0;
-    //     this.gameState.players[player - 1].score! += 1; 
-    //     console.log(`⚽ GOAL! Player ${player} scored! Score: ${this.gameState.players[0].score} - ${this.gameState.players[1].score}`);
-    //     this.broadcastScoreUpdate();
-    //     this.updateDatabaseState();
-    // }
 
     resetBall(): void {
         // Reset ball to center
@@ -621,6 +774,7 @@ export class BaseGameEngine {
         this.gameState.ballPosY = this.maxY / 2;
         this.gameState.ballVelX = 0;
         this.gameState.ballVelY = 0;
+        this.lastContact = 0;
         
         // Random direction
         this.xDir = Math.random() > 0.5 ? 1 : -1;

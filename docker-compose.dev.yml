@@ -1,16 +1,16 @@
 services:
   backend:
     container_name: backend_dev
-    build: ./backend/.
+    build: ./src/backend/.
     ports:
       - "3000:3000"
     volumes:
-      - ./backend/src:/app/src
-      - ./backend/config:/app/config
-      - ./backend/.env:/app/.env 
-      - ./backend/package.json:/app/package.json
-      - ./backend/tsconfig.json:/app/tsconfig.json
-      - ./frontend/dist:/app/frontend/dist
+      - ./src/backend/src:/app/src
+      - ./src/backend/config:/app/config
+      - ./src/backend/.env:/app/.env 
+      - ./src/backend/package.json:/app/package.json
+      - ./src/backend/tsconfig.json:/app/tsconfig.json
+      - ./src/frontend/dist:/app/frontend/dist
       - transcendence_db:/app/database
     environment:
       - NODE_ENV=development
@@ -29,13 +29,13 @@ services:
 
   frontend:
     build: 
-      context: ./frontend/
+      context: ./src/frontend/
       dockerfile: Dockerfile.dev
     container_name: frontend_dev
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend/src:/app/src
+      - ./src/frontend/src:/app/src
     environment:
       - VITE_BACKEND_URL=http://backend_dev:3000
     restart: unless-stopped
@@ -51,7 +51,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: database/
+      device: src/database/
 
 networks:
   transcendence_dev:

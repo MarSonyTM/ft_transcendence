@@ -635,7 +635,6 @@ class TournamentManager {
 				if (!t) throw new Error('[Tournaments] hydrateTournament failed');
 			}
 			return tt;
-			// return db.getAllTournaments() || [];
 		} catch (error) {
 			console.error('getAllTournaments error:', error);
 			return [];

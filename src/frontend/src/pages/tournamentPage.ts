@@ -19,7 +19,6 @@ import { renderSetup } from './tournamentLobbyPage';
 import { MatchStatus, MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
 import { getCurrentMatch, getCurrentTournament, hydrateMatch, hydrateTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
-import { baby3D } from '../game/game3D';
 import { render2PlayerGame } from './2PlayerGame';
 import { getCurrentRoom, setCurrentRoom } from '../utils/roomState';
 
@@ -155,7 +154,10 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     }
 
     let resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
-        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+        headers: { 
+            'Content-Type': 'application/json',
+            // 'Authorization': `Bearer ${authService.getToken()}`//TODO MERGE -> where do i get the token from?
+        }
     });
     if (!resp.ok) {
         console.error('[Tournament] Failed to fetch tournament players:', resp.status);
@@ -362,7 +364,7 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authService.getToken()}`
+                    // 'Authorization': `Bearer ${authService.getToken()}`//TODO MERGE -> get token?
                 }
             });
             const data = await resp.json();
@@ -448,7 +450,7 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authService.getToken()}`
+                // 'Authorization': `Bearer ${authService.getToken()}`//TODO MERGE -> get token?
             },
             body: JSON.stringify({})
         });
@@ -477,10 +479,10 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
     }
 }
 
-function initTWS(t: Tournament): void {
+async function initTWS(t: Tournament): Promise<void> {
     if (tWS) return;
     if (!t || !t.id) return;
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     if (!user) return;
 
     const hostPlayer = t.players.find(p => p.tpt === 'host' || p.user?.id === user.id);

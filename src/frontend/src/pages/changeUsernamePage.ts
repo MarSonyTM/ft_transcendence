@@ -3,6 +3,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { checkUsernameAvailability, changeUsername } from '../_api/user';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 export async function renderChangeUsernamePage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -55,51 +56,57 @@ export async function renderChangeUsernamePage(): Promise<void> {
         return;
     }
 
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card" style="max-width: 500px; margin: 0 auto;">
-                <h2 style="text-align: center; margin-bottom: 2em;">Change Username</h2>
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+            ${userNavHTML}
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="padding: 2em; width:100%;">
+                <h2 class="title-neon" style="text-align: center; margin-bottom: 1.5em;">Change Username</h2>
                 
-                <div style="background: rgb(31 41 55); padding: 1.5em; border-radius: 8px; margin-bottom: 2em;">
-                    <p style="color: rgb(209 213 219); margin-bottom: 1em;"><strong>Current Username:</strong></p>
-                    <p style="color: rgb(229 231 235); font-size: 1.2em; font-weight: bold;">${user.username}</p>
-                </div>
-                
-                <form id="changeUsernameForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                    <div class="form-group">
-                        <label for="newUsername" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">New Username</label>
-                        <input 
-                            type="text" 
-                            id="newUsername" 
-                            name="newUsername" 
-                            required
-                            minlength="3"
-                            maxlength="20"
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
-                            placeholder="Enter new username"
-                        >
-                        <div id="usernameAvailability" style="margin-top: 0.5em; font-size: 0.9em;"></div>
+                <div style="max-width: 600px; margin: 0 auto;">
+                    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1.2em; border-radius: 8px; margin-bottom: 2em;">
+                        <p style="color: rgb(156 163 175); margin-bottom: 0.5em; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em;">Current Username</p>
+                        <p style="color: rgb(229 231 235); font-size: 1.5em; font-weight: bold; margin: 0;">${user.username}</p>
                     </div>
                     
-                    <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none;"></div>
-                    <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none;"></div>
+                    <form id="changeUsernameForm" style="display: flex; flex-direction: column; gap: 1.2em;">
+                        <div class="form-group">
+                            <label for="newUsername" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">New Username</label>
+                            <input 
+                                type="text" 
+                                id="newUsername" 
+                                name="newUsername" 
+                                required
+                                minlength="3"
+                                maxlength="20"
+                                style="width: 100%; padding: 0.7em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 1em; transition: border-color 0.2s;"
+                                onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                placeholder="Enter new username"
+                            >
+                            <div id="usernameAvailability" style="margin-top: 0.5em; font-size: 0.85em;"></div>
+                        </div>
+                        
+                        <div id="errorMessage" style="color: #ef4444; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+                        <div id="successMessage" style="color: #10b981; font-size: 0.85em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+                        
+                        <div style="display: flex; gap: 1em; margin-top: 0.5em;">
+                            <button type="submit" id="changeUsernameBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+                                ✓ Change Username
+                            </button>
+                            <button type="button" id="cancelBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+                                ✕ Cancel
+                            </button>
+                        </div>
+                    </form>
                     
-                    <div style="display: flex; gap: 1em; margin-top: 1em;">
-                        <button type="submit" id="changeUsernameBtn" class="btn" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                            Change Username
-                        </button>
-                        <button type="button" id="cancelBtn" class="btn btn-back" style="flex: 1; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                            Cancel
-                        </button>
+                    <div style="margin-top: 2em; padding: 1em; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.3);">
+                        <h4 style="color: #f59e0b; margin-bottom: 0.5em; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em;">⚠️ Important</h4>
+                        <p style="color: rgb(156 163 175); font-size: 0.85em; margin: 0; line-height: 1.5;">
+                            Changing your username will update it across all your games and statistics. This action cannot be undone.
+                        </p>
                     </div>
-                </form>
-                
-                <div style="margin-top: 2em; padding: 1em; background: rgb(55 65 81); border-radius: 8px; border-left: 4px solid #f59e0b;">
-                    <h4 style="color: #f59e0b; margin-bottom: 0.5em;">⚠️ Important</h4>
-                    <p style="color: rgb(209 213 219); font-size: 0.9em; margin: 0;">
-                        Changing your username will update it across all your games and statistics. 
-                        This action cannot be undone.
-                    </p>
                 </div>
             </div>
         </div>
@@ -188,6 +195,7 @@ export async function renderChangeUsernamePage(): Promise<void> {
                 if (result.success) {
                     successDiv.textContent = 'Username changed successfully!';
                     successDiv.style.display = 'block';
+                    authService.setCurrentUserProfile(null);
                     
                     // Redirect to profile page after 2 seconds
                     setTimeout(() => {
@@ -218,4 +226,7 @@ export async function renderChangeUsernamePage(): Promise<void> {
             renderApp();
         });
     }
+
+    // Attach user nav dropdown listeners
+    attachUserNavListeners();
 }

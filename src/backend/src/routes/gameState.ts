@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { GameState } from '../game/gameState';
-import { database } from '../database/index';
-import { Player } from '../../../shared/gameTypes';
+import { database, Player } from '../database/index';
 
 // Types
 export interface CreateGameStateInput {

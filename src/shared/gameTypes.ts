@@ -1,6 +1,6 @@
 export interface Player {
   id: number;
-  name: string;
+  name?: string;
   gameId?: number;
   pos: number;
   score: number;
@@ -11,14 +11,13 @@ export interface Player {
 // Core game state structure
 export interface GameState {
   gameId?: number;
-  players: any[];
+  players: Player[];
   ballPosX: number;
   ballPosY: number;
   ballVelX?: number;
   ballVelY?: number;
   mode: '2P' | '4P' | string;
   lastContact: number;
-  lastActivity?: string;
 }
 
 // WebSocket message structure

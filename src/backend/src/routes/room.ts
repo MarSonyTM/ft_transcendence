@@ -4,7 +4,13 @@ import { broadcastGameStartToRoom, broadcastToRoom, broadcastCountdownToRoom } f
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { activeGames } from './game';
-import { GameState } from '../../../shared/gameTypes';
+import { GameState } from '../database/index';
+import {
+    sanitizeString,
+    sanitizeUsername,
+    sanitizeAlias,
+    sanitizeId
+} from '../utils/sanitization';
 
 interface CreateRoomBody {
     hostId: string;
@@ -37,12 +43,24 @@ async function roomRoutes(fastify: FastifyInstance) {
             reply: FastifyReply
         ) => {
         try {
-            const { hostId, hostUsername, maxPlayers = 2 } = request.body;
+            let { hostId, hostUsername, maxPlayers = 2 } = request.body;
+
+            // ✅ SANITIZE INPUTS (XSS Protection)
+            hostId = sanitizeString(hostId);
+            hostUsername = sanitizeUsername(hostUsername);
 
             if (!hostId || !hostUsername) {
                 return reply.code(400).send({
                     success: false,
                     message: 'hostId and hostUsername are required'
+                });
+            }
+
+            // Validate maxPlayers
+            if (maxPlayers !== 2 && maxPlayers !== 4) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'maxPlayers must be 2 or 4'
                 });
             }
 
@@ -68,7 +86,14 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     // Get room details
     fastify.get('/api/room/:roomId', async (request, reply) => {
-        const { roomId } = request.params as { roomId: string };
+        let { roomId } = request.params as { roomId: string };
+        
+        // ✅ SANITIZE ROOM ID (XSS Protection)
+        roomId = sanitizeString(roomId);
+        
+        if (!roomId) {
+            return reply.status(400).send({ success: false, message: 'Invalid room ID' });
+        }
       
         const room = gameRoomManager.getRoom(roomId);
         if (!room) {
@@ -93,14 +118,29 @@ async function roomRoutes(fastify: FastifyInstance) {
         reply: FastifyReply
         ) => {
         try {
-            const { roomId } = request.params;
-            const { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
+            let { roomId } = request.params;
+            let { playerId, username, isAI = false, isReady: _ignoredIsReady, isLocal = false, difficulty } = request.body;
+            
+            // ✅ SANITIZE ALL INPUTS (XSS Protection)
+            roomId = sanitizeString(roomId);
+            playerId = sanitizeString(playerId);
+            username = sanitizeUsername(username);
+            if (difficulty) difficulty = sanitizeString(difficulty);
+            
             const isReady = (isAI || isLocal) ? true : false;
 
-            if (!playerId || !username) {
+            if (!roomId || !playerId || !username) {
                 return reply.code(400).send({
                     success: false,
-                    message: 'playerId and username are required'
+                    message: 'roomId, playerId and username are required'
+                });
+            }
+            
+            // Validate username length
+            if (username.length < 1 || username.length > 50) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Username must be 1-50 characters'
                 });
             }
 
@@ -147,13 +187,17 @@ async function roomRoutes(fastify: FastifyInstance) {
         reply: FastifyReply
         ) => {
         try {
-            const { roomId } = request.params;
-            const { playerId } = request.body;
+            let { roomId } = request.params;
+            let { playerId } = request.body;
 
-            if (!playerId) {
+            // ✅ SANITIZE INPUTS (XSS Protection)
+            roomId = sanitizeString(roomId);
+            playerId = sanitizeString(playerId);
+
+            if (!roomId || !playerId) {
                 return reply.code(400).send({
                     success: false,
-                    message: 'playerId is required'
+                    message: 'roomId and playerId are required'
                 });
             }
 
@@ -205,13 +249,17 @@ async function roomRoutes(fastify: FastifyInstance) {
         reply: FastifyReply
         ) => {
         try {
-            const { roomId } = request.params;
-            const { playerId } = request.body;
+            let { roomId } = request.params;
+            let { playerId } = request.body;
 
-            if (!playerId) {
+            // ✅ SANITIZE INPUTS (XSS Protection)
+            roomId = sanitizeString(roomId);
+            playerId = sanitizeString(playerId);
+
+            if (!roomId || !playerId) {
                 return reply.code(400).send({
                     success: false,
-                    message: 'playerId is required'
+                    message: 'roomId and playerId are required'
                 });
             }
 
@@ -262,8 +310,16 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     // Start game in room
     fastify.post('/api/room/:roomId/start', async (request, reply) => {
-        const { roomId } = request.params as { roomId: string };
-        const { hostId } = request.body as { hostId: string };
+        let { roomId } = request.params as { roomId: string };
+        let { hostId } = request.body as { hostId: string };
+
+        // ✅ SANITIZE INPUTS (XSS Protection)
+        roomId = sanitizeString(roomId);
+        hostId = sanitizeString(hostId);
+
+        if (!roomId || !hostId) {
+            return reply.status(400).send({ success: false, message: 'roomId and hostId are required' });
+        }
 
         const room = gameRoomManager.getRoom(roomId);
         if (!room) {
@@ -324,11 +380,14 @@ async function roomRoutes(fastify: FastifyInstance) {
                             color: { r: 1, g: 1, b: 1 },
                             score: 0,
                             connectionStatus: 'connected',
-                            lastActivity: new Date().toISOString()
+                            lastActivity: new Date().toISOString(),
+                            isAI: roomPlayer.isAI || false,
+                            difficulty: roomPlayer.difficulty || undefined
                         };
                     });
 
                     const initialGameState: GameState = {
+                        id: 0,
                         gameId: gameId,
                         players: players,
                         ballPosX: 200,
@@ -377,7 +436,15 @@ async function roomRoutes(fastify: FastifyInstance) {
 
     // End the current game and reset room to waiting for a fresh start
     fastify.post('/api/room/:roomId/end', async (request, reply) => {
-        const { roomId } = request.params as { roomId: string };
+        let { roomId } = request.params as { roomId: string };
+        
+        // ✅ SANITIZE ROOM ID (XSS Protection)
+        roomId = sanitizeString(roomId);
+        
+        if (!roomId) {
+            return reply.status(400).send({ success: false, message: 'Invalid room ID' });
+        }
+        
         const room = gameRoomManager.getRoom(roomId);
         if (!room) {
             return reply.status(404).send({ success: false, message: 'Room not found' });

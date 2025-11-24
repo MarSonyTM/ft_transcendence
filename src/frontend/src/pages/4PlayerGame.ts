@@ -7,6 +7,7 @@ import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket
 import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
 
 export let pongGame: PongGame | null = null;
+let keyboardCleanup: (() => void) | null = null;
 
 export async function render4PlayerGame(): Promise<void> {
     const room = getCurrentRoom();
@@ -33,52 +34,63 @@ export async function render4PlayerGame(): Promise<void> {
     const user = authService.getCurrentUser();
     
     root.innerHTML = `
-        <h1 class="main-title">4-Player Pong</h1>
-        <div class="game-status">
-            <div>
-                Status: <span id="gameStatus" class="status-text">Initializing...</span>
+
+    <!-- Fixed Debug Panel - Top Left -->
+        <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(0, 255, 255, 0.3); border-radius: 8px; padding: 10px; font-size: 0.85rem; max-width: 300px;">
+            <div style="margin-bottom: 8px; color: #0ff; font-weight: bold; border-bottom: 1px solid rgba(0, 255, 255, 0.3); padding-bottom: 5px;">Debug Panel</div>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;">
+                <div>Status: <span id="gameStatus" style="color: #0ff; font-weight: bold;">Initializing...</span></div>
+                <div>WebSocket: <span id="wsStatus" style="color: #0f0; font-weight: bold;">Disconnected</span></div>
+                <div>FPS: <span id="fpsCounter" style="color: #ff0; font-weight: bold;">0</span></div>
             </div>
-            <div>
-                WebSocket: <span id="wsStatus" class="ws-status">Disconnected</span>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button id="startBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Start Game</button>
+                <button id="pauseBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Pause Game</button>
+                <button id="endBtn" class="btn btn-neon danger" style="padding: 5px 10px; font-size: 0.8rem;">End Game</button>
+                <button id="reconnectBtn" class="btn btn-neon primary" style="padding: 5px 10px; font-size: 0.8rem;">Reconnect WebSocket</button>
+                <button id="tournamentsBtn" class="btn btn-neon accent" style="padding: 5px 10px; font-size: 0.8rem;">Tournaments</button>
             </div>
-            <div>
-                FPS: <span id="fpsCounter" class="fps-text">0</span>
+        </div>
+        <div class="neon-grid" style="padding: 0; ">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="max-width: 1200px; width: 100%;">
+
+                <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
+                    <div class="player-names" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span id="player1Name" class="player1-name" style="color: #0ff; font-weight: bold;">${players[0].username}</span>
+                        <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
+                        <span id="player2Name" class="player2-name" style="color: #ff0; font-weight: bold;">${players[1].username}</span>
+                        <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
+                        <span id="player3Name" class="player3-name" style="color: #f0f; font-weight: bold;">${players[2].username}</span>
+                        <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
+                        <span id="player4Name" class="player4-name" style="color: #0f0; font-weight: bold;">${players[3].username}</span>
+                    </div>
+                    <div class="score-container" style="font-size: 2.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
+                        <span id="player1score" class="player1-score">0</span>
+                        <span class="score-separator" style="margin: 0 15px;">-</span>
+                        <span id="player2score" class="player2-score">0</span>
+                        <span class="score-separator" style="margin: 0 15px;">-</span>
+                        <span id="player3score" class="player3-score">0</span>
+                        <span class="score-separator" style="margin: 0 15px;">-</span>
+                        <span id="player4score" class="player4-score">0</span>
+                    </div>
+                </div>
+
+                <div class="threeD-wrapper">
+                    <canvas id="renderCanvas"></canvas>
+                </div>
+
+                <div class="controls-info" style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 15px; margin-top: 20px; text-align: center;">
+                    <p style="color: #0ff; font-weight: bold; margin: 5px 0;">W / S keys</p>
+                    ${!pongGame.hasLocal ? '<p style="color: #0f0; font-weight: bold; margin: 5px 0;">Player 2: Up/Down arrows</p>' : ''}
+                    <p style="color: #ff6b00; font-style: italic; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="backToLandingBtn" class="btn btn-neon danger">Back to Home</button>
+                </div>
             </div>
         </div>
-        <div class="controls-container">
-            <button id="startBtn" class="btn btn-start">Start Game</button>
-            <button id="pauseBtn" class="btn btn-pause">Pause Game</button>
-            <button id="endBtn" class="btn btn-end">End Game</button>
-            <button id="reconnectBtn" class="btn btn-reconnect">Reconnect WebSocket</button>
-        </div>
-        
-        <div class="player-info">
-            <span id="player1Name" class="player1-name">${players[0].username}</span>
-            <span class="vs-text">vs</span> 
-            <span id="player2Name" class="player2-name">${players[1].username}</span>
-            <span class="vs-text">vs</span> 
-            <span id="player3Name" class="player3-name">${players[2].username}</span>
-            <span class="vs-text">vs</span> 
-            <span id="player4Name" class="player4-name">${players[3].username}</span>
-        </div>
-        <div class="score-container">
-            <span id="player1score" class="player1-score">0</span> 
-            <span class="score-separator">-</span> 
-            <span id="player2score" class="player2-score">0</span>
-            <span class="score-separator">-</span> 
-            <span id="player3score" class="player3-score">0</span>
-            <span class="score-separator">-</span> 
-            <span id="player4score" class="player4-score">0</span>
-        </div>
-        <div class="threeD-wrapper">
-            <canvas id="renderCanvas"></canvas>
-        </div>
-        <div class="controls-info" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 5px; margin-top: 15px;">
-            <p style="color: #60a5fa; font-weight: bold;">W / S</p>
-            ${!pongGame.hasLocal ? '<p style="color: #19d81cff; font-weight: bold;">Player 2 - Up/Down</p>' : ''}
-            <p style="color: #ffaa00; font-style: italic; text-align: center; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
-        </div>
-        <button id="backToLandingBtn" class="btn btn-back">Back to Home</button>
     `;
 
     await setupGameButtons(pongGame);
@@ -86,9 +98,14 @@ export async function render4PlayerGame(): Promise<void> {
     const backBtn = document.getElementById('backToLandingBtn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
+            // Clean up keyboard handlers
+            if (keyboardCleanup) {
+                keyboardCleanup();
+            }
+            
             if (pongGame) {
                 cleanupGame(pongGame);
-                pongGame.endGame();
+                endGame(pongGame);
             }
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
@@ -169,7 +186,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         return;
     }
     
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     
     if (!user) {
         console.error('No authenticated user for room game');
@@ -237,37 +254,57 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls for room-based game
-function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () => void {
+function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+    // Clean up any existing handlers first!
+    if (keyboardCleanup) {
+        console.log('🧹 Cleaning up old keyboard handlers');
+        keyboardCleanup();
+    }
+
     const keys: { [key: string]: boolean } = {};
     const hasLocal = pongGame && pongGame.hasLocal;
-    
     const gameMode = getCurrentGameMode();
-
-    console.log('Setting up controls:', { 
+    
+    // DEBUG: Check what's in the room
+    const room = getCurrentRoom();
+    const user = authService.getCurrentUser();
+    
+    console.log('🔍 DEBUG Setup Controls:', { 
         playerId,
+        userFromAuth: user,
+        roomPlayers: room?.players,
         hasLocal,
         gameMode
     });
-
-    const movementKeys = new Set(['w','s','o','l']);
+    
+    // Verify this player is in the room
+    if (room) {
+        const playerInRoom = room.players.find((p: any) => p.id === playerId);
+        if (!playerInRoom) {
+            console.error('❌ Player NOT found in room!', {
+                lookingFor: playerId,
+                availablePlayers: room.players.map((p: any) => p.id)
+            });
+        } else {
+            console.log('✅ Player found in room:', playerInRoom);
+        }
+    }
+    
+    const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);
 
     const handleKeyDown = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase();
         const wasPressed = keys[key];
         keys[key] = true;
         
-        // Only send on key state CHANGE
         if (!wasPressed && movementKeys.has(key)) {
             e.preventDefault();
             
-            // Check if this is a local guest key (o/l)
             const isGuestKey = ['o', 'l'].includes(key);
             
             if (isGuestKey && hasLocal) {
-                // Send as guest/local player
                 ws.sendKeyState(key, true, true);
             } else if (!isGuestKey) {
-                // Send as main player
                 ws.sendKeyState(key, true, false);
             }
         }
@@ -290,19 +327,22 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () =
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-    return () => {
+
+    keyboardCleanup = () => {
         document.removeEventListener('keydown', handleKeyDown);
         document.removeEventListener('keyup', handleKeyUp);
-    }
+        console.log('✅ Keyboard handlers removed for', playerId);
+        keyboardCleanup = null;
+    };
 }
 
 
 // Sync game state from room WebSocket
-function syncGameStateFromRoom(state: any): void {
+async function syncGameStateFromRoom(state: any): Promise<void> {
     if (!pongGame || !pongGame.gameState) return;
 
     const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
 
     // Ball position
@@ -319,7 +359,7 @@ function syncGameStateFromRoom(state: any): void {
 }
 
 // Update remote player position
-function updateRemotePlayerPosition(playerId: string, position: number): void {
+async function updateRemotePlayerPosition(playerId: string, position: number): Promise<void> {
     if (!pongGame || !pongGame.gameState) return;
     
     const room = getCurrentRoom();
@@ -327,7 +367,7 @@ function updateRemotePlayerPosition(playerId: string, position: number): void {
     if (!room) 
         return;
     
-    const user = authService.getCurrentUser();
+    const user = await authService.getCurrentUser();
     const currentPlayerId = user?.id?.toString();
     
     if (playerId === currentPlayerId) 

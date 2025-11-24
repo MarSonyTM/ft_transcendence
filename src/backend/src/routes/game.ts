@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { database } from '../database/index';
+import { database, Game, Player } from '../database/index';
+import { createGameEngine } from '../game/gameEngine';
 import type { BaseGameEngine } from '../game/gameEngine';
 import { JWT_SECRET } from '../config/index';
 import jwt from 'jsonwebtoken';
@@ -35,43 +36,11 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.get('/', async (request, reply) => {
         try {
             const games = database.games.getAllGames();
-        
-            // Map games and use players from the game object (JSON field)
-            const gamesWithPlayers = games.map(game => {
-                let players = game.players || [];
-                let points = game.points || [];
-                
-                // If players is a string, parse it
-                if (typeof players === 'string') {
-                    try {
-                        players = JSON.parse(players);
-                    } catch (e) {
-                        console.error(`Failed to parse players for game ${game.id}:`, e);
-                        players = [];
-                    }
-                }
-
-                // If points is a string, parse it
-                if (typeof points === 'string') {
-                    try {
-                        points = JSON.parse(points);
-                    } catch (e) {
-                        console.error(`Failed to parse points for game ${game.id}:`, e);
-                        points = [];
-                    }
-                }
-                
-                return {
-                    ...game,
-                    players: players,
-                    points: points
-                };
-            });
             
             return {
                 success: true,
-                count: gamesWithPlayers.length,
-                data: gamesWithPlayers
+                count: games.length,
+                data: games  // ✅ Use games as-is, don't overwrite players field
             };
         } catch (error) {
             fastify.log.error(error);
@@ -106,22 +75,16 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 return;
             }
             
-            // Also get players for this game
-            const players = database.players.getPlayers(gameId);
-            
             return {
                 success: true,
-                data: {
-                    ...game,
-                    players
-                }
+                data: game
             };
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({
                 success: false,
                 message: 'Failed to fetch game'
-            });
+                });
         }
     });
 
@@ -309,7 +272,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                         ballVelY: 0,
                         players: [{
                             id: 0,
-                            name: `${userId}`, // Placeholder, replace with actual user name if available
+                            name: `${userId}`, 
                             gameId: newGame.id,
                             pos: 0,
                             score: 0,
@@ -712,8 +675,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const gameId = parseInt(id);
             const { winnerId } = request.body as { winnerId: number };
             
-            console.log(`🎯 Winner endpoint called for game ${gameId}, winnerId: ${winnerId}`);
-            
             if (isNaN(gameId)) {
                 reply.code(400).send({
                     success: false,
@@ -733,45 +694,76 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             let gamePlayers = database.players.getPlayers(gameId);
-            console.log(`📊 Players from database: ${gamePlayers.length}`);
             
             if (gamePlayers.length === 0) {
-                console.log(`⚠️ No players in database, checking game engine...`);
                 const gameEngine = activeGames.get(gameId);
                 
                 if (gameEngine) {
-                    console.log(`✅ Game engine found!`);
                     const currentState = gameEngine.getCurrentState();
                     
                     if (currentState && currentState.players) {
-                        console.log(`📝 Getting ${currentState.players.length} players from game engine`);
                         
                         gamePlayers = currentState.players.map((player: any, index: number) => {
-                            let actualUserId = index + 1; // Fallback
+                            const positionId = index + 1; // Position ID (1-based)
                             
-                            if (player.username) {
+                            // Check if this position is an AI player via the game engine
+                            const isAI = gameEngine.isPlayerAI(positionId) || player.isAI || (player.name && player.name.toLowerCase().includes('ai'));
+                            
+                            // Determine player name and user ID
+                            let actualUserId = positionId; // Default fallback
+                            let playerName = player.name || player.username;
+                            
+                            if (isAI) {
+                                // For AI players, use special ID and format name
+                                actualUserId = 9000 + positionId;
+                                const difficulty = player.difficulty || 'Normal';
+                                const difficultyCapitalized = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+                                playerName = `AI Bot (${difficultyCapitalized})`;
+                                console.log(`   🤖 AI Player detected at position ${positionId}`);
+                            } else if (player.username) {
+                                // Real player - find by username
                                 const userByUsername = database.users.getAllUsers().find(
                                     u => u.username === player.username
                                 );
+                                
                                 if (userByUsername) {
                                     actualUserId = userByUsername.id;
-                                    console.log(`   ✅ Found ${player.username} = user ID ${actualUserId}`);
+                                    // console.log(`   ✅ Found ${searchName} = user ID ${actualUserId}`);//TODO MERGE -> where is searchName?
+                                } else {
+                                    // console.log(`   ⚠️ "${searchName}" NOT FOUND in database (might be local player)`);
+                                }
+                            } else if (player.id && typeof player.id === 'number') {
+                                // Try using player.id for real players
+                                const userById = database.users.getUserById(player.id);
+                                if (userById) {
+                                    actualUserId = player.id;
+                                    console.log(`   ✅ Found user by ID ${player.id}`);
+                                }
+                            } else if (player.id && typeof player.id === 'number') {
+                                // Try using player.id for real players
+                                const userById = database.users.getUserById(player.id);
+                                if (userById) {
+                                    actualUserId = player.id;
+                                    console.log(`   ✅ Found user by ID ${player.id}`);
                                 }
                             }
                             
                             return {
-                                id: actualUserId,
+                                id: actualUserId || -(index + 1),
                                 gameId: gameId,
-                                playerId: actualUserId, // Use the REAL user ID from database
+                                playerId: actualUserId,
                                 playerPosition: index === 0 ? 'left' : 'right',
                                 score: player.score || 0,
                                 connectionStatus: 'connected',
                                 lastActivity: new Date().toISOString(),
                                 pos: player.pos || 0,
                                 color: player.color || { r: 255, g: 255, b: 255 },
-                                name: player.name || player.username
+                                name: playerName,
+                                username: playerName,
+                                isAI: isAI,
+                                difficulty: player.difficulty || undefined
                             };
-                        });
+                        });                    
                     } else {
                         console.log(`❌ No players in game engine state`);
                     }
@@ -783,22 +775,30 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             // Build players data for saving
             // Build the players array with usernames
             const playersData = gamePlayers.map((player: any) => {
-                const user = database.users.getUserById(player.playerId);
-                
                 let displayName = '';
                 
-                if (user) {
-                    // Registered user - use their username
-                    displayName = user.username;
-                } else if (player.name) {
-                    if (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot')) {
-                        const difficulty = player.difficulty || 'Normal';
-                        displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
-                    } else {
+                // Special handling for local players (playerId: "local")
+                if (player.playerId === 'local' || player.playerId === 'Local') {
+                    displayName = player.name || 'Local Player';
+                } 
+                // Special handling for AI players
+                else if (player.name && (player.name.toLowerCase().includes('ai') || player.name.toLowerCase().includes('bot'))) {
+                    const difficulty = player.difficulty || 'Normal';
+                    displayName = `AI Bot (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`;
+                }
+                // Try to look up registered user
+                else {
+                    const user = database.users.getUserById(player.playerId);
+                    
+                    if (user) {
+                        // Registered user - use their username
+                        displayName = user.username;
+                    } else if (player.name) {
+                        // Fallback to player.name if no user found
                         displayName = player.name;
+                    } else {
+                        displayName = `Player ${player.playerId}`;
                     }
-                } else {
-                    displayName = `Player ${player.playerId}`;
                 }
                 
                 return {
@@ -929,6 +929,53 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             reply.code(500).send({
                 success: false,
                 message: 'Failed to update player position'
+            });
+        }
+    });
+
+    // Clear all games (for testing/development)
+    fastify.delete('/clear-all', async (request, reply) => {
+        try {
+            // Delete all game states
+            const gameStates = database.gameState.getAllGameStates();
+            gameStates.forEach(gs => {
+                database.gameState.deleteGameState(gs.id);
+            });
+            
+            // Delete all players
+            const allGames = database.games.getAllGames();
+            allGames.forEach(game => {
+                const players = database.players.getPlayers(game.id);
+                players.forEach(player => {
+                    database.players.removePlayerFromGame(game.id, player.id);
+                });
+            });
+            
+            // Delete all games
+            allGames.forEach(game => {
+                database.games.deleteGame(game.id);
+            });
+            
+            // Reset user statistics
+            const users = database.users.getAllUsers();
+            users.forEach(user => {
+                database.users.updateUser(user.id, {
+                    gamesWon: 0,
+                    gamesLost: 0
+                } as any);
+            });
+            
+            return {
+                success: true,
+                message: 'All game data cleared successfully',
+                gamesDeleted: allGames.length,
+                gameStatesDeleted: gameStates.length
+            };
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({
+                success: false,
+                message: 'Failed to clear game data'
             });
         }
     });

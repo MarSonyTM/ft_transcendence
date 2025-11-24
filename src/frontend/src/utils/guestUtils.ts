@@ -1,24 +1,12 @@
-export function isGuestUser(): boolean {
-  return localStorage.getItem('isGuest') === 'true';
+import { authService } from "./auth";  
+
+export async function getGuestUsername(): Promise<string | null> {
+
+    const user = await authService.getCurrentUser();
+    return user ? user.username : null;
 }
 
-export function getGuestUsername(): string | null {
-    if (!isGuestUser()) return null;
-  
-    const token = localStorage.getItem('authToken');
-    if (!token) return null;
-  
-    try {
-        // Decode JWT token (without verification, just to read the payload)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return payload.username || null;
-    } catch {
-        return null;
-    }
-}
-
-export function showGuestBanner(): HTMLElement | null {
-    if (!isGuestUser()) return null;
+export async function showGuestBanner(): Promise<HTMLElement | null> {
   
     const banner = document.createElement('div');
     banner.id = 'guest-banner';
@@ -36,7 +24,7 @@ export function showGuestBanner(): HTMLElement | null {
         box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     `;
   
-    const username = getGuestUsername() || 'Guest';
+    const username = await getGuestUsername() || 'Guest';
     banner.innerHTML = `
         <span>👋 Playing as <strong>${username}</strong> (Guest)</span>
         <button 
@@ -99,20 +87,19 @@ export function initGuestBanner(): void {
     }
 }
 
-export function clearGuestSession(): void {
-    localStorage.removeItem('isGuest');
-    localStorage.removeItem('authToken');
+export async function clearGuestSession(): Promise<void> {
+    await authService.logout();
     sessionStorage.removeItem('guestBannerDismissed');
 }
 
+//TODO: improve expiration check for guest users
 export function isGuestSessionExpired(): boolean {
-    if (!isGuestUser()) return false;
-  
-    const token = localStorage.getItem('authToken');
-    if (!token) return true;
+
+    const user = authService.getCurrentUser();
+    if (!user) return true;
   
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(token.split('.')[1]));//TODO MERGE -> no token?
         const exp = payload.exp * 1000; // Convert to milliseconds
         return Date.now() > exp;
     } catch {

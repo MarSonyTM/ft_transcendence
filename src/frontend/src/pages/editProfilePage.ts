@@ -3,6 +3,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { updateUserProfile, deleteUserAccount } from '../_api/user';
+import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
 interface UserProfile {
     id: number;
@@ -11,6 +12,7 @@ interface UserProfile {
     firstName: string;
     lastName: string;
     avatar?: string;
+    twoFactorEnabled?: boolean;
     gamesWon: number;
     gamesLost: number;
 }
@@ -29,10 +31,11 @@ export async function renderEditProfilePage(): Promise<void> {
 
     // Show loading state
     root.innerHTML = `
-        <div style="display: flex; justify-content: center; align-items: center; height: 80vh;">
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1em;"></div>
-                <p style="color: #666;">Loading profile...</p>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="text-align: center; max-width: 400px;">
+                <div style="width: 40px; height: 40px; border: 4px solid rgba(255, 255, 255, 0.3); border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1em;"></div>
+                <p style="color: #9ca3af;">Loading profile...</p>
             </div>
         </div>
         <style>
@@ -48,10 +51,13 @@ export async function renderEditProfilePage(): Promise<void> {
     
     if (!user) {
         root.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
-                <h2 style="color: #f87171; margin-bottom: 1em;">Error Loading Profile</h2>
-                <p style="color: #666; margin-bottom: 2em;">Failed to load user profile</p>
-                <button id="backToProfileBtn" class="btn btn-back">Back to Profile</button>
+            <div class="neon-grid">
+                <div class="grid-anim"></div>
+                <div class="glass-card" style="text-align: center; max-width: 400px;">
+                    <h2 style="color: #ef4444; margin-bottom: 1em;">Error Loading Profile</h2>
+                    <p style="color: #9ca3af; margin-bottom: 2em;">Failed to load user profile</p>
+                    <button id="backToProfileBtn" class="btn btn-neon accent">Back to Profile</button>
+                </div>
             </div>
         `;
         
@@ -67,116 +73,174 @@ export async function renderEditProfilePage(): Promise<void> {
     }
 
     const userData: UserProfile = {
-        id: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+        id: typeof user.id === 'string' ? parseInt(user.id) : (user.id || 0),
         username: user.username,
         email: user.email || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         avatar: user.avatar || '',
+        twoFactorEnabled: user.twoFactorEnabled || false,
         gamesWon: user.gamesWon || 0,
         gamesLost: user.gamesLost || 0
     };
 
+    const userNavHTML = await createUserNav();
     root.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-card" style="max-width: 600px; margin: 0 auto;">
-                <h2 style="text-align: center; margin-bottom: 2em;">Edit Profile</h2>
-                
-                <div style="margin-bottom: 2em;">
-                    <h3 style="color: rgb(229 231 235); margin-bottom: 1em; border-bottom: 1px solid rgb(55 65 81); padding-bottom: 0.5em;">Account Information</h3>
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+            ${userNavHTML}
+            <div class="grid-anim"></div>
+            <div class="glass-card" style="padding: 2em; width:100%;">
+
+                <h2 class="title-neon" style="text-align: center; margin-bottom: 1.2em;">Edit Profile</h2>
+
+                <!-- Desktop Layout: Three Columns -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2em; align-items: start;">
                     
-                    <div class="form-group" style="margin-bottom: 1.5em;">
-                        <label style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Username</label>
-                        <div style="display: flex; align-items: center; gap: 1em;">
-                            <div style="flex: 1; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235);">
-                                ${userData.username}
+                    <!-- Left Column: Account Information + Avatar Preview -->
+                    <div>
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Account Information</h3>
+
+                        <!-- Avatar Preview at Top -->
+                        ${userData.avatar ? `
+                            <div style="text-align: center; margin-bottom: 1.2em;">
+                                <img 
+                                    src="${userData.avatar.trim()}" 
+                                    alt="Current Avatar" 
+                                    referrerpolicy="no-referrer"
+                                    style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.5); object-fit: cover;"
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                >
+                                <div style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); display: none; align-items: center; justify-content: center; margin: 0 auto; color: #9ca3af; font-size: 2em;">
+                                    👤
+                                </div>
                             </div>
-                            <button type="button" id="changeUsernameBtn" class="btn" style="background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 0.75em 1.5em; cursor: pointer;">
-                                Change Username
-                            </button>
+                        ` : `
+                            <div style="text-align: center; margin-bottom: 1.2em;">
+                                <div style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto; color: #9ca3af; font-size: 2em;">
+                                    👤
+                                </div>
+                            </div>
+                        `}
+
+                        <div style="display: flex; flex-direction: column; gap: 1em;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Username</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500; margin-bottom: 0.5em; font-size: 0.95em;">
+                                    ${userData.username}
+                                </div>
+                                <button type="button" id="changeUsernameBtn" class="btn-neon accent" style="font-size: 0.85em; padding: 0.5em 1em; border-radius: 8px; font-weight: 500; width: 100%;">
+                                    Change Username
+                                </button>
+                            </div>
+
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Email</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-weight: 500; margin-bottom: 0.5em; font-size: 0.95em; word-break: break-all;">
+                                    ${userData.email || 'Not set'}
+                                </div>
+                                <button type="button" id="changeEmailBtn" class="btn-neon accent" style="font-size: 0.85em; padding: 0.5em 1em; border-radius: 8px; font-weight: 500; width: 100%;">
+                                    Change Email
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Middle Column: Personal Information Form -->
+                    <div>
+                        <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">Personal Information</h3>
                     
-                    <div class="form-group">
-                        <label style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Email</label>
-                        <div style="display: flex; align-items: center; gap: 1em;">
-                            <div style="flex: 1; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235);">
-                                ${userData.email || 'Not set'}
+                        <form id="editProfileForm" style="display: flex; flex-direction: column; gap: 1em;">
+                            <div class="form-group">
+                                <label for="firstName" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">First Name</label>
+                                <input
+                                    type="text"
+                                    id="firstName"
+                                    name="firstName"
+                                    value="${userData.firstName || ''}"
+                                    required
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                >
                             </div>
-                            <button type="button" id="changeEmailBtn" class="btn" style="background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 0.75em 1.5em; cursor: pointer;">
-                                Change Email
-                            </button>
-                        </div>
+
+                            <div class="form-group">
+                                <label for="lastName" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Last Name</label>
+                                <input
+                                    type="text"
+                                    id="lastName"
+                                    name="lastName"
+                                    value="${userData.lastName || ''}"
+                                    required
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Avatar URL</label>
+                                <input
+                                    type="text"
+                                    id="avatar"
+                                    name="avatar"
+                                    value="${userData.avatar || ''}"
+                                    placeholder="https://example.com/avatar.jpg"
+                                    style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); color: rgb(229 231 235); font-size: 0.95em; transition: border-color 0.2s;"
+                                    onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+                                    onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="twoFactorEnabled" style="display: block; margin-bottom: 0.5em; font-weight: 500; color: #9ca3af; font-size: 0.85em;">Two-Factor Authentication</label>
+                                <div style="padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);">
+                                    <label style="display: flex; align-items: center; gap: 0.8em; cursor: pointer;">
+                                        <input 
+                                            type="checkbox" 
+                                            id="twoFactorEnabled" 
+                                            name="twoFactorEnabled" 
+                                            ${userData.twoFactorEnabled ? 'checked' : ''}
+                                            style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;"
+                                        >
+                                        <span style="color: rgb(229 231 235); font-weight: 500; font-size: 0.95em;">
+                                            Enable Two-Factor Authentication
+                                        </span>
+                                    </label>
+                                </div>
+                                <p style="color: rgb(156 163 175); font-size: 0.75em; margin-top: 0.5em; line-height: 1.4;">
+                                    Two-factor authentication adds an extra layer of security to your account.
+                                </p>
+                            </div>
+
+                            <div id="errorMessage" style="color: #ef4444; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+                            <div id="successMessage" style="color: #10b981; font-size: 0.8em; text-align: center; display: none; padding: 0.5em; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);"></div>
+
+                            <div style="display: flex; gap: 1em; margin-top: 0.5em;">
+                                <button type="submit" id="saveProfileBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer;">
+                                    ✓ Save Changes
+                                </button>
+                                <button type="button" id="cancelBtn" style="flex: 1; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(255, 255, 255, 0.03); color: rgb(156 163 175); border: 1px solid rgba(255, 255, 255, 0.15); cursor: pointer;">
+                                    ✕ Cancel
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                </div>
-                
-                <div style="margin-bottom: 2em;">
-                    <h3 style="color: rgb(229 231 235); margin-bottom: 1em; border-bottom: 1px solid rgb(55 65 81); padding-bottom: 0.5em;">Personal Information</h3>
-                </div>
-                
-                <form id="editProfileForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                    <div class="form-group">
-                        <label for="firstName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">First Name</label>
-                        <input 
-                            type="text" 
-                            id="firstName" 
-                            name="firstName" 
-                            value="${userData.firstName || ''}" 
-                            required
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
-                        >
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="lastName" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Last Name</label>
-                        <input 
-                            type="text" 
-                            id="lastName" 
-                            name="lastName" 
-                            value="${userData.lastName || ''}" 
-                            required
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
-                        >
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="avatar" style="display: block; margin-bottom: 0.5em; font-weight: 600; color: rgb(209 213 219);">Avatar URL</label>
-                        <input 
-                            type="url" 
-                            id="avatar" 
-                            name="avatar" 
-                            value="${userData.avatar || ''}"
-                            style="width: 100%; padding: 0.75em; border: 2px solid rgb(55 65 81); border-radius: 8px; background: rgb(31 41 55); color: rgb(229 231 235); font-size: 1em;"
-                        >
-                    </div>
-                    
-                    <div id="errorMessage" style="color: #ef4444; font-size: 0.9em; text-align: center; display: none;"></div>
-                    <div id="successMessage" style="color: #10b981; font-size: 0.9em; text-align: center; display: none;"></div>
-                    
-                    <div style="display: flex; gap: 1em; margin-top: 1em;">
-                        <button type="submit" id="saveProfileBtn" class="btn" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                            Save Changes
+
+                    <!-- Right Column: Danger Zone -->
+                    <div>
+                        <h3 style="color: #ef4444; font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(239, 68, 68, 0.3); padding-bottom: 0.5em;">⚠️ Danger Zone</h3>
+                        <p style="color: rgb(156 163 175); font-size: 0.85em; margin-bottom: 1em; line-height: 1.5;">
+                            Deleting your account is permanent. All data will be lost forever.
+                        </p>
+                        <button id="deleteAccountBtn" class="btn-neon danger" style="width: 100%; font-size: 0.85em; padding: 0.55em 1.2em; border-radius: 8px; font-weight: 500;">
+                            🗑️ Delete Account
                         </button>
-                        <button type="button" id="cancelBtn" class="btn btn-back" style="flex: 1; background: #6b7280; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                            Cancel
-                        </button>
                     </div>
-                </form>
-                
-                <div style="margin-top: 3em; padding-top: 2em; border-top: 1px solid rgb(55 65 81);">
-                    <h3 style="color: #ef4444; margin-bottom: 1em; text-align: center;">Danger Zone</h3>
-                    <p style="color: rgb(156 163 175); font-size: 0.9em; text-align: center; margin-bottom: 1.5em;">
-                        Once you delete your account, there is no going back. Please be certain.
-                    </p>
-                    <button id="deleteAccountBtn" class="btn" style="width: 100%; background: #dc2626; color: #fff; border: none; border-radius: 8px; padding: 0.75em; font-size: 1em; cursor: pointer;">
-                        Delete Account
-                    </button>
                 </div>
             </div>
         </div>
-    `;
-
-    // Form submission handler
+    `;    // Form submission handler
     const form = document.getElementById('editProfileForm') as HTMLFormElement;
     if (form) {
         form.addEventListener('submit', async (e) => {
@@ -196,16 +260,23 @@ export async function renderEditProfilePage(): Promise<void> {
             
             try {
                 const formData = new FormData(form);
+                const avatarValue = (formData.get('avatar') as string)?.trim();
+                const twoFactorCheckbox = document.getElementById('twoFactorEnabled') as HTMLInputElement;
                 const updateData = {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
-                    avatar: formData.get('avatar') as string || undefined
+                    // Only update avatar if a new value is provided, otherwise keep existing
+                    avatar: avatarValue,
+                    twoFactorEnabled: twoFactorCheckbox?.checked || false
                 };
                 
                 const result = await updateUserProfile(updateData);
                 
                 if (result.success) {
+                    // Refresh user profile in auth service to get updated avatar
+                    await authService.fetchUserProfile();
+                    
                     successDiv.textContent = 'Profile updated successfully!';
                     successDiv.style.display = 'block';
                     
@@ -227,6 +298,45 @@ export async function renderEditProfilePage(): Promise<void> {
                 saveBtn.textContent = 'Save Changes';
             }
         });
+    }
+
+    // Avatar preview handler
+    const avatarInput = document.getElementById('avatar') as HTMLInputElement;
+    if (avatarInput) {
+        const previewContainer = avatarInput.parentElement?.querySelector('.avatar-preview-container') as HTMLElement;
+        const previewImg = previewContainer?.querySelector('img') as HTMLImageElement;
+        const errorMsg = previewContainer?.querySelector('.avatar-error') as HTMLElement;
+        
+        avatarInput.addEventListener('input', () => {
+            const url = avatarInput.value.trim();
+            if (previewContainer && previewImg && errorMsg) {
+                if (url.length > 0) {
+                    previewContainer.style.display = 'block';
+                    previewImg.src = url;
+                    previewImg.style.display = 'block';
+                    errorMsg.style.display = 'none';
+                } else {
+                    previewContainer.style.display = 'none';
+                }
+            }
+        });
+        
+        // Handle image load/error
+        if (previewImg) {
+            previewImg.addEventListener('error', () => {
+                if (previewImg && errorMsg) {
+                    previewImg.style.display = 'none';
+                    errorMsg.style.display = 'block';
+                }
+            });
+            
+            previewImg.addEventListener('load', () => {
+                if (previewImg && errorMsg) {
+                    previewImg.style.display = 'block';
+                    errorMsg.style.display = 'none';
+                }
+            });
+        }
     }
 
     // Cancel button handler
@@ -273,6 +383,9 @@ export async function renderEditProfilePage(): Promise<void> {
             }
         });
     }
+
+    // Attach user nav dropdown listeners
+    attachUserNavListeners();
 }
 
 async function handleAccountDeletion(): Promise<void> {
@@ -290,7 +403,7 @@ async function handleAccountDeletion(): Promise<void> {
         
         if (result.success) {
             // Logout and redirect to landing page
-            authService.logout();
+            await authService.logout();
             history.pushState({ page: 'landing' }, '', '/');
             setCurrentPage('landing');
             renderApp();

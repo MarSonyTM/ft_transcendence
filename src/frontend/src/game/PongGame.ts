@@ -1,4 +1,4 @@
-import { GameState, WebSocketMessage, Player } from '../../../shared/gameTypes';
+import { GameState, WebSocketMessage, Player } from '../types';
 import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
 import { authService } from '../utils/auth';
@@ -24,7 +24,6 @@ export class PongGame {
         ballPosY: getCurrentGameMode() === '4P' ? 200 : 100,
         mode: getCurrentGameMode(),
         lastContact: 0,
-        lastActivity: ''
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
@@ -38,7 +37,6 @@ export class PongGame {
     private stateListeners: Array<(state: GameState, game: PongGame) => void> = [];
     hasLocal: boolean = false;
     isGuest: boolean = false;
-    private didHandleGameEnd: boolean = false;
 
     private interpolatedState = {
         ballPosX: 200,
@@ -47,7 +45,7 @@ export class PongGame {
     private lerpFactor = 1;
     
     constructor() {
-        // this.setupKeyboardControls();
+        this.setupKeyboardControls();
         const uiMode = getCurrentGameMode();
         if (uiMode) this.gameState.mode = uiMode as any;
         this.initializeModelFromGameState();
@@ -140,7 +138,7 @@ export class PongGame {
         
         this.updateStatus("Ready to start...");
         
-        const currentUser = authService.getCurrentUser();
+        const currentUser = await authService.getCurrentUser();//TODO had to add await but wasnt part of DEV??
         if (currentUser && currentUser.id)
             this.playerId = parseInt(currentUser.id);
         
@@ -176,7 +174,6 @@ export class PongGame {
                 await this.init3DGame();
                 
                 this.startRenderLoop();
-                this.didHandleGameEnd = false;
             } else {
                 throw new Error("Failed to establish game ID");
             }
@@ -229,9 +226,9 @@ export class PongGame {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/new`, {
                 method: "POST",
+                credentials: 'include',
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({ 
                     mode: selectedMode, 
@@ -255,8 +252,7 @@ export class PongGame {
         return new Promise<void>((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
-            const token = localStorage.getItem('authToken');
-            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws?token=${token}`;
+            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
@@ -370,34 +366,35 @@ export class PongGame {
                 break;
 
             case 'gameEnd':
-                // Update scores from finalScores if available
-                if (Array.isArray(message.finalScores)) {
-                    message.finalScores.forEach((scoreData: any) => {
-                        const playerIndex = scoreData.playerId - 1;
-                        if (this.gameState.players[playerIndex]) {
-                            this.gameState.players[playerIndex].score = scoreData.score || 0;
-                        }
-                    });
-                    // Update the score display with final scores
-                    this.updateScoreDisplay();
-                }
+            if (Array.isArray(message.finalScores)) {
+                message.finalScores.forEach((scoreData: any) => {
+                    const playerIndex = scoreData.playerId - 1;
+                    if (this.gameState.players[playerIndex]) {
+                        this.gameState.players[playerIndex].score = scoreData.score || 0;
+                    }
+                });
+                this.updateScoreDisplay();
+            }
+            
+            if (message.mode === '4P') {
+                this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
+                console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
                 
-                if (message.mode === '4P') {
-                    this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
-                    console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
-                    if (this.onGameEnd) {
-                        const winnerId = message.winnerName ? this.parseWinnerIdFromName(message.winnerName) : 1;
-                        this.onGameEnd(winnerId);
-                    }
-                } else {
-                    this.updateStatus(`Game Over! ${message.winner} wins!`);
-                    console.log(`Game Over! Winner: ${message.winner}`);
-                    if (this.onGameEnd && message.winner !== undefined) {
-                        this.onGameEnd(message.winner);
-                    }
+                // Trigger callback for 4-player mode
+                if (this.onGameEnd) {
+                    const winnerId = message.winner || 1;
+                    this.onGameEnd(winnerId);
                 }
-                this.isActive = false;
-                break;
+            } else {
+                this.updateStatus(`Game Over! ${message.winner} wins!`);
+                console.log(`Game Over! Winner: ${message.winner}`);
+                
+                if (this.onGameEnd && message.winner !== undefined) {
+                    this.onGameEnd(message.winner);
+                }
+            }
+            this.isActive = false;
+            break;
 
             case 'ping':
                 console.log("pong");
@@ -432,9 +429,9 @@ export class PongGame {
             const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${this.gameId}/start`, {
                 method: "POST",
+                credentials: 'include',
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
                     gameId: this.gameId
@@ -490,81 +487,22 @@ export class PongGame {
         }
     }
 
-    setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): () => void {
-        const keys: { [key: string]: boolean } = {};
-        const hasLocal = this.hasLocal;
-        
-        const gameMode = getCurrentGameMode();
-    
-        console.log('Setting up controls:', { 
-            playerId,
-            hasLocal,
-            gameMode
+    setupKeyboardControls(): void {
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
         });
         
-        const movementKeys = new Set(['w','s','o','l']);
-    
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const key = e.key.toLowerCase();
-            const wasPressed = keys[key];
-            keys[key] = true;
-            
-            // Only send on key state CHANGE
-            if (!wasPressed && movementKeys.has(key)) {
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            const gameKeys = ['KeyW', 'KeyS'];
+            if (gameKeys.includes(e.code)) {
                 e.preventDefault();
-                
-                // Check if this is a local guest key (o/l)
-                const isGuestKey = ['o', 'l'].includes(key);
-                
-                if (isGuestKey && hasLocal) {
-                    // Send as guest/local player
-                    ws.sendKeyState(key, true, true);
-                } else if (!isGuestKey) {
-                    // Send as main player
-                    ws.sendKeyState(key, true, false);
-                }
             }
-        };
-    
-        const handleKeyUp = (e: KeyboardEvent) => {
-            const key = e.key.toLowerCase();
-            keys[key] = false;
-            
-            if (movementKeys.has(key)) {
-                const isGuestKey = ['o', 'l'].includes(key);
-                
-                if (isGuestKey && hasLocal) {
-                    ws.sendKeyState(key, false, true);
-                } else if (!isGuestKey) {
-                    ws.sendKeyState(key, false, false);
-                }
-            }
-        };
-    
-        document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('keyup', handleKeyUp);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('keyup', handleKeyUp);
-        }
+        });
     }
-
-    // setupKeyboardControls(): void {
-    //     document.addEventListener('keydown', (e) => {
-    //         this.keys[e.code] = true;
-    //     });
-        
-    //     document.addEventListener('keyup', (e) => {
-    //         this.keys[e.code] = false;
-    //     });
-        
-    //     document.addEventListener('keydown', (e) => {
-    //         const gameKeys = ['KeyW', 'KeyS'];
-    //         if (gameKeys.includes(e.code)) {
-    //             e.preventDefault();
-    //         }
-    //     });
-    // }
 
     startHeartbeat(): void {
         this.heartbeatInterval = setInterval(() => {
@@ -624,10 +562,10 @@ export class PongGame {
             try {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
-                     method: "POST",
+                    method: "POST",
+                    credentials: 'include',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify({
                         gameId: this.gameId
@@ -656,7 +594,6 @@ export class PongGame {
 
     async endGame(): Promise<void> {
         this.isActive = false;
-        this.didHandleGameEnd = true;
         
         this.stopRenderLoop();
         
@@ -675,9 +612,9 @@ export class PongGame {
                 const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/end`, {
                     method: "POST",
+                    credentials: 'include',
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify({
                         gameId: this.gameId
@@ -689,7 +626,6 @@ export class PongGame {
             }
             
             this.gameId = undefined;
-            this.didHandleGameEnd = false;
         }
 
         const startBtn = document.getElementById('startBtn') as HTMLButtonElement;

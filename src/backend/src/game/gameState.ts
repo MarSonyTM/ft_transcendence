@@ -1,17 +1,13 @@
-import { database } from '../database/index';
-import { Player } from '../../../shared/gameTypes';
+import { database, Player } from '../database/index';
 
 export class GameState {
-    id: number = 0;
-    gameId: number = 0;
+    id?: number;
     ballPosX: number = 0;
     ballPosY: number = 0;
     ballVelX: number = 0;
     ballVelY: number = 0;
     players: Player[] = [];
     mode: string = "";
-    lastContact: number = 0;
-    lastActivity: string = new Date().toISOString();
 
     getBallPosX() {
         return this.ballPosX;
@@ -45,8 +41,6 @@ export class GameState {
 
     getGameState() {
         return {
-            gameId: this.gameId,
-            id: this.id,
             ballPosX: this.ballPosX,
             ballPosY: this.ballPosY,
             ballVelX: this.ballVelX,
@@ -55,13 +49,9 @@ export class GameState {
                 id: player.id,
                 name: player.name,
                 pos: player.pos,
-                score: player.score,
-                connectionStatus: player.connectionStatus,
-                lastActivity: player.lastActivity
+                score: player.score
             })),
-            mode: this.mode,
-            lastContact: this.lastContact,
-            lastActivity: this.lastActivity
+            mode: this.mode
         };
     }
 }

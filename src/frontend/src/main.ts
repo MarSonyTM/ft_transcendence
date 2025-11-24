@@ -19,27 +19,39 @@ import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
 import { renderTournamentPage, cleanupTournamentPage } from './pages/tournamentPage';
+import { renderStatsPage } from './pages/statsPage';
+import { authService } from './utils/auth';
+import { renderStartPage } from './pages/startPage';
+import { removePingPongBalls } from './utils/pingPongBalls';
+import { renderTwoFactorAuthPage } from './pages/twoAuth';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-const publicPages = ['/', '/landing', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
 
 // Centralized routing handler
-function handleRouting(): void {
+async function handleRouting(): Promise<void> {
   const path = window.location.pathname;
 
-  if (!publicPages.includes(path)) {
-    const authToken = localStorage.getItem('authToken');
+  // Skip auth check on public pages (including auth callback)
+  const isPublicPage = publicPages.some(publicPath => path.includes(publicPath.replace('//', '/')));
+
+  if (!isPublicPage) {
+    await authService.whenReady(); 
+    const user = await authService.getCurrentUser();
     
-    if (!authToken) {
-      history.pushState({ page: 'login' }, '', '/login');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    if (!user) {
+      console.log('User not authenticated, redirecting to login');
+      if (path !== '/ping-pong') {
+        history.pushState({ page: 'pingPong' }, '', '/ping-pong');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
       return;
     }
     
-    const needsVerification = localStorage.getItem('needEmailVerification');
-    if (needsVerification === 'true') {
+    const needsVerification = authService.isEmailVerificationNeeded();
+    if (needsVerification) {
       history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
@@ -71,7 +83,7 @@ function handleRouting(): void {
     case '/lobby':
       setCurrentPage('lobby');
       break;
-    case '/gameSelect':
+    case '/game-select':
       setCurrentPage('gameSelect');
       break;
     case '/profile':
@@ -90,6 +102,7 @@ function handleRouting(): void {
         setCurrentPage('friends');
         break;
     case '/auth/callback':
+    case '//auth/callback':
       setCurrentPage('authCallback');
       break;
     case '/2PGame':
@@ -98,8 +111,8 @@ function handleRouting(): void {
     case '/4PGame':
       setCurrentPage('4PGame');
       break;
-    case 'tempLogin':
-        setCurrentPage('tempLogin');
+    case '/temp-login':
+        setCurrentPage('temp-login');
         break;
     case '/verify-email':
       setCurrentPage('verifyEmail');
@@ -109,6 +122,15 @@ function handleRouting(): void {
       break;
     case '/tournament':
       setCurrentPage('tournament');
+      break;
+    case '/stats':
+      setCurrentPage('stats');
+      break; 
+    case '/ping-pong':
+      setCurrentPage('pingPong');
+      break;
+    case '/two-factor-auth':
+      setCurrentPage('twoFactorAuth');
       break;
     default:
       setCurrentPage('landing');
@@ -140,7 +162,7 @@ export async function renderApp(): Promise<void> {
       renderRegisterPage();
       break;
     case 'authCallback':
-      renderAuthCallbackPage();
+      await renderAuthCallbackPage();
       break;
     case 'join':
       if (currentRoomId) {
@@ -172,15 +194,17 @@ export async function renderApp(): Promise<void> {
       renderChangeEmailPage();
       break;
     case '2PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render2PlayerGame();
       break;
     case '4PGame':
+      removePingPongBalls(); // Remove balls on game pages
       render4PlayerGame();
       break;
     case 'friends':
       renderFriendsPage();
       break;
-    case 'tempLogin':
+    case 'temp-login':
       renderTempLoginPage();
       break;
     case 'verifyEmail':
@@ -191,6 +215,15 @@ export async function renderApp(): Promise<void> {
       break;
     case 'tournament':
       renderTournamentPage();
+      break;
+    case 'stats':
+      renderStatsPage();
+      break; 
+    case 'pingPong':
+      renderStartPage();
+      break;
+    case 'twoFactorAuth':
+      await renderTwoFactorAuthPage();
       break;
     default:
       renderLandingPage();

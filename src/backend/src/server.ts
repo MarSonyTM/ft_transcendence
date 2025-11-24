@@ -1,5 +1,4 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import path from 'path';
 import websocket from '@fastify/websocket';
 import userRoutes from './routes/users';
 import auth from './routes/auth';
@@ -13,9 +12,8 @@ import roomWebSocketRoutes from './websocket/roomHandler';
 import tournamentRoutes from './routes/tournaments';
 import tournamentWebSocketRoutes from './websocket/tournamentHandler';
 import { authGuard } from './middleware';
-// import friendRoutes from './routes/friends';
-// import invitationRoutes from './routes/invite';
-import { database } from './database';
+import friendRoutes from './routes/friends';
+import cookie from '@fastify/cookie';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -69,7 +67,8 @@ const start = async (): Promise<void> => {
                 /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
                 /^https:\/\/localhost$/,
                 'http://frontend:8080',
-                'https://play.google.com'
+                'https://play.google.com',
+                '10.18.178.53:5173'
             ];
             
             const isAllowed = allowedPatterns.some(pattern => {
@@ -80,7 +79,6 @@ const start = async (): Promise<void> => {
             });
             
             if (isAllowed) {
-                console.log('✅ Origin allowed:', origin);
                 cb(null, true);
             } else {
                 console.log('❌ Origin blocked:', origin);
@@ -89,11 +87,45 @@ const start = async (): Promise<void> => {
         },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+        exposedHeaders: ['set-cookie'],
     });
 
     await server.register(websocket);
+    await server.register(cookie, {
+        secret: process.env.COOKIE_SECRET || 'supersecret',
+    });
     console.log('✅ WebSocket support registered');
+    
+    // ✅ SECURITY HEADERS (XSS Protection, CSP, etc.)
+    server.addHook('onSend', async (request, reply) => {
+        // Content Security Policy - Prevents XSS attacks
+        reply.header('Content-Security-Policy', 
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data: https:; " +
+            "font-src 'self' data:; " +
+            "connect-src 'self' ws: wss:; " +
+            "frame-ancestors 'none';"
+        );
+        
+        // X-Content-Type-Options - Prevents MIME type sniffing
+        reply.header('X-Content-Type-Options', 'nosniff');
+        
+        // X-Frame-Options - Prevents clickjacking
+        reply.header('X-Frame-Options', 'DENY');
+        
+        // X-XSS-Protection - Enables browser XSS filter
+        reply.header('X-XSS-Protection', '1; mode=block');
+        
+        // Referrer-Policy - Controls referrer information
+        reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+        
+        // Permissions-Policy - Restricts browser features
+        reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    });
+    console.log('✅ Security headers configured');
     
     // Register WebSocket routes BEFORE authGuard
     await server.register(webSocketRoutes);
@@ -113,8 +145,7 @@ const start = async (): Promise<void> => {
     await server.register(tournamentRoutes);
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
-    // await server.register(friendRoutes, { prefix: '/api/friends' });
-    // await server.register(invitationRoutes, { prefix: '/api/invitations' });
+    await server.register(friendRoutes, { prefix: '/api/friends' });
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {

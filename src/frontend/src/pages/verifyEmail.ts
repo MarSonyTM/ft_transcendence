@@ -1,22 +1,19 @@
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { verifyEmail, resendVerificationEmail } from '../_api/auth';
+import { authService } from '../utils/auth';
 
-export function renderVerifyEmailPage(): void {
+export async function renderVerifyEmailPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
-    // Get email from URL parameters or localStorage
+    // Get email from URL parameters or pending value set after registration
     const urlParams = new URLSearchParams(window.location.search);
-    const email = urlParams.get('email') || localStorage.getItem('pendingEmailVerification') || '';
-    if (!email || email.length === 0 || email === 'null' || email === 'undefined') {
-        localStorage.removeItem('pendingEmailVerification');
-        localStorage.removeItem('needEmailVerification');
-        localStorage.removeItem('authToken');
-        history.pushState({ page: 'login' }, '', '/login');
-        window.dispatchEvent(new PopStateEvent('popstate'));
-        return;
-    }
+    const emailFromUrl = urlParams.get('email');
+    const email = (emailFromUrl && emailFromUrl !== 'null' && emailFromUrl !== 'undefined')
+        ? emailFromUrl
+        : (authService.getPendingEmailVerification() || '');
+    authService.setPendingEmailVerification(email || null);
 
     root.innerHTML = `
         <div class="verify-email-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 2em;">
@@ -35,15 +32,15 @@ export function renderVerifyEmailPage(): void {
                 </div>
 
                 <form id="verifyEmailForm" style="display: flex; flex-direction: column; gap: 1.5em;">
-                    <div>
-                        <label for="verificationCode" style="display: block; color: #f9fafb; font-weight: 500; margin-bottom: 0.5em;">Verification Code</label>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <label for="verificationCode" style="display: block; color: #f9fafb; font-weight: 500; margin-bottom: 0.5em; width: 100%; text-align: center;">Verification Code</label>
                         <input 
                             id="verificationCode" 
                             type="text" 
                             placeholder="Enter 6-digit code" 
                             maxlength="6"
                             required 
-                            style="width: 100%; padding: 0.8em; font-size: 1.2em; text-align: center; letter-spacing: 0.2em; background: #374151; border: 2px solid #4b5563; border-radius: 8px; color: #f9fafb; outline: none; transition: border-color 0.2s;"
+                            style="width: 100%; max-width: 300px; padding: 0.8em; font-size: 1.2em; text-align: center; letter-spacing: 0.2em; background: #374151; border: 2px solid #4b5563; border-radius: 8px; color: #f9fafb; outline: none; transition: border-color 0.2s; margin: 0 auto;"
                         />
                     </div>
                     
@@ -148,7 +145,7 @@ export function renderVerifyEmailPage(): void {
             setSuccess('');
 
             const verificationCode = verificationCodeInput?.value.trim() || '';
-			const email = localStorage.getItem('pendingEmailVerification') || '';
+			const email = authService.getPendingEmailVerification();
 
             if (!verificationCode || verificationCode.length !== 6) {
                 setError('Please enter a valid 6-digit verification code');
@@ -176,8 +173,10 @@ export function renderVerifyEmailPage(): void {
                 setSuccess('Email verified successfully! Redirecting...');
                 
                 // Clear pending email verification
-                localStorage.removeItem('pendingEmailVerification');
-				localStorage.removeItem('needEmailVerification');
+                authService.setPendingEmailVerification(null);
+                authService.setNeededEmailVerification(false);
+
+                await authService.fetchUserProfile();
                 
                 // Redirect to landing page after successful verification
                 setTimeout(() => {

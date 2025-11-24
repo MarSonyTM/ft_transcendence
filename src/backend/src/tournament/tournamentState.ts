@@ -1,9 +1,11 @@
+import { GameRoom } from '../game/gameRoom';
 import { Tournament, TournamentMatch, TournamentPlayer, TournamentStatus } from '../types/index';
 
 export class TournamentState {
 	tournamentId: number;
 	hostId: number;
 	status: TournamentStatus;
+	room?: GameRoom | null;
 	round: number = 0;
 	championId: number | null = null;
 	createdAt: string = new Date().toISOString();
@@ -17,6 +19,7 @@ export class TournamentState {
 		this.tournamentId = base.id;
 		this.hostId = base.players.find(p => p.tpt === 'host')?.id || 0;
 		this.status = base.status;
+		this.room = base.curM?.room;
 		this.round = base.round;
 		this.championId = base.players.find(p => p.id === base.championId)?.id || null;
 		this.players = base.players.slice();
@@ -43,6 +46,7 @@ export class TournamentState {
 		return {
 			tournamentId: this.tournamentId,
 			status: this.status,
+			room: this.room,
 			round: this.round,
 			championId: this.championId,
 			players: this.players,

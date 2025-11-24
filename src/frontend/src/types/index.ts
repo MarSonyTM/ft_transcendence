@@ -1,10 +1,5 @@
-import { Player, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
+import { Player as SharedPlayer, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
 import { GameRoom } from "../utils/roomState";
-
-export type AppPage = 
-    'landing' | 'login' | 'register' | 'gameSelect' | 'tempLogin' | 'leaderboard' | 'friends' |
-    'profile' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'authCallback' |
-    'game' | 'lobby' | 'join' | '2PGame' | '4PGame' | 'tournament';
 
 export function getApiEndpoint(): string {
 	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
@@ -90,6 +85,12 @@ export interface WebSocketMessage extends SharedWebSocketMessage {
   players?: Player[];
 }
 
+export type AppPage = 
+    'landing' | 'login' | 'register' | 'gameSelect' | 'temp-login' | 'leaderboard' | 'friends' |
+    'profile' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'authCallback' |
+    'game' | 'lobby' | 'join' | '2PGame' | '4PGame' | 'tournament' |
+    'pingPong' | 'twoFactorAuth' | 'stats';
+
 declare global {
     interface Window {
         __INITIAL_STATE__?: {
@@ -102,10 +103,12 @@ declare global {
             wsEndpoint: string;
             environment: string;
         };
-        __GAME_STATE__?: any;
-        __GAME_ID__?: number | null;
-        __USERNAME__?: string;
-        __CURRENT_PAGE__?: string;
-        game?: any;
-    }
+    __GAME_STATE__?: any;
+    __GAME_ID__?: number | null;
+    __USERNAME__?: string;
+    __CURRENT_PAGE__?: string;
+    game?: any;
+  }
 }
+
+export type Player = SharedPlayer;
