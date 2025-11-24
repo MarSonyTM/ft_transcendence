@@ -3,6 +3,14 @@ import { database, User } from '../database/index';
 import { sendVerificationEmail } from '../config/email';
 import crypto from 'crypto';
 import { JwtUser } from '../middleware';
+import {
+    sanitizeUsername,
+    sanitizeEmail,
+    sanitizeName,
+    sanitizeUrl,
+    validateEmail,
+    validateUsername
+} from '../utils/sanitization';
 
 // Types
 export interface CreateUserInput {
@@ -12,6 +20,7 @@ export interface CreateUserInput {
     username?: string;
     password?: string;
     avatar?: string;
+    twoFactorEnabled?: boolean;
 }
 
 // Add input validation schemas
@@ -38,7 +47,8 @@ const updateUserSchema = {
         lastName: { type: 'string', minLength: 1, maxLength: 100 },
         email: { type: 'string', format: 'email' }, // Use email format validation
         username: { type: 'string', minLength: 3, maxLength: 50 },
-        avatar: { type: 'string', maxLength: 500 } // Limit length to prevent oversized inputs
+        avatar: { type: 'string', maxLength: 500 }, // Limit length to prevent oversized inputs
+        twoFactorEnabled: { type: 'boolean' }
     },
     additionalProperties: false // Prevent extra fields
 };
@@ -307,11 +317,32 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const userId = (request as any).user.id;
             const updateData = request.body as Partial<CreateUserInput>;
 
-            // Sanitize as above
-            if (updateData.firstName) updateData.firstName = updateData.firstName.trim();
-            if (updateData.lastName) updateData.lastName = updateData.lastName.trim();
-            if (updateData.username) updateData.username = updateData.username.trim().toLowerCase();
-            if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
+            // ✅ SANITIZE ALL INPUTS (XSS Protection)
+            if (updateData.firstName) updateData.firstName = sanitizeName(updateData.firstName);
+            if (updateData.lastName) updateData.lastName = sanitizeName(updateData.lastName);
+            if (updateData.username) {
+                updateData.username = sanitizeUsername(updateData.username);
+                if (!validateUsername(updateData.username)) {
+                    reply.code(400).send({
+                        success: false,
+                        message: 'Invalid username format'
+                    });
+                    return;
+                }
+            }
+            if (updateData.email) {
+                updateData.email = sanitizeEmail(updateData.email);
+                if (!validateEmail(updateData.email)) {
+                    reply.code(400).send({
+                        success: false,
+                        message: 'Invalid email format'
+                    });
+                    return;
+                }
+            }
+            if (updateData.avatar) {
+                updateData.avatar = sanitizeUrl(updateData.avatar);
+            }
 
             console.log('Update data received:', updateData);
             

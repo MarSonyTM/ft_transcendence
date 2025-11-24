@@ -83,6 +83,36 @@ const start = async (): Promise<void> => {
     });
     console.log('✅ WebSocket support registered');
     
+    // ✅ SECURITY HEADERS (XSS Protection, CSP, etc.)
+    server.addHook('onSend', async (request, reply) => {
+        // Content Security Policy - Prevents XSS attacks
+        reply.header('Content-Security-Policy', 
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data: https:; " +
+            "font-src 'self' data:; " +
+            "connect-src 'self' ws: wss:; " +
+            "frame-ancestors 'none';"
+        );
+        
+        // X-Content-Type-Options - Prevents MIME type sniffing
+        reply.header('X-Content-Type-Options', 'nosniff');
+        
+        // X-Frame-Options - Prevents clickjacking
+        reply.header('X-Frame-Options', 'DENY');
+        
+        // X-XSS-Protection - Enables browser XSS filter
+        reply.header('X-XSS-Protection', '1; mode=block');
+        
+        // Referrer-Policy - Controls referrer information
+        reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+        
+        // Permissions-Policy - Restricts browser features
+        reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    });
+    console.log('✅ Security headers configured');
+    
     // Register WebSocket routes BEFORE authGuard
     await server.register(webSocketRoutes);
     await server.register(roomWebSocketRoutes);

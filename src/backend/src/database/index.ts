@@ -21,6 +21,7 @@ export interface User {
     avatar: string;
     googleId: string;
     emailVerified: boolean;
+    twoFactorEnabled: boolean;
     gamesWon: number;
     gamesLost: number;
     createdAt: string;
@@ -90,6 +91,15 @@ export interface EmailVerification {
     id: number;
     userId: number;
     email: string;
+    verificationCode: string;
+    status: 'pending' | 'verified' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+}
+
+export interface TwoFactorVerification {
+    id: number;
+    userId: number;
     verificationCode: string;
     status: 'pending' | 'verified' | 'expired';
     createdAt: string;
@@ -232,7 +242,7 @@ class UserDatabaseManager {
         return this.getUserById(userId);
     }
 
-    updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string; username?: string; emailVerified?: boolean; avatar?: string }>): User | undefined {
+    updateUser(id: number, userData: Partial<{ firstName: string; lastName: string; email?: string; username?: string; emailVerified?: boolean; avatar?: string, twoFactorEnabled?: boolean }>): User | undefined {
         const fields: string[] = [];
         const values: any[] = [];
         
@@ -264,6 +274,11 @@ class UserDatabaseManager {
         if (userData.avatar !== undefined) {
             fields.push('avatar = ?');
             values.push(userData.avatar || 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg');
+        }
+
+        if (userData.twoFactorEnabled !== undefined) {
+            fields.push('twoFactorEnabled = ?');
+            values.push(userData.twoFactorEnabled ? 1 : 0);
         }
         
         if (fields.length === 0) {
@@ -853,6 +868,74 @@ class EmailVerificationDatabaseManager {
     }
 }
 
+class TwoFactorVerificationDatabaseManager {
+    private db: Database.Database;
+
+    constructor(database: Database.Database) {
+        this.db = database;
+    }
+
+    // Create 2FA verification request
+    createVerificationRequest(userId: number, verificationCode: string): TwoFactorVerification {
+        // Set expiration to 10 minutes from now
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      
+        const stmt = this.db.prepare(`
+            INSERT INTO two_factor_verifications (userId, verificationCode, status, expiresAt) 
+            VALUES (?, ?, 'pending', ?)
+        `);
+      
+        const result = stmt.run(userId, verificationCode, expiresAt);
+        return this.getVerificationById(result.lastInsertRowid as number)!;
+    }
+
+    getVerificationById(id: number): TwoFactorVerification | undefined {
+        const stmt = this.db.prepare('SELECT * FROM two_factor_verifications WHERE id = ?');
+        return stmt.get(id) as TwoFactorVerification | undefined;
+    }
+
+    getVerificationByCode(verificationCode: string): TwoFactorVerification | undefined {
+        const stmt = this.db.prepare('SELECT * FROM two_factor_verifications WHERE verificationCode = ? AND status = "pending"');
+        return stmt.get(verificationCode) as TwoFactorVerification | undefined;
+    }
+
+    getPendingVerification(userId: number): TwoFactorVerification | undefined {
+        const stmt = this.db.prepare(`
+            SELECT * FROM two_factor_verifications 
+            WHERE userId = ? AND status = 'pending'
+            AND datetime(expiresAt) > datetime('now')
+            ORDER BY createdAt DESC LIMIT 1
+        `);
+        return stmt.get(userId) as TwoFactorVerification | undefined;
+    }
+
+    verify2FA(verificationCode: string, userId: number): TwoFactorVerification | undefined {
+        const stmt = this.db.prepare(`
+            UPDATE two_factor_verifications 
+            SET status = 'verified' 
+            WHERE verificationCode = ? AND userId = ? AND status = 'pending'
+            AND datetime(expiresAt) > datetime('now')
+        `);
+      
+        const result = stmt.run(verificationCode, userId);
+        if (result.changes === 0) return undefined;
+      
+        return this.db.prepare(
+            'SELECT * FROM two_factor_verifications WHERE verificationCode = ? AND userId = ?'
+        ).get(verificationCode, userId) as TwoFactorVerification | undefined;
+    }
+
+    cleanupExpiredVerifications(): void {
+        const stmt = this.db.prepare(`
+            UPDATE two_factor_verifications 
+            SET status = 'expired' 
+            WHERE status = 'pending' 
+            AND datetime(expiresAt) <= datetime('now')
+        `);
+        stmt.run();
+    }
+}
+
 class UsernameChangeDatabaseManager {
     private db: Database.Database;
 
@@ -1001,6 +1084,7 @@ export class DatabaseManager extends BaseDatabaseManager {
     public friends: FriendDatabaseManager;
     public invitations: InvitationDatabaseManager;
     public emailVerifications: EmailVerificationDatabaseManager;
+    public twoFactorVerifications: TwoFactorVerificationDatabaseManager;
     public usernameChanges: UsernameChangeDatabaseManager;
 
     constructor() {
@@ -1012,6 +1096,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.friends = new FriendDatabaseManager(this.db);
         this.invitations = new InvitationDatabaseManager(this.db);
         this.emailVerifications = new EmailVerificationDatabaseManager(this.db);
+        this.twoFactorVerifications = new TwoFactorVerificationDatabaseManager(this.db);
         this.usernameChanges = new UsernameChangeDatabaseManager(this.db);
     }
 
@@ -1023,6 +1108,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.initializeFriendsTable();
         this.initializeInvitationsTable();
         this.initializeEmailVerificationsTable();
+        this.initializeTwoFactorVerificationsTable();
         this.initializeUsernameChangesTable();
         this.createSeedUser();
     }
@@ -1039,6 +1125,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 avatar TEXT,
                 googleId TEXT UNIQUE,
                 emailVerified BOOLEAN DEFAULT FALSE,
+                twoFactorEnabled BOOLEAN DEFAULT FALSE,
                 gamesWon INTEGER DEFAULT 0,
                 gamesLost INTEGER DEFAULT 0,
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1161,6 +1248,22 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.db.exec(createEmailVerificationsTable);
     }
 
+    private initializeTwoFactorVerificationsTable() {
+        const createTwoFactorVerificationsTable = `
+            CREATE TABLE IF NOT EXISTS two_factor_verifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                verificationCode TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending', 'verified', 'expired')) DEFAULT 'pending',
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expiresAt DATETIME NOT NULL,
+                FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `;
+      
+        this.db.exec(createTwoFactorVerificationsTable);
+    }
+
     private initializeUsernameChangesTable() {
         const createUsernameChangesTable = `
             CREATE TABLE IF NOT EXISTS username_changes (
@@ -1204,8 +1307,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 1,                // emailVerified (true)
                 0,                // gamesWon
                 0,                 // gamesLost
-                'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg' //Avatar
-            );
+                'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg'            );
 
             console.log(`Seed user created with ID: ${result.lastInsertRowid}`);
         } catch (error) {

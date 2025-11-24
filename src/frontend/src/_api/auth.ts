@@ -9,7 +9,7 @@ interface RegisterResult {
 	token?: string;
 	error?: string;
 }
-export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; emailVerified?: boolean; error?: string }> {
+export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; emailVerified?: boolean; requires2FA?: boolean; userId?: number; error?: string }> {
     const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
     
     const res = await fetch(`${apiEndpoint}/api/auth/login`, {
@@ -21,6 +21,19 @@ export async function loginUser(username: string, password: string): Promise<{ s
     
     if (res.ok) {
         const data = await res.json().catch(() => ({}));
+		
+		// Check if 2FA is required
+		if (data.requires2FA) {
+			return {
+				success: false,
+				requires2FA: true,
+				userId: data.data?.userId,
+				username: data.data?.username,
+				emailVerified: data.data?.emailVerified,
+				error: data.message
+			};
+		}
+		
 		if (data?.data && !data.data.emailVerified) {
 			authService.setPendingEmailVerification(data.data.email || '');
 		}
@@ -244,3 +257,74 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
 		};
 	}
 }
+
+// Verify 2FA code
+export async function verify2FA(verificationCode: string, userId: number): Promise<{ success: boolean; token?: string; message?: string; error?: string }> {
+	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+	
+	try {
+		const res = await fetch(`${apiEndpoint}/api/auth/verify-2fa`, {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 
+                'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ verificationCode, userId })
+		});
+		
+		const data = await res.json().catch(() => ({}));
+		
+		if (res.ok) {
+			presenceService.startHeartbeat();
+			return {
+				success: true,
+				token: data.token,
+				message: data.message || '2FA verification successful'
+			};
+		}
+		
+		return {
+			success: false,
+			error: data.message || `Verification failed (${res.status})`
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: 'Network error - please try again'
+		};
+	}
+}
+
+// Resend 2FA code
+export async function resend2FA(userId: number): Promise<{ success: boolean; message?: string; error?: string }> {
+	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+	
+	try {
+		const res = await fetch(`${apiEndpoint}/api/auth/resend-2fa`, {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ userId })
+		});
+		
+		const data = await res.json().catch(() => ({}));
+		
+		if (res.ok) {
+			return {
+				success: true,
+				message: data.message || '2FA code sent successfully'
+			};
+		}
+		
+		return {
+			success: false,
+			error: data.message || `Failed to resend 2FA code (${res.status})`
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: 'Network error - please try again'
+		};
+	}
+}
+

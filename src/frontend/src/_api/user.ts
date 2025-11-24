@@ -6,6 +6,7 @@ export interface UpdateUserProfileData {
     lastName?: string;
     email?: string;
     avatar?: string;
+    twoFactorEnabled?: boolean;
     gamesWon?: number;
     gamesLost?: number;
 }

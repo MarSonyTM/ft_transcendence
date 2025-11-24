@@ -79,6 +79,20 @@ export async function createUserNav(): Promise<string> {
                     ">
                         🏆 Leaderboard
                     </button>
+                    <button id="navStatsBtn" class="user-menu-item" style="
+                        width: 100%;
+                        text-align: left;
+                        padding: 0.8em 1.2em;
+                        background: transparent;
+                        border: none;
+                        color: #00ffff;
+                        cursor: pointer;
+                        font-size: 0.95em;
+                        transition: background 0.2s ease;
+                        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+                    ">
+                        📊 Statistics
+                    </button>
                     <button id="navLogoutBtn" class="user-menu-item" style="
                         width: 100%;
                         text-align: left;
@@ -123,6 +137,7 @@ export function attachUserNavListeners(): void {
     const profileBtn = document.getElementById('navProfileBtn');
     const editProfileBtn = document.getElementById('navEditProfileBtn');
     const leaderboardBtn = document.getElementById('navLeaderboardBtn');
+    const statsBtn = document.getElementById('navStatsBtn');
     const logoutBtn = document.getElementById('navLogoutBtn');
 
     if (!menuBtn || !dropdown) return;
@@ -167,6 +182,16 @@ export function attachUserNavListeners(): void {
             dropdown.classList.remove('show');
             history.pushState({ page: 'leaderboard' }, '', '/leaderboard');
             setCurrentPage('leaderboard');
+            renderApp();
+        });
+    }
+
+    // Statistics button
+    if (statsBtn) {
+        statsBtn.addEventListener('click', () => {
+            dropdown.classList.remove('show');
+            history.pushState({ page: 'stats' }, '', '/stats');
+            setCurrentPage('stats');
             renderApp();
         });
     }

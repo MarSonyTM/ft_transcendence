@@ -18,14 +18,16 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { renderStatsPage } from './pages/statsPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
 import { removePingPongBalls } from './utils/pingPongBalls';
+import { renderTwoFactorAuthPage } from './pages/twoAuth';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
 
 
 // Centralized routing handler
@@ -117,9 +119,15 @@ async function handleRouting(): Promise<void> {
       break;
     case '/leaderboard':
       setCurrentPage('leaderboard');
+      break;
+    case '/stats':
+      setCurrentPage('stats');
       break; 
     case '/ping-pong':
       setCurrentPage('pingPong');
+      break;
+    case '/two-factor-auth':
+      setCurrentPage('twoFactorAuth');
       break;
     default:
       setCurrentPage('landing');
@@ -198,9 +206,15 @@ export async function renderApp(): Promise<void> {
       break;
     case 'leaderboard':
       renderLeaderboardPage();
+      break;
+    case 'stats':
+      renderStatsPage();
       break; 
     case 'pingPong':
       renderStartPage();
+      break;
+    case 'twoFactorAuth':
+      await renderTwoFactorAuthPage();
       break;
     default:
       renderLandingPage();
