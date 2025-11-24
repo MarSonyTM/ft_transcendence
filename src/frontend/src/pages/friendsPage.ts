@@ -360,9 +360,19 @@ async function displayFriends(friends: User[]) {
 
   container.innerHTML = friends.map(friend => {
     const presence = presences.get(friend.id);
-    const isOnline = presence?.status === 'online';
-    const statusColor = isOnline ? '#10b981' : '#6b7280';
-    const statusText = isOnline ? 'Online' : 'Offline';
+    const status = presence?.status;
+    let statusColor;
+    let statusText;
+    if (status == 'online') {
+      statusColor = '#10b981';
+      statusText = 'Online';
+    } else if (status == 'in game') {
+      statusColor = '#12d6f0ff';
+      statusText = 'In Game';
+    } else {
+      statusColor = '#6b7280';
+      statusText = 'Offline';
+    }
 
     return `
     <div class="glass-card" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; margin-bottom: 10px;">
@@ -386,7 +396,7 @@ async function displayFriends(friends: User[]) {
                   height: 8px; 
                   border-radius: 50%; 
                   background: ${statusColor};
-                  ${isOnline ? 'box-shadow: 0 0 8px ' + statusColor + ';' : ''}
+                  ${'box-shadow: 0 0 8px ' + statusColor + ';'}
                 "></div>
                 <span style="color: ${statusColor}; font-size: 0.75rem; font-weight: 500;">
                   ${statusText}

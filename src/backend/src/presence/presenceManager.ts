@@ -17,7 +17,9 @@ class PresenceManager {
     }
 
     updateHeartbeat(userId: number, username: string): UserPresence {
+        const user = this.userPresence.get(userId)
         const now = new Date();
+
         const presence: UserPresence = {
             userId,
             username,
@@ -26,6 +28,14 @@ class PresenceManager {
             lastHeartbeat: now
         };
         this.userPresence.set(userId, presence);
+        return presence;
+    }
+
+    setUserOnline(userId: number): UserPresence | null {
+        const presence = this.userPresence.get(userId);
+        if (!presence) return null;
+        presence.status = 'online';
+        presence.lastSeen = new Date();
         return presence;
     }
 

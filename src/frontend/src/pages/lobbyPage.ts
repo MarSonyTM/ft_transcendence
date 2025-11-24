@@ -457,7 +457,6 @@ function renderLobby(root: HTMLElement): void {
   const canStart = players.length >= minPlayersRequired && players.every(p => p.isReady);
 	const isHost = currentRoom.hostId === currentUserId;
 	const currentPlayer = players.find(p => p.id === currentUserId);
-  let hasGuest = false;
   let hasLocal = players.some(p => p.id === 'local');
   
   

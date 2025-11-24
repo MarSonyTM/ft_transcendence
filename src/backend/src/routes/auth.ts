@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 import { database, User } from '../database/index';
 import jwt from 'jsonwebtoken';
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import {
   JWT_SECRET,
   GOOGLE_CLIENT_ID,

@@ -37,10 +37,8 @@ export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
                 updatedPresence = presenceManager.setUserInGame(userId);
             } else if (status === 'offline') {
                 updatedPresence = presenceManager.setUserOffline(userId);
-            } else {
-                // For 'online' or 'away', update the heartbeat (which sets status to 'online')
-                // You may want to add a separate method for 'away' status in presenceManager
-                updatedPresence = presenceManager.updateHeartbeat(userId, username);
+            } else if (status === 'online') {
+                updatedPresence = presenceManager.setUserOnline(userId);
             }
 
             if (!updatedPresence) {
@@ -49,7 +47,6 @@ export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
                     message: 'User presence not found'
                 });
             }
-
             console.log(`✅ [PRESENCE] User ${username} (${userId}) status updated to: ${status}`);
 
             return reply.send({

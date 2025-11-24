@@ -131,7 +131,7 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
-    await server.register(registerPresenceStatusRoute, { prefix: '/api/presence'})
+    await server.register(registerPresenceStatusRoute)
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {
