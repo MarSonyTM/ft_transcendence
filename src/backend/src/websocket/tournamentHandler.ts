@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { tournamentManager } from '../tournament/tournamentManager';
+import { Tournament, TournamentMatch } from '../types/index';
 import { activeGames } from '../routes/game';
 
 const DEBUG = true;
@@ -57,7 +58,7 @@ async function tournamentWebSocketRoutes(fastify: FastifyInstance) {
 		broadcastToTournament(tournamentIdNum, {
 			type: 'playerJoined',
 			playerId: playerId,
-			tournament: publicTournamentShape(tournament)
+			tournament: tournament
 		}, playerId);
 
 		socket.on('close', () => {
@@ -81,7 +82,7 @@ async function tournamentWebSocketRoutes(fastify: FastifyInstance) {
 	});
 }
 
-function handleTournamentMessage(tournamentId: number, playerId: number, message: any, socket: any): void {
+async function handleTournamentMessage(tournamentId: number, playerId: number, message: any, socket: any): Promise<void> {
 	const t = tournamentManager.getTournament(tournamentId);
 	if (!t) return;
 	switch (message.type) {
@@ -90,7 +91,7 @@ function handleTournamentMessage(tournamentId: number, playerId: number, message
 			break;
 
 		case 'ready':
-			let curM = tournamentManager.getCurrentMatch(tournamentId);
+			let curM = await tournamentManager.getCurrentMatch(tournamentId);
 			if (curM) {
 				tournamentManager.toggleMatchPlayerReady(tournamentId, curM.id, playerId);
 				broadcastToTournament(tournamentId, {
@@ -106,13 +107,13 @@ function handleTournamentMessage(tournamentId: number, playerId: number, message
 			break;
 
 		case 'requestMatchState':
-			const m = tournamentManager.getCurrentMatch(tournamentId);
+			const m = await tournamentManager.getCurrentMatch(tournamentId);
 			if (m)
 				sendMatchState(tournamentId, playerId, m.id);
 			break;
 
 		case 'move':
-			const activeMatch = tournamentManager.getCurrentMatch(tournamentId);
+			const activeMatch = await tournamentManager.getCurrentMatch(tournamentId);
 			if (activeMatch && activeMatch.gameId && typeof message.position === 'number') {
 				const gameEngine = activeGames.get(activeMatch.gameId);
 				if (gameEngine && typeof gameEngine.updatePlayerPosition === 'function') {
@@ -129,7 +130,7 @@ function handleTournamentMessage(tournamentId: number, playerId: number, message
 			break;
 
 		case 'keyState':
-			const keyMatch = tournamentManager.getCurrentMatch(tournamentId);
+			const keyMatch = await tournamentManager.getCurrentMatch(tournamentId);
 			if (keyMatch && keyMatch.gameId) {
 				const gameEngine = activeGames.get(keyMatch.gameId);
 				if (gameEngine && typeof gameEngine.setPlayerKeyState === 'function') {
@@ -156,47 +157,51 @@ function getMatchPlayerNumber(match: any, playerId: number): number {
 	return 1;
 }
 
-export function publicTournamentShape(t: any) {
-	t = tournamentManager.hydrateTournament(t);
-	return {
-		id: t.id,
-		status: t.status,
-		round: t.round,
-		players: t.players,
-		allMatches: t.allMatches,
-		currentMatch: t.curM,
-		matchQueue: t.matchQueue,
-		championId: t.championId,
-		createdAt: t.createdAt,
-		startedAt: t.startedAt,
-		endedAt: t.endedAt
-	};
-}
+// export function publicTournamentShape(t: any) {
+// 	console.debug('BEFORE HYDRATING:', t);
+// 	t = tournamentManager.hydrateTournament(t);
+// 	console.debug('AFTER HYDRATING:', t);
+// 	return {
+// 		id: t.id,
+// 		status: t.status,
+// 		curM: t.curM,
+// 		round: t.round,
+// 		players: t.players,
+// 		allMatches: t.allMatches,
+// 		currentMatch: t.curM,
+// 		matchQueue: t.matchQueue,
+// 		championId: t.championId,
+// 		createdAt: t.createdAt,
+// 		startedAt: t.startedAt,
+// 		endedAt: t.endedAt
+// 	} as Tournament;
+// }
 
-export function publicMatchShape(m: any) {
-	if (m.tournamentId) {
-		let t = tournamentManager.getTournament(m.tournamentId);
-		if (!t) return;
-		t = tournamentManager.hydrateTournament(t);
-		if (!t || !t.curM) return;
-		m = t.curM;
-	}
-	return {
-		id: m.id,
-		tournamentId: m.tournamentId,
-		status: m.status,
-		p1: m.p1,
-		p2: m.p2,
-		gameId: m.gameId,
-		winnerId: m.winnerId,
-		round: m.round,
-		roundIdx: m.roundIdx,
-		isBye: m.isBye,
-		createdAt: m.createdAt,
-		startedAt: m.startedAt,
-		endedAt: m.endedAt
-	};
-}
+// export function publicMatchShape(m: any) {
+// 	if (m.tournamentId) {
+// 		let t = tournamentManager.getTournament(m.tournamentId);
+// 		if (!t) return;
+// 		t = tournamentManager.hydrateTournament(t);
+// 		if (!t || !t.curM) return;
+// 		m = t.curM;
+// 	}
+// 	return {
+// 		id: m.id,
+// 		tournamentId: m.tournamentId,
+// 		status: m.status,
+// 		p1: m.p1,
+// 		p2: m.p2,
+// 		gameId: m.gameId,
+// 		room: m.room,
+// 		winnerId: m.winnerId,
+// 		round: m.round,
+// 		roundIdx: m.roundIdx,
+// 		isBye: m.isBye,
+// 		createdAt: m.createdAt,
+// 		startedAt: m.startedAt,
+// 		endedAt: m.endedAt
+// 	} as TournamentMatch;
+// }
 
 function sendTournamentState(tournamentId: number, playerId: number): void {
 	const t = tournamentManager.getTournament(tournamentId);
@@ -207,7 +212,7 @@ function sendTournamentState(tournamentId: number, playerId: number): void {
 	if (!socket || typeof socket.send !== 'function') return;
 	socket.send(JSON.stringify({
 		type: 'tournamentState',
-		tournament: publicTournamentShape(t)
+		tournament: t
 	}));
 }
 
@@ -229,7 +234,7 @@ function sendMatchState(tournamentId: number, playerId: number, matchId: number)
 	}
 	socket.send(JSON.stringify({
 		type: 'matchState',
-		match: publicMatchShape(m)
+		match: m
 	}));
 }
 
@@ -336,7 +341,7 @@ export function broadcastMatchEndToTournament(tournamentId: number, matchId: num
 	if (t) {
 		broadcastToTournament(tournamentId, {
 			type: 'tournamentState',
-			tournament: publicTournamentShape(t)
+			tournament: t
 		});
 	}
 }
@@ -346,7 +351,7 @@ export function broadcastTournamentState(tournamentId: number): void {
 	if (!t) return;
 	broadcastToTournament(tournamentId, {
 		type: 'tournamentState',
-		tournament: publicTournamentShape(t)
+		tournament: t
 	});
 }
 

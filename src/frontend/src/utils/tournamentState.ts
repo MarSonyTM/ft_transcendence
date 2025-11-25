@@ -15,20 +15,6 @@ export function setCurrentTournament(t: Tournament | null): void {
         currentMatch = t.curM;
 }
 
-export function hydrateTournament(t: Tournament): void {
-    if (!t) return;
-    currentTournament = t;
-    if (t.curM)
-        currentMatch = t.curM;
-}
-
-export function hydrateMatch(m: TournamentMatch): void {
-    if (!m) return;
-    currentMatch = m;
-    if (currentTournament)
-        currentTournament.curM = m;
-}
-
 export function getTournamentPlayers(): TournamentPlayer[] {
     return currentTournament ? currentTournament.players : [];
 }

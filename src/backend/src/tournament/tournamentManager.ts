@@ -26,7 +26,7 @@ class TournamentManager {
 	/* Tournament Setup                                    */
 	/* ================================================== */
 
-	createTournament(name: string, userId: number): Tournament | null {
+	async createTournament(name: string, userId: number): Promise<Tournament> {
 		try {
 			let t: Tournament | null;
 			t = db.createTournament({});
@@ -34,7 +34,8 @@ class TournamentManager {
 			if (!this.addPlayerToTournament(t.id, name, 'host', userId))
 				throw new Error('Failed to add host player to tournament');
 			t = db.getTournamentById(t.id);
-			if (!t) throw new Error('Failed to retrieve tournament after creation');
+			if (!t)
+				throw new Error('Failed to retrieve tournament after creation');
 			console.log(`Tournament ${t.id} created by ${name}`);
 			return t;
 		} catch (error) {
@@ -43,35 +44,37 @@ class TournamentManager {
 		}
 	}
 
-	addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): TournamentPlayer | null {
+	async addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) {
 				console.error('Tournament not found:', tournamentId);
-				return null;
+				return null as any;
 			}
 			if (t.status !== 'setup') {
-				console.warn('Cannot join: tournament already started');
-				return null;
+				console.error('Cannot join: tournament already started');
+				return null as any;
 			}
 			if (t.players.length >= this.maxPlayers) {
-				console.warn('Cannot join: max players reached');
-				return null;
+				console.error('Cannot join: max players reached');
+				return null as any;
 			}
 			if (t.players.find(p => p.name === name)) {
-				console.warn('Cannot join: duplicate name');
-				return null;
+				console.error('Cannot join: duplicate name');
+				return null as any;
 			}
 			const player = db.createPlayer({
 				tournamentId,
 				tpt,
 				name,
 				isReady: tpt === 'ai',
-				userId: userId || null
+				userId: userId || null as any
 			});
-			if (!player) throw new Error('Failed to create player');
+			if (!player)
+				throw new Error('Failed to create player');
 			t = db.getTournamentById(tournamentId);
-			if (!t) throw new Error('Failed to refresh tournament');
+			if (!t)
+				throw new Error('Failed to get tournament');
 			const alreadyPresent = t.players.some(p => p.id === player.id);
 			if (!alreadyPresent) {
 				t.players.push(player);
@@ -113,7 +116,7 @@ class TournamentManager {
 	/* Bracket & Match Management                          */
 	/* ================================================== */
 
-	createMatch(tournamentId: number, roundIdx: number, round: number, isBye: boolean = false): TournamentMatch | null {
+	async createMatch(tournamentId: number, roundIdx: number, round: number, isBye: boolean = false): Promise<TournamentMatch> {
 		try {
 			const match = db.createMatch({
 				tournamentId,
@@ -122,23 +125,26 @@ class TournamentManager {
 				isBye,
 				status: 'setup'
 			});
-			if (!match) return null;
+			if (!match) return null as any;
 			console.log(`Created match ${match.id} (round ${round}${isBye ? ', bye' : ''})`);
 			return match;
 		} catch (error) {
 			console.error('Failed to create match:', error);
-			return null;
+			return null as any;
 		}
 	}
 
-	createMatchRoom(match: TournamentMatch): boolean {
+	async createMatchRoom(match: TournamentMatch): Promise<boolean> {
 		try {
 			if (!match.p1 || !match.p1.name) {
 				console.error('Cannot create room: match has no player 1');
 				return false;
 			}
-			match.room = gameRoomManager.createRoom(
-				match.p1.id.toString(),
+
+			let id = match.p1.userId?.toString() || match.p1.id.toString();
+
+			match.room = gameRoomManager.createRoom(//TODO needs host? what if ai vs ai? --> always fails because p1 is never ai-type
+				id,
 				match.p1.name,
 				2
 			);
@@ -176,7 +182,7 @@ class TournamentManager {
 		}
 	}
 
-	setupMatches(tournamentId: number): boolean {
+	async setupMatches(tournamentId: number): Promise<boolean> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) throw new Error('Tournament not found');
@@ -192,12 +198,12 @@ class TournamentManager {
 			while (matchCount > 0) {
 				let roundMatches: TournamentMatch[] = [];
 				for (let i = 0; i < matchCount; i++) {
-					const match = this.createMatch(tournamentId, i, round, false);
+					const match = await this.createMatch(tournamentId, i, round, false);
 					if (!match) throw new Error('Failed to create match');
 					roundMatches.push(match);
 				}
 				if (hasBye) {
-					const byeMatch = this.createMatch(tournamentId, matchCount, round, true);
+					const byeMatch = await this.createMatch(tournamentId, matchCount, round, true);
 					if (!byeMatch) throw new Error('Failed to create bye match');
 					roundMatches.push(byeMatch);
 				}
@@ -218,7 +224,7 @@ class TournamentManager {
 		}
 	}
 
-	private insertPlayersIntoNextRound(tournamentId: number): boolean {
+	async insertPlayersIntoNextRound(tournamentId: number): Promise<boolean> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) throw new Error('Tournament not found');
@@ -295,7 +301,7 @@ class TournamentManager {
 	/* Tournament Lifecycle                                */
 	/* ================================================== */
 
-	isSetupComplete(tournamentId: number): boolean {
+	async isSetupComplete(tournamentId: number): Promise<boolean> {
 		try {
 			const t = db.getTournamentById(tournamentId);
 			if (!t) return false;
@@ -309,7 +315,7 @@ class TournamentManager {
 		}
 	}
 
-	startTournament(tournamentId: number): boolean {
+	async startTournament(tournamentId: number): Promise<boolean> {
 		try {
 			console.log(`Starting tournament ${tournamentId}`);
 			let t = db.getTournamentById(tournamentId);
@@ -343,7 +349,7 @@ class TournamentManager {
 		}
 	}
 
-	endTournament(tournamentId: number): boolean {
+	async endTournament(tournamentId: number): Promise<boolean> {
 		try {
 			console.log(`Ending tournament ${tournamentId}`);
 			this.computeChampionIfPossible(tournamentId);
@@ -362,7 +368,7 @@ class TournamentManager {
 		}
 	}
 
-	private computeChampionIfPossible(tournamentId: number): void {
+	async computeChampionIfPossible(tournamentId: number): Promise<void> {
 		try {
 			const remaining = db.getAllPlayers(tournamentId).filter((p: TournamentPlayer) => !p.eliminated);
 			if (remaining.length === 1) {
@@ -378,7 +384,7 @@ class TournamentManager {
 	/* Match Operations                                    */
 	/* ================================================== */
 
-	getCurrentMatch(tournamentId: number): TournamentMatch | null {
+	async getCurrentMatch(tournamentId: number): Promise<TournamentMatch | null> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
@@ -393,7 +399,7 @@ class TournamentManager {
 			}
 			if (!t.curM && t.matchQueue.length === 0 && t.round > 0) {
 				console.log('Attempting to advance to next round...');
-				if (this.insertPlayersIntoNextRound(tournamentId)) {
+				if (await this.insertPlayersIntoNextRound(tournamentId)) {
 					t = db.getTournamentById(tournamentId);
 					if (t) return t.curM;
 				}
@@ -406,7 +412,7 @@ class TournamentManager {
 		}
 	}
 
-	prepareMatch(tournamentId: number, matchId: number): Tournament | null {
+	async prepareMatch(tournamentId: number, matchId: number): Promise<Tournament | null> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
@@ -427,7 +433,7 @@ class TournamentManager {
 				return null;
 			}
 
-			if (!this.createMatchRoom(t.curM)) return null;
+			if (!(await this.createMatchRoom(t.curM))) return null;
 			t.curM = db.getMatchById(matchId);
 			if (!t || !t.curM || !t.curM.room|| !t.curM.room.roomId) {
 				console.error('Failed to create match room');
@@ -441,7 +447,7 @@ class TournamentManager {
 		}
 	}
 
-	endMatch(matchId: number): boolean {
+	async endMatch(matchId: number): Promise<boolean> {
 		try {
 			let match = db.getMatchById(matchId);
 			if (!match) throw new Error('Match not found');
@@ -472,7 +478,7 @@ class TournamentManager {
 		}
 	}
 
-	private computeWinnerIfPossible(matchId: number): void {
+	async computeWinnerIfPossible(matchId: number): Promise<void> {
 		try {
 			const match = db.getMatchById(matchId);
 			if (!match) return;
@@ -496,7 +502,7 @@ class TournamentManager {
 		}
 	}
 
-	private allPlayersReadyForMatch(tournamentId: number): boolean {
+	allPlayersReadyForMatch(tournamentId: number): boolean {
 		try {
 			const t = db.getTournamentById(tournamentId);
 			if (!t || !t.curM) return false;
@@ -509,24 +515,37 @@ class TournamentManager {
 		}
 	}
 
-	toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): boolean {
+	async toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): Promise<boolean> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t || !t.curM || t.curM.id !== matchId) return false;
-			if (t.curM.p1 && t.curM.p1.id === playerId) {
-				db.updatePlayer({ id: playerId, isReady: !t.curM.p1.isReady });
-			} else if (t.curM.p2 && t.curM.p2.id === playerId) {
-				t.curM.p2.isReady = !t.curM.p2.isReady;;
-				console.debug(`Player ${playerId} ready state toggled to ${t.curM.p2.isReady}`);
-				db.updatePlayer({ id: playerId, isReady: !t.curM.p2.isReady });
+			if (!t.curM.p1 || !t.curM.p2 || (playerId !== t.curM.p1.id && playerId !== t.curM.p2.id)) return false;
+
+			let p = t.curM.p1.id === playerId ? t.curM.p1 : t.curM.p2;
+			if (!p.isReady) p.isReady = true;
+			else if (p.isReady) p.isReady = false;
+			else p.isReady = false;
+
+			let player = db.updatePlayer({ id: playerId, isReady: p.isReady});
+			if (!player) {
+				console.error('updatePlayer failed');
+				return false;
 			}
-			if (!t.curM.isBye && this.allPlayersReadyForMatch(tournamentId))
+
+			if (player.id === t.curM.p1.id) t.curM.p1 = player;
+			else t.curM.p2 = player;
+
+			if (!t.curM.isBye && this.allPlayersReadyForMatch(tournamentId)) {
 				console.debug('Both players are ready for match', matchId);
 				t.curM.status = 'ready';
+			}
+
 			t.curM = db.updateMatch({id: t.curM.id, status: t.curM.status, p1: t.curM.p1, p2: t.curM.p2});
 			if (!t.curM) throw new Error('Failed to update match');
+
 			t = db.updateTournament(t.id, { curM: t.curM });
 			if (!t) throw new Error('Failed to update tournament');
+
 			broadcastTournamentState(tournamentId);
 			return true;
 		} catch (error) {
@@ -589,6 +608,15 @@ class TournamentManager {
         }
     }
 
+	async deleteTournament(tId: number): Promise<void> {
+		try {
+			if (!db.deleteTournament(tId))
+				throw new Error('Failed to delete tournament');
+		} catch (err) {
+			console.error('deleteTournament failed:', err);
+		}
+	}
+
 	/* ================================================== */
 	/* Utility Methods                                     */
 	/* ================================================== */
@@ -619,7 +647,6 @@ class TournamentManager {
 				return this.hydrateTournament(t);
 			else
 				return null;
-			// return db.getTournamentById(tournamentId);
 		} catch (error) {
 			console.error('getTournament error:', error);
 			return null;

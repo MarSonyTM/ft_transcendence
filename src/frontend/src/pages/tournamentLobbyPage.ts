@@ -1,4 +1,4 @@
-import { TPT, TPTmap, Tournament } from '../types';
+import { TPT, TPTmap, Tournament, getApiEndpoint } from '../types';
 import { setCurrentPage } from '../utils/globalState';
 import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
@@ -8,7 +8,8 @@ import {
 	removeTournamentPlayer,
 	setEffectiveTournament,
 	loadCurrentMatch,
-	startTournament
+	startTournament,
+	deleteTournament
 } from '../utils/tournamentUtils';
 import { renderTournamentPage } from './tournamentPage';
 import { renderApp } from '../main';
@@ -45,8 +46,10 @@ function startTournamentIfReady(): boolean {
 export async function renderSetup(content: HTMLElement): Promise<void> {
 	clearNextIds();
 	activeT = getCurrentTournament();
-	if (!activeT)
-		activeT = await createTournament();
+	if (!activeT) {
+		let activeT = await createTournament();
+		if (activeT) setCurrentTournament(activeT);
+	}
 	if (!activeT) return;
 	content.innerHTML = `
 		<p class="t-msg">Create a new tournament</p>
@@ -56,7 +59,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
 				<button id="addRemoteBtn" class="btn btn-add">${TPTmap.get('remote')} Invite Remote Player?</button>
 			</div>
-			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">Remove</button></ul>
+			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">x</button></ul>
 			<div class="t-footer">
 				<div class="t-actions">
 					<button id="clearBtn" class="btn btn-end t-flex-1">Clear</button>
@@ -70,17 +73,18 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	const rerender = async () => {
 		activeT = getCurrentTournament();
 		if (activeT?.id)
-			activeT = await setEffectiveTournament(activeT.id);
+			await setEffectiveTournament(activeT.id);
+		activeT = getCurrentTournament();
 		if (!activeT) return;
 		if (activeT.players.length === 0) {
 			listEl.innerHTML = `<li class="empty">No players yet</li>`;
-		} else if (activeT.players.length >= 11) {
+		} else if (activeT.players.length >= 10) {
 			alert('Maximum of 10 players reached');
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
 				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}</span>
 				<button class="btn btn-remove" data-player-name="${p.name}" data-player-type="${p.tpt}"
-				style="${p.tpt === 'host' ?  'display: none' : ''}">X</button></li>`;
+				style="${p.tpt === 'host' ?  'display: none' : ''}">x</button></li>`;
 			}).join('');
 		}
 		const startBtn = document.getElementById('startBtn') as HTMLButtonElement | null;
@@ -151,7 +155,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		if (!activeT) return;
 		console.debug('[Tournament] Start button clicked');
 		if (!startTournamentIfReady()) {
-			alert('Add at least 3 players');
+			alert('Minimum are 3 players');
 			rerender();
 		}
 		else if (activeT && activeT.players.length >= 3) {
@@ -166,14 +170,16 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 				activeT.curM = await loadCurrentMatch();
 				console.debug('[Tournament] Current match set to:', activeT.curM);
 			}
-			console.debug('[Tournament] Rendering tournament page');
 			setCurrentTournament(activeT);
 			setCurrentMatch(activeT.curM!);
 			renderTournamentPage();
+			console.debug('[Tournament] Rendering tournament page');
 		}
 	});
 
-	document.getElementById('backBtn')?.addEventListener('click', () => {
+	document.getElementById('backBtn')?.addEventListener('click', async () => {
+		if (activeT && activeT.id)
+			await deleteTournament(activeT.id);
 		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
 		setCurrentPage('gameSelect');
 		renderApp();

@@ -4,23 +4,37 @@ import { authService } from './auth';
 import { setCurrentPage } from './globalState';
 import { renderApp } from '../main';
 
-function unwrapPayload<T>(raw: any): T | null {
+export function unwrapPayload<T>(raw: any): T | null {
     if (!raw) return null;
     if (raw.success !== undefined) {
         if (!raw.success) return null;
-        return (raw.data ?? raw.tournament ?? raw.match ?? null) as T | null;
+        return (raw.data ?? null) as T | null;
     }
     return raw as T;
 }
 
-function normalizeMatch(raw: any): TournamentMatch {
+export function normalizePlayer(raw: any): TournamentPlayer {
+    return {
+        id: raw.id,
+        tournamentId: raw.tournamentId,
+        name: raw.name,
+        tpt: raw.tpt,
+        user: raw.user,
+        isReady: !!raw.isReady,
+        eliminated: !!raw.eliminated,
+        score: raw.score ?? 0,
+        createdAt: raw.createdAt,
+        updatedAt: raw.updatedAt
+    } as TournamentPlayer;
+}
+
+export function normalizeMatch(raw: any): TournamentMatch {
     return {
         id: raw.id,
         tournamentId: raw.tournamentId,
         gameId: raw.gameId,
-        roomId: raw.roomId,
         room: raw.room,
-        status: raw.status || 'pending',
+        status: raw.status,
         isBye: raw.isBye ?? false,
         p1: raw.p1,
         p2: raw.p2,
@@ -30,72 +44,49 @@ function normalizeMatch(raw: any): TournamentMatch {
         createdAt: raw.createdAt,
         startedAt: raw.startedAt,
         endedAt: raw.endedAt
-    };
+    } as TournamentMatch;
 }
 
-function normalizeTournament(raw: any): Tournament {
+export function normalizeTournament(raw: any): Tournament {
     return {
         id: raw.id,
-        status: raw.status || 'setup',
-        players: (raw.players || []).map((p: any) => ({
-            id: p.id,
-            tournamentId: p.tournamentId,
-            name: p.name,
-            tpt: p.tpt,
-            user: p.user,
-            isReady: !!p.isReady,
-            eliminated: !!p.eliminated,
-            score: p.score ?? 0,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt
-        })),
+        status: raw.status,
+        players: (raw.players || []).map(normalizePlayer),
         allMatches: (raw.allMatches || []).map(normalizeMatch),
         championId: raw.championId ?? null,
-        curM: raw.currentMatch || raw.curM ? normalizeMatch(raw.currentMatch || raw.curM) : null,
-        matchQueue: raw.matchQueue || [],
+        curM: raw.curM ? normalizeMatch(raw.curM) : null,
+        matchQueue: (raw.matchQueue || []).map(normalizeMatch),
         round: raw.round,
         createdAt: raw.createdAt,
         startedAt: raw.startedAt,
         endedAt: raw.endedAt
-    };
-}
-
-export function hydrateTournament(t: Tournament): void {
-    if (!t) return;
-    setCurrentTournament(t);
-    if (t.curM)
-        setCurrentMatch(t.curM);
+    } as Tournament;
 }
 
 export async function createTournament(): Promise<Tournament | null> {
     try {
-        const host = authService.getCurrentUser();
-        if (!host) {
-            console.error('Cannot create tournament: no authenticated user');
-            return null;
-        }
-
+        let ok: string = 'true';
+        const host = await authService.getCurrentUser();
+        if (!host) ok = 'false';
         const response = await fetch(`${getApiEndpoint()}/api/tournament`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${authService.getToken()}` 
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                name: host.username,
-                id: host.id
+                name: host?.username,
+                id: host?.id,
+                ok
             })
         });
 
-        const json = await response.json();
+        const data = await response.json();
         if (!response.ok) {
-            console.error('Failed to create tournament:', json);
+            console.error('Failed to create tournament:', data);
             return null;
         }
-        const raw = unwrapPayload<any>(json);
+        const raw = unwrapPayload<any>(data);
         if (!raw) return null;
         const t = normalizeTournament(raw);
-        hydrateTournament(t);
+        setCurrentTournament(t);
         return t;
     } catch (err) {
         console.error('createTournament error:', err);
@@ -103,28 +94,39 @@ export async function createTournament(): Promise<Tournament | null> {
     }
 }
 
+export async function deleteTournament(tId: number): Promise<void> {
+    try {
+        const response = await fetch(`${getApiEndpoint()}/api/tournament/${tId}/delete`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            console.error('Failed to delete Tournament');
+            return;
+        }
+        setCurrentTournament(null);
+        setCurrentMatch(null);
+    } catch (err) {
+        console.error('deleteTournament failed:', err);
+    }
+}
+
 export async function resetTournament(): Promise<void> {
-    setCurrentTournament(null);
-    setCurrentMatch(null);
+    let t = getCurrentTournament();
+    if (t && t.id)
+        deleteTournament(t.id);
     const host = authService.getCurrentUser();
     if (!host) {
         console.error('Cannot create new tournament: no user logged in');
         return;
     }
-    let t = await createTournament();
+    t = await createTournament();
     if (!t || !t.id) {
         console.error('Failed to create new tournament during reset');
         return;
     }
     setCurrentTournament(t);
-}
-
-// export function getTournament(): Tournament | null {
-//     return getCurrentTournament();
-// }
-
-export function setTournament(t: Tournament): void {
-    hydrateTournament(t);
 }
 
 export async function addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer | null> {
@@ -133,10 +135,7 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
         if (userId) id = userId.toString();
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}/player`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${authService.getToken()}` 
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 name, 
                 tpt,
@@ -144,15 +143,14 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
             })
         });
 
-        const json = await resp.json();
+        const data = await resp.json();
         if (!resp.ok) {
-            console.error('Failed to add player:', json);
+            console.error('Failed to add player:', data);
             return null;
         }
-        const raw = unwrapPayload<any>(json);
+        const raw = unwrapPayload<any>(data);
         if (!raw) return null;
         const t = normalizeTournament(raw);
-        hydrateTournament(t);
         return t.players.find(p => p.name === name) || null;
     } catch (error) {
         console.error('addPlayerToTournament error:', error);
@@ -161,58 +159,60 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
 }
 
 export async function removeTournamentPlayer(playerName: string): Promise<void> {
-    const currentTournament = getCurrentTournament();
-    if (!currentTournament) return;
-    const player = currentTournament.players.find(p => p.name === playerName);
+    const t = getCurrentTournament();
+    if (!t) return;
+
+    const player = t.players.find(p => p.name === playerName);
     if (!player || !player.id) {
-        console.error(`Player ${playerName} not found`, { player, allPlayers: currentTournament.players });
+        console.error(`Player ${playerName} not found`, { player, allPlayers: t.players });
         return;
     }
+
     try {
-        console.log(`Removing player ${playerName} (id=${player.id}) from tournament ${currentTournament.id}`);
-        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${currentTournament.id}/leave`, {
+        console.log(`Removing player ${playerName} (id=${player.id}) from tournament ${t.id}`);
+
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/leave`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authService.getToken()}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ playerId: player.id })
         });
+
         if (!resp.ok) {
             const msg = await resp.text().catch(() => '');
             console.error(`Failed to remove player ${player.id}`, msg);
             return;
         }
+
         showTournamentPlayerDisconnectedMessage(playerName);
-        console.log(`Player ${player.id} removed from tournament ${currentTournament.id}`);
-        if (currentTournament.id)
-            await setEffectiveTournament(currentTournament.id);
+        console.log(`Player ${player.id} removed from tournament ${t.id}`);
+        if (t.id)
+            await setEffectiveTournament(t.id);
     } catch (e) {
         console.error('removeTournamentPlayer failed:', e);
     }
 }
 
 export async function startTournament(): Promise<boolean> {
-    const t = getCurrentTournament();
-    if (!t || !t.id) {
-        console.error('Cannot start tournament: no current tournament');
-        return false;
-    }
     try {
-        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/start`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${authService.getToken()}` 
-            },
-            body: JSON.stringify({})
-        });
-        const json = await resp.json();
-        if (!resp.ok) {
-            console.error('Failed to start tournament:', json?.message || `HTTP ${resp.status}`);
+        let t = getCurrentTournament();
+        if (!t || !t.id) {
+            console.error('Cannot start tournament: no current tournament');
             return false;
         }
-        await setEffectiveTournament(t.id);
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            console.error('Failed to start tournament:', data?.message || `HTTP ${resp.status}`);
+            return false;
+        }
+        const raw = unwrapPayload<any>(data);
+        if (!raw) return false;
+        t = normalizeTournament(raw);
+        setCurrentTournament(t);
+        // await setEffectiveTournament(t.id);
         console.log(`Tournament ${t.id} started`);
         return true;
     } catch (e) {
@@ -222,15 +222,16 @@ export async function startTournament(): Promise<boolean> {
 }
 
 export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
-    const t = getCurrentTournament();
-    if (!t || !t.id) return null;
     try {
+        const t = getCurrentTournament();
+        if (!t || !t.id) return null;
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/current`, {
-            headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
         });
-        const json = await resp.json();
+        const data = await resp.json();
         if (!resp.ok) return null;
-        const raw = unwrapPayload<any>(json);
+        const raw = unwrapPayload<any>(data);
         if (!raw) return null;
         const m = normalizeMatch(raw);
         setCurrentMatch(m);
@@ -244,19 +245,15 @@ export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
 export async function setEffectiveTournament(tournamentId: number): Promise<Tournament> {
     try {
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}`, {
-            headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+            headers: { 'Content-Type': 'application/json' }
         });
-        const json = await resp.json();
+        const data = await resp.json();
         if (!resp.ok) return null as any;
-        const raw = unwrapPayload<any>(json);
+        const raw = unwrapPayload<any>(data);
         if (!raw) return null as any;
         const t = normalizeTournament(raw);
-        hydrateTournament(t);
-        const curM = await loadCurrentMatch();
-        if (curM) {
-            t.curM = curM;
-            setCurrentMatch(curM);
-        }
+        setCurrentTournament(t);
+        t.curM = await loadCurrentMatch();
         console.log(`Loaded tournament ${tournamentId} with ${t.players.length} players and ${t.allMatches.length} matches`);
         return t;
     } catch (error) {
@@ -269,16 +266,18 @@ export async function postTournamentMatchWinner(tournamentId: number, matchId: n
     try {
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}/match/${matchId}/end`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'Authorization': `Bearer ${authService.getToken()}` 
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ winnerId })
         });
         if (!resp.ok) {
             console.error('Failed to post match winner:', resp.status);
             return false;
         }
+        const data = await resp.json();
+        const raw = unwrapPayload<any>(data);
+        if (!raw) return false;
+        const t = normalizeTournament(raw);
+        setCurrentTournament(t);
         return true;
     } catch (e) {
         console.error('Failed to post match winner:', e);

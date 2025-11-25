@@ -47,8 +47,7 @@ export interface TournamentPlayer {
 export interface TournamentMatch {
     id?: number;
     tournamentId: number;
-    roomId?: string;
-    room: GameRoom;
+    room?: GameRoom;
     gameId?: number;
     status: MatchStatus;
     isBye?: boolean;
@@ -65,10 +64,10 @@ export interface TournamentMatch {
 export interface Tournament {
     id?: number;
     status: TournamentStatus;
-    players: Array<TournamentPlayer>;
-    allMatches: Array<TournamentMatch>;
+    players: TournamentPlayer[];
+    allMatches: TournamentMatch[];
     curM: TournamentMatch | null;
-    matchQueue?: Array<number>;
+    matchQueue?: TournamentMatch[];//Array<number>;
     championId: number | null;
     round?: number;
     createdAt?: string;

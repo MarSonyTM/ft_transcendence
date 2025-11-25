@@ -60,7 +60,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         '/assets/',
         '/api/room',
         '/api/game',
-        '/api/tournament/',
+        '/api/tournament',
         '/game/',
         '/room/',
         '/join/',

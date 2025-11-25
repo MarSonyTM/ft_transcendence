@@ -1078,7 +1078,7 @@ class TournamentDatabaseManager {
         }
     }
 
-    hydrateTournament(t: Tournament | null): Tournament | null {
+    hydrateTournament(t: any): Tournament | null {
         if (!t) return null;
         
         try {
@@ -1096,7 +1096,11 @@ class TournamentDatabaseManager {
             const matches = this.getAllMatches(t.id);
             if (matches.length > 0)
                 t.allMatches = matches;
-            return t;
+            const mqueue = t.allMatches.filter((m: TournamentMatch) => m.round === t.round);
+            if (mqueue.length > 0)
+                t.matchQueue = mqueue;
+            t.curM = this.hydrateMatch(t.curM);
+            return t as Tournament;
         } catch (error) {
             console.error('Error hydrating tournament:', error);
             return t;
@@ -1189,15 +1193,15 @@ class TournamentDatabaseManager {
         return results;
     }
 
-    hydratePlayer(player: TournamentPlayer | null): TournamentPlayer | null {
+    hydratePlayer(player: any): TournamentPlayer | null {
         if (!player) return null;
         try {
             if (typeof player.eliminated === 'number')
-                player.eliminated = player.eliminated === 1;
-            return player;
+                player.eliminated = player.eliminated === 1 ? true : false;
+            return player as TournamentPlayer;
         } catch (error) {
             console.error('Error hydrating player:', error);
-            return player;
+            return null;
         }
     }
 
@@ -1291,7 +1295,7 @@ class TournamentDatabaseManager {
         return results;
     }
 
-    hydrateMatch(match: TournamentMatch | null): TournamentMatch | null {
+    hydrateMatch(match: any): TournamentMatch | null {
         if (!match) return null;
         try {
             if (typeof match.p1 === 'string')
