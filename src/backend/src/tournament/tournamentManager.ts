@@ -1,7 +1,7 @@
-import { database } from "../database/index";
+import { database, GameState, Player } from "../database/index";
 import { Tournament, TournamentMatch, TournamentPlayer, TPT } from "../types/index";
 import { BaseGameEngine, createGameEngine } from "../game/gameEngine";
-import { GameState, Player } from "../../../shared/gameTypes";
+// import { Player } from "../../../shared/gameTypes";
 import { activeGames, CreateGameInput } from "../routes/game";
 import { gameRoomManager } from "../game/gameRoom";
 import {
@@ -417,23 +417,21 @@ class TournamentManager {
 		try {
 			let gameInput: CreateGameInput = { mode: '2P', difficulty: 'normal' };
 			const game = database.games.createGame(gameInput);
-			if (!game) throw new Error('Failed to create new game for Tournament');
+			if (!game || !game.id) throw new Error('Failed to create new game for Tournament');
 			let m = db.getMatchById(mId);
 			if (!m) throw new Error('Failed to get match by id');
-			if (game.id) {
-				m.room!.gameId = game.id;
-				m.gameId = game.id;
-			}
+			m.room!.gameId = game.id;
+			m.gameId = game.id;
 			m = db.updateMatch({ id: m.id, gameId: m.gameId, room: m.room });
 			if (!m) throw new Error('Failed to update match');
 			return m;
 		} catch (err) {
-			console.error('createGameState for Tournament failed');
+			console.error('createGameState for Tournament failed:', err);
 			return null as any;
 		}
 	}
 
-	async prepareMatch(tournamentId: number, matchId: number): Promise<Tournament | null> {
+	async prepareMatch(tournamentId: number, matchId: number): Promise<TournamentMatch | null> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
@@ -461,11 +459,11 @@ class TournamentManager {
 				return null;
 			}
 			t.curM = await this.createGameState(t.curM.id);
-			console.debug('GAMEID:', t.curM.gameId);
+			if (!t.curM) return null;
 			t = db.updateTournament(t.id, { curM: t.curM });
 			if (!t) return null;
 			console.debug('IN PREPARE MATCH:', t.curM);
-			return t;
+			return t.curM;
 		} catch (error) {
 			console.error('startMatch error:', error);
 			return null;

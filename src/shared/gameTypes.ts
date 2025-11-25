@@ -1,11 +1,11 @@
 export interface Player {
   id: number;
-  name?: string;
-  gameId?: number;
+  name: string;
+  gameId: number;
   pos: number;
   score: number;
-  connectionStatus?: string;
-  lastActivity?: string;
+  connectionStatus: string;
+  lastActivity: string;
 }
 
 // Core game state structure

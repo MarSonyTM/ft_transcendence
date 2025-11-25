@@ -728,9 +728,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                 
                                 if (userByUsername) {
                                     actualUserId = userByUsername.id;
-                                    // console.log(`   ✅ Found ${searchName} = user ID ${actualUserId}`);//TODO MERGE -> where is searchName?
-                                } else {
-                                    // console.log(`   ⚠️ "${searchName}" NOT FOUND in database (might be local player)`);
                                 }
                             } else if (player.id && typeof player.id === 'number') {
                                 // Try using player.id for real players

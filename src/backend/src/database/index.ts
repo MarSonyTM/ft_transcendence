@@ -1218,7 +1218,7 @@ class TournamentDatabaseManager {
             for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
                 if (data[key] !== undefined) {
                     fields.push(key);
-                    if (key === 'p1' || key === 'p2')
+                    if (key === 'p1' || key === 'p2' || key === 'room' || key === 'gameState')
                         values.push(JSON.stringify(data[key]));
                     else {
                         const v = data[key];
@@ -1276,7 +1276,7 @@ class TournamentDatabaseManager {
             
             for (const key of Object.keys(data) as (keyof TournamentMatch)[]) {
                 if (data[key] !== undefined) {
-                    const value = (key === 'p1' || key === 'p2' || key === 'room') ? JSON.stringify(data[key])
+                    const value = (key === 'p1' || key === 'p2' || key === 'room' || key === 'gameState') ? JSON.stringify(data[key])
                         : (typeof data[key] === 'boolean' ? (data[key] ? 1 : 0) : data[key]);
                     this.db.prepare(`UPDATE t_matches SET ${key} = ? WHERE id = ?`).run(value, data.id);
                 }
@@ -1306,6 +1306,8 @@ class TournamentDatabaseManager {
                 match.p2 = match.p2 ? JSON.parse(match.p2) : undefined;
             if (typeof match.room === 'string')
                 match.room = match.room ? JSON.parse(match.room) : null;
+			if (typeof match.gameState === 'string')
+				match.gameState = match.gameState ? JSON.parse(match.gameState) : undefined;
             return match;
         } catch (error) {
             console.error('Error hydrating match:', error);
@@ -1518,6 +1520,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 ballPosY INTEGER NOT NULL DEFAULT 0,
                 ballVelX INTEGER NOT NULL DEFAULT 0,
                 ballVelY INTEGER NOT NULL DEFAULT 0,
+				players JSON DEFAULT '{}',
                 mode TEXT NOT NULL DEFAULT '2P',
                 lastActivity DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (gameId) REFERENCES games(id) ON DELETE CASCADE
@@ -1656,6 +1659,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 tournamentId INTEGER NOT NULL,
                 gameId INTEGER,
                 room JSON DEFAULT '{}',
+				gameState JSON DEFAULT '{}',
                 status TEXT NOT NULL DEFAULT 'setup',
                 isBye BOOLEAN DEFAULT FALSE,
                 p1 JSON DEFAULT '{}',
@@ -1768,6 +1772,8 @@ export class DatabaseManager extends BaseDatabaseManager {
                     'id', id,
                     'tournamentId', tournamentId,
                     'gameId', gameId,
+					'room', room,
+					'gameState', gameState,
                     'status', status,
                     'isBye', isBye,
                     'p1', json(p1),

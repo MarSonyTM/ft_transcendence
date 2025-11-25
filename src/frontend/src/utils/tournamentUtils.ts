@@ -34,6 +34,7 @@ export function normalizeMatch(raw: any): TournamentMatch {
         tournamentId: raw.tournamentId,
         gameId: raw.gameId,
         room: raw.room,
+		gameState: raw.gameState,
         status: raw.status,
         isBye: raw.isBye ?? false,
         p1: raw.p1,

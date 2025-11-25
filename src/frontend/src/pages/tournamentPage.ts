@@ -16,14 +16,13 @@ import {
     setEffectiveTournament,
     postTournamentMatchWinner,
     showTournamentEndScreen,
-    startTournament
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
-import { MatchStatus, MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
-import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
+import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
+import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 import { render2PlayerGame } from './2PlayerGame';
-import { getCurrentRoom, setCurrentRoom } from '../utils/roomState';
+import { setCurrentRoom } from '../utils/roomState';
 
 let activeMatch: PongGame | undefined = undefined;
 let isGameActive = false;
@@ -361,12 +360,18 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
             const raw = unwrapPayload<any>(data);
             if (!raw) return null;
             t.curM = normalizeMatch(raw);
-            setCurrentMatch(t.curM);          
+			if (!t || !t.curM)
+				throw new Error('No current Tournament');  
             updateReadyUI(t, {startBtn});
             if (!tWS)
                 await initTWS(t);
             if (tWS?.isConnected())
-                tWS.requestMatchState();//tWS.requestState();//
+                tWS.requestMatchState();
+			t.curM.pong = new PongGame;
+			if (!t.curM.pong)
+				throw new Error('Create new PongGame for Tournament failed');
+			t.curM.pong.gameId = t.curM.gameId;
+			t.curM.pong.createGame();
             await showMatch(t);
             // await renderTournamentContent(t);
             console.log('[Tournament] Match start initiated');
@@ -457,8 +462,8 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
             updateReadyUI(t, {p1Btn: button});
         else if (t.curM.p2.id === playerId)
             updateReadyUI(t, {p2Btn: button});
-
-        if (tWS?.isConnected()) {
+		if (!tWS) initTWS(t);
+        if (tWS && tWS.isConnected()) {
             tWS.requestMatchState();
         } else {
             console.warn('WS not connected; skipped requestMatchState');
@@ -564,14 +569,16 @@ async function initTWS(t: Tournament): Promise<void> {
 }
 
 async function showMatch(t: Tournament): Promise<void> {
-    if (!t || !t.curM) return console.error('No tournament or current Match found');
+    if (!t || !t.curM || !t.curM.pong) return console.error('No tournament or current Match found');
     if (!t.curM.room) return console.error('No current room found');
     const gameContainer = document.getElementById('tournamentGameContainer');
     if (gameContainer)
         gameContainer.style.display = 'block';
     setCurrentRoom(t.curM.room);
     await render2PlayerGame();
+	t.curM.pong.startServerGame();
     isGameActive = true;
+	
 }
 
 function cleanupActiveGame(): void {

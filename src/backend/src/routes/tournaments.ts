@@ -419,17 +419,17 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	});
 
 	// Start match
-	fastify.post('/api/tournament/:tournamentId/match/:matchId/start', async (req, reply) => {
+	fastify.post('/api/tournament/:tournamentId/match/:matchId/start', async (req: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId } = req.params as { tournamentId: string; matchId: string };
 			const tId = +tournamentId;
 			const mId = +matchId;
 			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
-			const t = await tournamentManager.prepareMatch(tId, mId);
-			if (!t || !t.curM)
-				return reply.status(404).send({ success: false, message: 'Failed to prepare match' });
-			return reply.send({ success: true, data: t.curM });
+			let m = await tournamentManager.prepareMatch(tId, mId);
+			if (!m)
+				return reply.status(404).send({ success: false, message: 'Failed to prepare match/game' });
+			return reply.send({ success: true, data: m });
 		} catch (error) {
 			fastify.log.error(error);
 			return reply.status(500).send({ success: false, message: 'Failed to start match' });

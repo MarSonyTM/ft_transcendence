@@ -9,10 +9,14 @@ import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen
 export let pongGame: PongGame | null = null;
 let keyboardCleanup: (() => void) | null = null;
 
-export async function render2PlayerGame(): Promise<void> {
+export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     const room = getCurrentRoom();
 
-    pongGame = new PongGame();
+	if (!pong)
+    	pongGame = new PongGame();
+	else
+		pongGame = pong;
+	console.warn(pongGame);
 
     if (room)
         pongGame.hasLocal = room.players.some(p => p.id === 'local');
@@ -194,7 +198,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         return;
     }
 
-    const playerId = user?.id?.toString() || `guest-${Date.now()}`;
+    const playerId = user?.id?.toString() || room.players[0].id.toString() || `guest-${Date.now()}`;
     const gameMode = getCurrentGameMode();
 
     console.log('Initializing room-based game:', {

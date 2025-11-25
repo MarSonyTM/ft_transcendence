@@ -1,5 +1,6 @@
 import { Player as SharedPlayer, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
 import { GameRoom } from "../utils/roomState";
+import { PongGame } from '../game/PongGame';
 
 export function getApiEndpoint(): string {
 	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
@@ -47,7 +48,9 @@ export interface TournamentPlayer {
 export interface TournamentMatch {
     id?: number;
     tournamentId: number;
+	pong?: PongGame;
     room?: GameRoom;
+	gameState?: GameState;
     gameId?: number;
     status: MatchStatus;
     isBye?: boolean;
@@ -67,7 +70,7 @@ export interface Tournament {
     players: TournamentPlayer[];
     allMatches: TournamentMatch[];
     curM: TournamentMatch | null;
-    matchQueue?: TournamentMatch[];//Array<number>;
+    matchQueue?: TournamentMatch[];
     championId: number | null;
     round?: number;
     createdAt?: string;

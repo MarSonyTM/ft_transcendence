@@ -1,4 +1,5 @@
 import { GameRoom } from "../game/gameRoom";
+import { GameState } from '../database/index';
 
 export type TPT = 'host' | 'ai' | 'local' | 'remote';
 export const TPTMap: Array<TPT> = ['host', 'ai', 'local', 'remote'];
@@ -29,6 +30,7 @@ export interface TournamentMatch {
 	tournamentId: number;
 	gameId?: number;
 	room?: GameRoom | null;
+	gameState?: GameState;//TODO add to table
 	status: MatchStatus;
 	isBye: boolean;
 	p1?: TournamentPlayer;
