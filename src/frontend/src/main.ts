@@ -223,10 +223,6 @@ export async function renderApp(): Promise<void> {
 
 // Handle browser navigation (back/forward)
 window.addEventListener('popstate', async () => {
-  console.log('🔙 Navigation event:', {
-    path: window.location.pathname,
-    hash: window.location.hash
-  });
   
   // Reset room ID on navigation
   currentRoomId = null;
@@ -236,10 +232,7 @@ window.addEventListener('popstate', async () => {
 });
 
 // Entry point with SSR support
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('App starting with SSR support...');
-  
-  // Always derive the page from URL routing to support deep links like /join/:roomId
+document.addEventListener('DOMContentLoaded', async () => {  
   if (window.__INITIAL_STATE__) {
     setCurrentUser(window.__USERNAME__ || '');
   }

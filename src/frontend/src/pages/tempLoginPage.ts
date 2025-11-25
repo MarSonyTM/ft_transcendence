@@ -68,8 +68,7 @@ export function renderTempLoginPage(): void {
       const result = await createGuestUser(username);
 
       if (result.success && result.token) {    
-        
-        console.log('successfully:', result.success);
+
         // Update current user
         const userData = {
           id: null,

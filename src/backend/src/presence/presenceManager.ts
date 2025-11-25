@@ -1,7 +1,7 @@
 interface UserPresence {
     userId: number;
     username: string;
-    status: 'online' | 'offline' | 'away';
+    status: 'online' | 'offline' | 'in game';
     lastSeen: Date;
     lastHeartbeat: Date;
 }
@@ -17,11 +17,13 @@ class PresenceManager {
     }
 
     updateHeartbeat(userId: number, username: string): UserPresence {
+        const user = this.userPresence.get(userId)
         const now = new Date();
+
         const presence: UserPresence = {
             userId,
             username,
-            status: 'online',
+            status: user && user.status == 'in game' ? 'in game' : 'online',
             lastSeen: now,
             lastHeartbeat: now
         };
@@ -29,10 +31,26 @@ class PresenceManager {
         return presence;
     }
 
+    setUserOnline(userId: number): UserPresence | null {
+        const presence = this.userPresence.get(userId);
+        if (!presence) return null;
+        presence.status = 'online';
+        presence.lastSeen = new Date();
+        return presence;
+    }
+
     setUserOffline(userId: number): UserPresence | null {
         const presence = this.userPresence.get(userId);
         if (!presence) return null;
         presence.status = 'offline';
+        presence.lastSeen = new Date();
+        return presence;
+    }
+
+    setUserInGame(userId: number): UserPresence | null {
+        const presence = this.userPresence.get(userId);
+        if (!presence) return null;
+        presence.status = 'in game';
         presence.lastSeen = new Date();
         return presence;
     }

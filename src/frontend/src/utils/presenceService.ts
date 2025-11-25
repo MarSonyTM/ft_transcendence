@@ -1,7 +1,7 @@
 interface UserPresence {
     userId: number;
     username: string;
-    status: 'online' | 'offline' | 'away';
+    status: 'online' | 'offline' | 'in game';
 }
 
 class PresenceService {
@@ -46,6 +46,60 @@ class PresenceService {
             }
         } catch (error) {
             console.error('❌ [PRESENCE] Heartbeat error:', error);
+        }
+    }
+
+    /**
+     * Set user status to "in game"
+     */
+    async setInGame(): Promise<boolean> {
+        try {
+            const apiUrl = this.getApiUrl();
+            const response = await fetch(`${apiUrl}/api/auth/presence/status`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'in game' })
+            });
+
+            if (response.ok) {
+                return true;
+            } else {
+                console.error('❌ [PRESENCE] Failed to set in game status:', response.status);
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ [PRESENCE] Error setting in game status:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Set user status to "online"
+     */
+    async setOnline(): Promise<boolean> {
+        try {
+            const apiUrl = this.getApiUrl();
+            const response = await fetch(`${apiUrl}/api/auth/presence/status`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'online' })
+            });
+
+            if (response.ok) {
+                return true;
+            } else {
+                console.error('❌ [PRESENCE] Failed to set online status:', response.status);
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ [PRESENCE] Error setting online status:', error);
+            return false;
         }
     }
 
@@ -107,6 +161,7 @@ class PresenceService {
         const isRunning = this.heartbeatTimer !== null;
         return isRunning ? '🟢 Heartbeat is running' : '🔴 Heartbeat is stopped';
     }
+
 }
 
 export const presenceService = new PresenceService();

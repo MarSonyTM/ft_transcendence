@@ -12,6 +12,7 @@ import roomRoutes from './routes/room';
 import roomWebSocketRoutes from './websocket/roomHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
+import { registerPresenceStatusRoute } from './routes/presence'
 import cookie from '@fastify/cookie';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -130,6 +131,7 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
+    await server.register(registerPresenceStatusRoute)
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {

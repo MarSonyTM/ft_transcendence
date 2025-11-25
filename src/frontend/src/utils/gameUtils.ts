@@ -13,7 +13,6 @@ export async function setGameScreen(pongGame: PongGame) {
     
     try {
         await pongGame.connectWebSocket();
-        console.log('✅ Connected to shared game WebSocket');
         pongGame.updateStatus("Connected - Click Start to begin");
         if (pongGame.startRenderLoop) pongGame.startRenderLoop();
 
