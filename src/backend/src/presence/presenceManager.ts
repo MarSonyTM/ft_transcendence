@@ -8,7 +8,6 @@ interface UserPresence {
 
 class PresenceManager {
     private userPresence: Map<number, UserPresence> = new Map();
-    private heartbeatInterval = 30000;
     private timeoutThreshold = 60000;
     private cleanupInterval: NodeJS.Timeout | null = null;
 

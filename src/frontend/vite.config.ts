@@ -4,6 +4,7 @@ export default defineConfig({
   root: './src',
   optimizeDeps: {
     include: ['@babylonjs/core', '@babylonjs/loaders'],
+    force: true,
     esbuildOptions: {
       target: 'es2020'
     }
