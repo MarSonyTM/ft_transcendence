@@ -122,7 +122,7 @@ export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     }
 }
 
-async function setupGameButtons(pongGame: PongGame): Promise<void> {
+export async function setupGameButtons(pongGame: PongGame): Promise<void> {
     
     let effectiveRoom = await setEffectiveRoom();
 
@@ -185,12 +185,15 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
 }
 
 // Initialize room-based multiplayer game
-async function initRoomBasedGame(room: any): Promise<void> {
+export async function initRoomBasedGame(room: any, pong?: PongGame, isT: boolean = false): Promise<void> {
     if (!pongGame) {
-        console.error('No pongGame instance');
-        return;
+        if (pong)
+            pongGame = pong || null;
+        if (!pongGame) {
+            console.error('No pongGame instance');
+            return;
+        }
     }
-    
     const user = await authService.getCurrentUser();
     
     if (!user) {
@@ -198,7 +201,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         return;
     }
 
-    const playerId = user?.id?.toString() || room.players[0].id.toString() || `guest-${Date.now()}`;
+    const playerId = room.players[0].id.toString() || user?.id?.toString() || `guest-${Date.now()}`;
     const gameMode = getCurrentGameMode();
 
     console.log('Initializing room-based game:', {
@@ -251,7 +254,8 @@ async function initRoomBasedGame(room: any): Promise<void> {
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
         
-            showGameEndScreen(winnerId, winnerName, pongGame!);
+            if (!isT)
+                showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });
 
@@ -263,7 +267,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls
-function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
+export function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
     // Clean up any existing handlers first!
     if (keyboardCleanup) {
         console.log('🧹 Cleaning up old keyboard handlers');

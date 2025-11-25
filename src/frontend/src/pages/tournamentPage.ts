@@ -21,7 +21,7 @@ import { renderSetup } from './tournamentLobbyPage';
 import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
 import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
-import { render2PlayerGame } from './2PlayerGame';
+import { initRoomBasedGame, setupGameButtons, setupKeyboardControls } from './2PlayerGame';
 import { setCurrentRoom } from '../utils/roomState';
 
 let activeMatch: PongGame | undefined = undefined;
@@ -119,7 +119,9 @@ function statusComplete(content: HTMLElement): void {
     });
 }
 
-export async function renderTournamentContent(t: Tournament): Promise<void> {
+export async function renderTournamentContent(t?: Tournament): Promise<void> {
+    if (!t)
+        t = getCurrentTournament() || undefined;
     const content = document.getElementById('tournamentContent');
     if (!content) {
         console.error('[Tournament] No tournament content element found');
@@ -153,26 +155,28 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         return;
     }
 
-    const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
-        headers: { 'Content-Type': 'application/json' }
-    });
+    if (!t.players) {
+        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
+            headers: { 'Content-Type': 'application/json' }
+        });
 
-    if (!resp.ok) {
-        console.error('[Tournament] Failed to fetch tournament players:', resp.status);
-        return;
-    }
-    const data = await resp.json();
-    if (!data || !data.data) {
-        console.error('[Tournament] Invalid player data received:', data);
-        return;
-    }
-    const raw = unwrapPayload<any>(data);
-    if (!raw) return;
-    t.players = raw.map(normalizePlayer);
-    if (!t.players || t.players.length === 0) {
-        console.debug('[Tournament] No players found in tournament after fetch');
-        content.innerHTML = '<p>No players found in tournament</p>';
-        return;
+        if (!resp.ok) {
+            console.error('[Tournament] Failed to fetch tournament players:', resp.status);
+            return;
+        }
+        const data = await resp.json();
+        if (!data || !data.data) {
+            console.error('[Tournament] Invalid player data received:', data);
+            return;
+        }
+        const raw = unwrapPayload<any>(data);
+        if (!raw) return;
+        t.players = raw.map(normalizePlayer);
+        if (!t.players || t.players.length === 0) {
+            console.debug('[Tournament] No players found in tournament after fetch');
+            content.innerHTML = '<p>No players found in tournament</p>';
+            return;
+        }
     }
     if (!t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id) {
         console.debug('[Tournament] Current match players not fully assigned yet');
@@ -188,7 +192,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         
         <div id="currentMatchBox" class="t-match-controls"></div>
         
-        <div id="tournamentGameContainer" class="t-game-container" style="display: none;">
+        <div id="tournamentGameContainer" class="t-game-container" style="display: none">
             <div id="pureGameContainer">
                 <h3 class="t-game-title">Live Match</h3>
                 <div class="game-status">
@@ -575,11 +579,18 @@ async function showMatch(t: Tournament): Promise<void> {
     if (gameContainer)
         gameContainer.style.display = 'block';
     setCurrentRoom(t.curM.room);
-    await render2PlayerGame();
-	t.curM.pong.startServerGame();
+    if (!t.curM || !t.curM.p1 || !t.curM.p2) return;
+    t.curM.pong.hasLocal = t.curM.p1.tpt === 'local' || t.curM.p2.tpt === 'local';
+    await setupGameButtons(t.curM.pong);
+    t.curM.pong.init();//TODO maybe this and the next lines -> wrong order?
+    initRoomBasedGame(t.curM.room, t.curM.pong, true);
+    setupKeyboardControls(t.curM.pong.roomWS!, t.curM.pong.players[0].id.toString());
+    await initRoomBasedGame(t.curM.room, t.curM.pong, true);
+	t.curM.pong.startServerGame();//dont have a start button
     isGameActive = true;
 	
 }
+//TODO keyboardCleanup, cleanupGame, endGame
 
 function cleanupActiveGame(): void {
     if (activeMatch) {

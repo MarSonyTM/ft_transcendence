@@ -1,13 +1,9 @@
-import { database, GameState, Player } from "../database/index";
+import { database } from "../database/index";
 import { Tournament, TournamentMatch, TournamentPlayer, TPT } from "../types/index";
-import { BaseGameEngine, createGameEngine } from "../game/gameEngine";
-// import { Player } from "../../../shared/gameTypes";
-import { activeGames, CreateGameInput } from "../routes/game";
+import { CreateGameInput } from "../routes/game";
 import { gameRoomManager } from "../game/gameRoom";
 import {
 	broadcastToTournament,
-	broadcastCountdownToMatch,
-	broadcastGameStartToMatch,
 	broadcastMatchEndToTournament,
 	broadcastTournamentState,
 	broadcastTournamentEnd
@@ -435,6 +431,8 @@ class TournamentManager {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
+			if (t.curM && t.curM.room && t.curM.room.gameId)
+				return t.curM;
 			if (!t.curM || t.curM.id !== matchId) {
 				let match = db.getMatchById(matchId);
 				if (!match) return null;
@@ -462,7 +460,6 @@ class TournamentManager {
 			if (!t.curM) return null;
 			t = db.updateTournament(t.id, { curM: t.curM });
 			if (!t) return null;
-			console.debug('IN PREPARE MATCH:', t.curM);
 			return t.curM;
 		} catch (error) {
 			console.error('startMatch error:', error);
