@@ -277,7 +277,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const p = m.p1.id === pId ? m.p1 : m.p2;
 			if (!p)
 				return reply.status(404).send({ success: false, message: 'Player not found in match' });
-			const success = await tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId);
+			const success = tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId);
 			if (!success)
 				return reply.status(400).send({ success: false, message: 'Unable to toggle player ready' });
 			m = tournamentManager.getMatch(+matchId);

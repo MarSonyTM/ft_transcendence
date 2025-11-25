@@ -1,8 +1,8 @@
 import { database } from "../database/index";
 import { Tournament, TournamentMatch, TournamentPlayer, TPT } from "../types/index";
-import { BaseGameEngine } from "../game/gameEngine";
+import { BaseGameEngine, createGameEngine } from "../game/gameEngine";
 import { GameState, Player } from "../../../shared/gameTypes";
-import { activeGames } from "../routes/game";
+import { activeGames, CreateGameInput } from "../routes/game";
 import { gameRoomManager } from "../game/gameRoom";
 import {
 	broadcastToTournament,
@@ -143,10 +143,11 @@ class TournamentManager {
 
 			let id = match.p1.userId?.toString() || match.p1.id.toString();
 
-			match.room = gameRoomManager.createRoom(//TODO needs host? what if ai vs ai? --> always fails because p1 is never ai-type
+			match.room = gameRoomManager.createRoom(
 				id,
 				match.p1.name,
-				2
+				2,
+				match.p1.tpt
 			);
 			if (!match.room) {
 				console.error('Failed to create game room for match:', match.id);
@@ -412,6 +413,26 @@ class TournamentManager {
 		}
 	}
 
+	async createGameState(mId: number): Promise<TournamentMatch> {
+		try {
+			let gameInput: CreateGameInput = { mode: '2P', difficulty: 'normal' };
+			const game = database.games.createGame(gameInput);
+			if (!game) throw new Error('Failed to create new game for Tournament');
+			let m = db.getMatchById(mId);
+			if (!m) throw new Error('Failed to get match by id');
+			if (game.id) {
+				m.room!.gameId = game.id;
+				m.gameId = game.id;
+			}
+			m = db.updateMatch({ id: m.id, gameId: m.gameId, room: m.room });
+			if (!m) throw new Error('Failed to update match');
+			return m;
+		} catch (err) {
+			console.error('createGameState for Tournament failed');
+			return null as any;
+		}
+	}
+
 	async prepareMatch(tournamentId: number, matchId: number): Promise<Tournament | null> {
 		try {
 			let t = db.getTournamentById(tournamentId);
@@ -425,7 +446,7 @@ class TournamentManager {
 			if (!t.curM) return null;
 			if (t.curM.isBye) {
 				console.log(`Bye match ${matchId}, auto-completing`);
-				this.endMatch(matchId);
+				await this.endMatch(matchId);
 				return null;
 			}
 			if (!this.allPlayersReadyForMatch(tournamentId)) {
@@ -439,7 +460,11 @@ class TournamentManager {
 				console.error('Failed to create match room');
 				return null;
 			}
+			t.curM = await this.createGameState(t.curM.id);
+			console.debug('GAMEID:', t.curM.gameId);
 			t = db.updateTournament(t.id, { curM: t.curM });
+			if (!t) return null;
+			console.debug('IN PREPARE MATCH:', t.curM);
 			return t;
 		} catch (error) {
 			console.error('startMatch error:', error);
@@ -507,31 +532,29 @@ class TournamentManager {
 			const t = db.getTournamentById(tournamentId);
 			if (!t || !t.curM) return false;
 			const p1 = t.curM.p1;
+			if (!p1 || !p1.isReady) return false;
 			const p2 = t.curM.p2;
-			return !!p1 && !!p2 && p1.isReady && p2.isReady;
+			if (!p2 || !p2.isReady) return false;
+			return true;
 		} catch (error) {
 			console.error('allPlayersReadyForMatch error:', error);
 			return false;
 		}
 	}
 
-	async toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): Promise<boolean> {
+	toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): boolean {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t || !t.curM || t.curM.id !== matchId) return false;
 			if (!t.curM.p1 || !t.curM.p2 || (playerId !== t.curM.p1.id && playerId !== t.curM.p2.id)) return false;
-
+			
 			let p = t.curM.p1.id === playerId ? t.curM.p1 : t.curM.p2;
-			if (!p.isReady) p.isReady = true;
-			else if (p.isReady) p.isReady = false;
-			else p.isReady = false;
 
-			let player = db.updatePlayer({ id: playerId, isReady: p.isReady});
+			let player = db.updatePlayer({ id: playerId, isReady: !p.isReady});
 			if (!player) {
 				console.error('updatePlayer failed');
 				return false;
 			}
-
 			if (player.id === t.curM.p1.id) t.curM.p1 = player;
 			else t.curM.p2 = player;
 

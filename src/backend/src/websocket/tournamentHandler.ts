@@ -93,7 +93,6 @@ async function handleTournamentMessage(tournamentId: number, playerId: number, m
 		case 'ready':
 			let curM = await tournamentManager.getCurrentMatch(tournamentId);
 			if (curM) {
-				tournamentManager.toggleMatchPlayerReady(tournamentId, curM.id, playerId);
 				broadcastToTournament(tournamentId, {
 					type: 'playerReady',
 					playerId,
@@ -156,52 +155,6 @@ function getMatchPlayerNumber(match: any, playerId: number): number {
 	if (match.p2?.id === playerId) return 2;
 	return 1;
 }
-
-// export function publicTournamentShape(t: any) {
-// 	console.debug('BEFORE HYDRATING:', t);
-// 	t = tournamentManager.hydrateTournament(t);
-// 	console.debug('AFTER HYDRATING:', t);
-// 	return {
-// 		id: t.id,
-// 		status: t.status,
-// 		curM: t.curM,
-// 		round: t.round,
-// 		players: t.players,
-// 		allMatches: t.allMatches,
-// 		currentMatch: t.curM,
-// 		matchQueue: t.matchQueue,
-// 		championId: t.championId,
-// 		createdAt: t.createdAt,
-// 		startedAt: t.startedAt,
-// 		endedAt: t.endedAt
-// 	} as Tournament;
-// }
-
-// export function publicMatchShape(m: any) {
-// 	if (m.tournamentId) {
-// 		let t = tournamentManager.getTournament(m.tournamentId);
-// 		if (!t) return;
-// 		t = tournamentManager.hydrateTournament(t);
-// 		if (!t || !t.curM) return;
-// 		m = t.curM;
-// 	}
-// 	return {
-// 		id: m.id,
-// 		tournamentId: m.tournamentId,
-// 		status: m.status,
-// 		p1: m.p1,
-// 		p2: m.p2,
-// 		gameId: m.gameId,
-// 		room: m.room,
-// 		winnerId: m.winnerId,
-// 		round: m.round,
-// 		roundIdx: m.roundIdx,
-// 		isBye: m.isBye,
-// 		createdAt: m.createdAt,
-// 		startedAt: m.startedAt,
-// 		endedAt: m.endedAt
-// 	} as TournamentMatch;
-// }
 
 function sendTournamentState(tournamentId: number, playerId: number): void {
 	const t = tournamentManager.getTournament(tournamentId);

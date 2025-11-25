@@ -6,12 +6,14 @@ interface TournamentWebSocketConfig {
     onDisconnect?: () => void;
     onTournamentState?: (tournament: any) => void;
     onMatchState?: (match: any) => void;
+    onPlayerReady?: (playerId: string, isReady: boolean) => void;
     onPlayerDisconnected?: (playerId: string) => void;
     onTournamentStart?: (tournamentId: string) => void;
     onTournamentEnd?: (tournamentId: string) => void;
     onGameStart?: (matchId: string, gameId: number) => void;
-    onGameEnd?: (data: { matchId: string; winnerId: string }) => void;
-    onMatchEnd?: (data: { matchId: string; winnerId: string | null }) => void;
+    onCountdown?: () => void;
+    onGameEnd?: (data: { matchId?: string; winnerId?: string, players?: any[] }) => void;
+    onMatchEnd?: (data: { matchId?: string; winnerId?: string | null, p1?: any, p2?: any }) => void;
     onError?: (error: Error) => void;
 }
 
@@ -100,6 +102,11 @@ export class TournamentWebSocketManager {
             case 'pong':
                 break;
 
+            case 'countdown':
+                if (this.tconfig.onCountdown)
+                    this.tconfig.onCountdown();
+                break;
+
             case 'tournamentState':
                 if (this.tconfig.onTournamentState)
                     this.tconfig.onTournamentState(message.tournament);
@@ -133,7 +140,8 @@ export class TournamentWebSocketManager {
                     const matchId = message.matchId || this.tconfig.matchId;
                     this.tconfig.onGameEnd({ 
                         matchId: String(matchId), 
-                        winnerId: String(winnerId) 
+                        winnerId: String(winnerId),
+                        players: message.players
                     });
                 }
                 break;
@@ -142,7 +150,9 @@ export class TournamentWebSocketManager {
                 if (this.tconfig.onMatchEnd) {
                     const winnerId = message.winnerId != null ? String(message.winnerId) : null;
                     const matchId = String(message.matchId || this.tconfig.matchId || '');
-                    this.tconfig.onMatchEnd({ matchId, winnerId });
+                    const p1 = message.p1 || null;
+                    const p2 = message.p2 || null;
+                    this.tconfig.onMatchEnd({ matchId, winnerId, p1, p2 });
                 }
                 break;
             
@@ -151,6 +161,11 @@ export class TournamentWebSocketManager {
                     this.tconfig.onPlayerDisconnected(message.playerId);
                 break;
             
+            case 'playerReady':
+                if (this.tconfig.onPlayerReady)
+                    this.tconfig.onPlayerReady(message.playerId, message.isReady);
+                break;
+
             case 'playerJoined':
                 if (message.tournament && this.tconfig.onTournamentState)
                     this.tconfig.onTournamentState(message.tournament);
@@ -174,6 +189,11 @@ export class TournamentWebSocketManager {
     sendReady(isReady: boolean): void {
         console.debug('SENDREADY');
         this.send({ type: 'ready', isReady });
+    }
+
+    sendPlayerReady(playerId: number, isReady: boolean): void {
+        console.debug('SEND PLAYER READY:', playerId, isReady);
+        this.send({ type: 'playerReady', playerId, isReady });
     }
 
     sendMove(position: number): void {

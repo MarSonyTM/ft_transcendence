@@ -1198,6 +1198,8 @@ class TournamentDatabaseManager {
         try {
             if (typeof player.eliminated === 'number')
                 player.eliminated = player.eliminated === 1 ? true : false;
+            if (typeof player.isReady === 'number')
+                player.isReady = player.isReady === 1 ? true : false;
             return player as TournamentPlayer;
         } catch (error) {
             console.error('Error hydrating player:', error);

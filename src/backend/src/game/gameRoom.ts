@@ -1,3 +1,5 @@
+import { TPT } from '../types/index'; 
+
 interface Player {
     id: string;
     username: string;
@@ -32,9 +34,9 @@ class GameRoomManager {
     }
 
     // Create a new game room
-    createRoom(hostId: string, hostUsername: string, maxPlayers: number = 2): GameRoom {
+    createRoom(hostId: string, hostUsername: string, maxPlayers: number = 2, tpt?: TPT): GameRoom {
         const roomId = this.generateRoomId();
-      
+
         const room: GameRoom = {
             roomId,
             hostId,
@@ -42,8 +44,8 @@ class GameRoomManager {
                 id: hostId,
                 username: hostUsername,
                 isReady: true,
-                isAI: false,
-                isLocal: false
+                isAI: tpt && tpt === 'ai' ? true : false,
+                isLocal: tpt && tpt === 'local' ? true : false
             }],
             maxPlayers,
             status: 'waiting',
