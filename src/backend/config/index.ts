@@ -12,13 +12,6 @@ if (!JWT_SECRET || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIREC
 	throw new Error('Missing environment variables, please add the .env file inside the backend folder ');
 }
 
-
-console.log("JWT_SECRET", JWT_SECRET);
-console.log("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID);
-console.log("GOOGLE_CLIENT_SECRET", GOOGLE_CLIENT_SECRET);
-console.log("GOOGLE_REDIRECT_URI", GOOGLE_REDIRECT_URI);
-console.log("FRONTEND_URL", FRONTEND_URL);
-
 export { 
 	JWT_SECRET,
 	GOOGLE_CLIENT_ID,

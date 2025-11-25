@@ -2,13 +2,14 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { presenceManager } from '../presence/presenceManager';
 
 interface SetStatusRequest {
-    status: 'online' | 'offline' | 'away' | 'in game';
+    status: 'online' | 'offline' | 'in game';
 }
 
 export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
     // POST /api/auth/presence/status - Update user status
     fastify.post('/api/auth/presence/status', async (request: FastifyRequest, reply: FastifyReply) => {
         try {
+            console.warn("UMM, ACTUALLY!!!!");
             const { status } = request.body as SetStatusRequest;
             
             // Get user from JWT token (assuming you have authentication middleware)
@@ -23,13 +24,15 @@ export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
             }
 
             // Validate status
-            const validStatuses: Array<'online' | 'offline' | 'away' | 'in game'> = ['online', 'offline', 'away', 'in game'];
+            const validStatuses: Array<'online' | 'offline' | 'in game'> = ['online', 'offline', 'in game'];
             if (!validStatuses.includes(status)) {
                 return reply.code(400).send({
                     success: false,
                     message: 'Invalid status. Must be one of: online, offline, away, in game'
                 });
             }
+
+            presenceManager.updateHeartbeat(userId, username);
 
             // Update the user's status
             let updatedPresence;

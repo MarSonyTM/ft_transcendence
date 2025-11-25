@@ -1,7 +1,7 @@
 interface UserPresence {
     userId: number;
     username: string;
-    status: 'online' | 'offline' | 'away' | 'in game';
+    status: 'online' | 'offline' | 'in game';
 }
 
 class PresenceService {
@@ -65,7 +65,6 @@ class PresenceService {
             });
 
             if (response.ok) {
-                console.log('✅ [PRESENCE] Status set to: in game');
                 return true;
             } else {
                 console.error('❌ [PRESENCE] Failed to set in game status:', response.status);
@@ -93,7 +92,6 @@ class PresenceService {
             });
 
             if (response.ok) {
-                console.log('✅ [PRESENCE] Status set to: online');
                 return true;
             } else {
                 console.error('❌ [PRESENCE] Failed to set online status:', response.status);

@@ -111,9 +111,6 @@ export async function render4PlayerGame(): Promise<void> {
                 endGame(pongGame);
             }
             
-            // Set status back to online when leaving game
-            await presenceService.setOnline();
-            
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
             renderApp();
@@ -133,8 +130,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
         console.error('❌ No shared gameId available yet; not creating a standalone game.');
         return;
     }
-
-    console.log('Room-based game detected! Using shared gameId:', effectiveRoom.gameId);
     
     pongGame.gameId = effectiveRoom.gameId;
     
@@ -173,7 +168,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             cleanupGame(pongGame);
             
             // Set status back to online when ending game
-            await presenceService.setOnline();
         });
     }
 
@@ -213,20 +207,11 @@ async function initRoomBasedGame(room: any): Promise<void> {
     const playerId = user.id?.toString() || `guest-${Date.now()}`;
     const gameMode = getCurrentGameMode();
 
-    console.log('Initializing room-based 4-player game:', {
-        roomId: room.roomId,
-        playerId,
-        gameId: room.gameId,
-        gameMode
-    });
-
-    // Initialize WebSocket connection to room
     pongGame.roomWS = initRoomWebSocket({
         roomId: room.roomId,
         playerId,
         
         onConnect: () => {
-            console.log('✅ Connected to 4-player game room');
             
             if (pongGame?.roomWS) {
                 pongGame.roomWS.requestState();
@@ -260,9 +245,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
             
-            // Set status back to online when game ends
-            await presenceService.setOnline();
-            
             showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });
@@ -290,14 +272,6 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
     const room = getCurrentRoom();
     const user = authService.getCurrentUser();
     
-    console.log('🔍 DEBUG Setup Controls:', { 
-        playerId,
-        userFromAuth: user,
-        roomPlayers: room?.players,
-        hasLocal,
-        gameMode
-    });
-    
     // Verify this player is in the room
     if (room) {
         const playerInRoom = room.players.find((p: any) => p.id === playerId);
@@ -306,9 +280,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
                 lookingFor: playerId,
                 availablePlayers: room.players.map((p: any) => p.id)
             });
-        } else {
-            console.log('✅ Player found in room:', playerInRoom);
-        }
+        } 
     }
     
     const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);

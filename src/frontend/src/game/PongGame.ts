@@ -140,7 +140,7 @@ export class PongGame {
         
         this.updateStatus("Ready to start...");
         
-        const currentUser = authService.getCurrentUser();
+        const currentUser = await authService.getCurrentUser();
         if (currentUser && currentUser.id)
             this.playerId = parseInt(currentUser.id);
         

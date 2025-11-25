@@ -54,8 +54,6 @@ export async function renderLandingPage(): Promise<void> {
         }
         // Add ping pong balls animation
         createPingPongBalls();
-        presenceService.setOnline();
-        // Leaderboard is only available for authenticated users
         return;
     }
 
@@ -134,5 +132,5 @@ export async function renderLandingPage(): Promise<void> {
     
     // Add ping pong balls animation
     createPingPongBalls();
-    await presenceService.setOnline();
+	  await presenceService.setOnline();
 }

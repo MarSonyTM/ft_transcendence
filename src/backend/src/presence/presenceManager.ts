@@ -1,7 +1,7 @@
 interface UserPresence {
     userId: number;
     username: string;
-    status: 'online' | 'offline' | 'away' | 'in game';
+    status: 'online' | 'offline' | 'in game';
     lastSeen: Date;
     lastHeartbeat: Date;
 }
@@ -23,7 +23,7 @@ class PresenceManager {
         const presence: UserPresence = {
             userId,
             username,
-            status: 'online',
+            status: user && user.status == 'in game' ? 'in game' : 'online',
             lastSeen: now,
             lastHeartbeat: now
         };
