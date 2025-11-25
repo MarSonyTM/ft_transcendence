@@ -1,6 +1,6 @@
 server {
     # Listen on port 443 for HTTPS traffic (IPv4 and IPv6)
-    listen 443 ssl;
+    listen 0.0.0.0:443 ssl;
     listen [::]:443 ssl;
     
     # Domain name
