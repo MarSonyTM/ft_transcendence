@@ -515,7 +515,6 @@ export class baby3D {
     }
 
     private createSkybox(): void {
-        console.log('🎨 [3D] Creating skybox...');
         
         const skybox = MeshBuilder.CreateBox(
             "skyBox", 
@@ -529,12 +528,12 @@ export class baby3D {
         
         const cubeTexture = CubeTexture.CreateFromImages(
             [
-                "../assets/px.png",
-                "../assets/py.png",
-                "../assets/pz.png",
-                "../assets/nx.png",
-                "../assets/ny.png",
-                "../assets/nz.png",
+                "/assets/px.png",
+                "/assets/py.png",
+                "/assets/pz.png",
+                "/assets/nx.png",
+                "/assets/ny.png",
+                "/assets/nz.png",
             ],
             this.scene
         );

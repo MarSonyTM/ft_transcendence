@@ -32,14 +32,35 @@ export class RoomWebSocketManager {
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
-                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : 
-                         `${window.location.hostname}:3000`;
-                const wsUrl = `${wsProtocol}//${wsHost}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
-                  
+                // Determine WebSocket endpoint based on environment
+                let baseWsUrl: string;
+                
+                // Check if endpoint is configured in index.html
+                if ((window as any).__INITIAL_STATE__?.wsEndpoint) {
+                    baseWsUrl = (window as any).__INITIAL_STATE__.wsEndpoint;
+                    console.log('🔌 Using configured WS endpoint:', baseWsUrl);
+                } else {
+                    // Fallback: construct based on current location
+                    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    
+                    // Only add :3000 if running on Vite dev ports
+                    if (window.location.port === '5173' || window.location.port === '8080') {
+                        baseWsUrl = `${wsProtocol}//${window.location.hostname}:3000`;
+                        console.log('🔧 Dev mode detected, using port 3000');
+                    } else {
+                        // Production: use same origin (nginx will proxy)
+                        baseWsUrl = `${wsProtocol}//${window.location.host}`;
+                        console.log('🚀 Production mode detected, using same origin');
+                    }
+                }
+                
+                const wsUrl = `${baseWsUrl}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
+                console.log('🔌 Connecting to room WebSocket:', wsUrl);
+                
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
+                    console.log('✅ Room WebSocket connected');
                     this.reconnectAttempts = 0;
                     this.startHeartbeat();
             
@@ -88,7 +109,7 @@ export class RoomWebSocketManager {
                     reject(error);
                 };
 
-                // Connection timeout - reduced to 5 seconds
+                // Connection timeout
                 setTimeout(() => {
                     if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
                         console.error('WebSocket connection timeout after 5 seconds');
@@ -107,7 +128,6 @@ export class RoomWebSocketManager {
     }
 
     private handleMessage(message: any): void {
-
         switch (message.type) {
             case 'connected':
                 break;
@@ -154,40 +174,24 @@ export class RoomWebSocketManager {
 
             case 'score':
                 if (this.config.onScore) {
-                    // Support both old format (scorePlayer1, etc.) and new format (players array)
-                    if (Array.isArray(message.players)) {
-                        this.config.onScore({
-                            scorePlayer1: message.players[0]?.score || 0,
-                            scorePlayer2: message.players[1]?.score || 0,
-                            scorePlayer3: message.players[2]?.score || 0,
-                            scorePlayer4: message.players[3]?.score || 0
-                        });
-                    } else {
-                        // Fallback to old format for backward compatibility
-                        this.config.onScore({
-                            scorePlayer1: message.scorePlayer1 || 0,
-                            scorePlayer2: message.scorePlayer2 || 0,
-                            scorePlayer3: message.scorePlayer3 || 0,
-                            scorePlayer4: message.scorePlayer4 || 0
-                        });
-                    }
-                }
-                break;
-
-            case 'gameEnd':
-                if (this.config.onGameEnd) {
-                    this.config.onGameEnd({
-                        winnerId: message.winner || message.winnerId,
-                        winnerSeat: message.winnerSeat,
-                        winnerName: message.winnerName,
-                        players: message.players,
-                    });
+                    this.config.onScore(message);
                 }
                 break;
 
             case 'gameStart':
                 if (this.config.onGameStart) {
                     this.config.onGameStart(message.gameId);
+                }
+                break;
+
+            case 'gameEnd':
+                if (this.config.onGameEnd) {
+                    this.config.onGameEnd({
+                        winnerId: message.winnerId,
+                        winnerSeat: message.winnerSeat,
+                        winnerName: message.winnerName,
+                        players: message.players
+                    });
                 }
                 break;
 
@@ -249,6 +253,7 @@ export class RoomWebSocketManager {
             isGuest,
         });
     }
+
     // Generic send method
     private send(message: any): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -330,4 +335,3 @@ export function disconnectRoomWebSocket(): void {
         globalRoomWS = null;
     }
 }
-
