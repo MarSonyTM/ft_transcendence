@@ -223,10 +223,10 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = +(tournamentId);
 			if (isNaN(tId) || tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			// const archive = tournamentManager.getArchive(tId);
-			// if (!archive)
-			// 	return reply.status(404).send({ success: false, message: 'Archive not found' });
-			// return reply.send({ success: true, data: archive });
+			const archive = tournamentManager.getTournament(tId);
+			if (!archive)
+				return reply.status(404).send({ success: false, message: 'Archive not found' });
+			return reply.send({ success: true, data: archive });
 		} catch (error) {
 			fastify.log.error(error);
 			return reply.status(500).send({ success: false, message: 'Failed to get archive' });
@@ -236,10 +236,10 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	// List all archives //TODO
 	fastify.get('/api/tournament/archives', async (_request: FastifyRequest, reply: FastifyReply) => {
 		try {
-			// const archives = tournamentManager.getAllArchives();
-			// if (!archives)
-			// 	return reply.status(404).send({ success: false, message: 'Archives not found' });
-			// return reply.send({ success: true, data: archives });
+			const archives = tournamentManager.getAllTournaments()
+			if (!archives)
+				return reply.status(404).send({ success: false, message: 'Archives not found' });
+			return reply.send({ success: true, data: archives });
 		} catch (error) {
 			fastify.log.error(error);
 			return reply.status(500).send({ success: false, message: 'Failed to list archives' });
