@@ -434,8 +434,15 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			if (winnerId) {
 				const match = tournamentManager.getMatch(mId);
 				if (match) {
-					match.winnerId = winnerId;
-					database.tournaments.updateMatch({ id: mId, winnerId });
+					let actualWinnerId = winnerId;
+					if (winnerId === 1 && match.p1) {
+						actualWinnerId = match.p1.id;
+					} else if (winnerId === 2 && match.p2) {
+						actualWinnerId = match.p2.id;
+					}
+					
+					match.winnerId = actualWinnerId;
+					database.tournaments.updateMatch({ id: mId, winnerId: actualWinnerId });
 				}
 			}
 			
