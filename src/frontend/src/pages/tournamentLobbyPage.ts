@@ -58,7 +58,6 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			<div class="t-flex-1">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
-				<button id="addRemoteBtn" class="btn btn-add">${TPTmap.get('remote')} Invite Remote Player?</button>
 			</div>
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">x</button></ul>
 			<div class="t-footer">
