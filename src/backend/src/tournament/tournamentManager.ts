@@ -220,7 +220,10 @@ class TournamentManager {
 			console.log(`Bracket setup complete: ${t.allMatches.length} total matches`);
 			if (!(await this.insertPlayersIntoNextRound(tournamentId)))
 				return false;
-			t.curM = await this.getCurrentMatch(t.id);
+			// if (t.matchQueue.length > 0)
+			// 	t.curM = t.matchQueue.shift() || null; 
+			if (!t.curM || (t.curM && t.curM.status === 'completed'))
+				t.curM = await this.getCurrentMatch(t.id);
 			if (!t || !t.curM) return false;
 			return true;
 		} catch (error) {
@@ -254,7 +257,7 @@ class TournamentManager {
 				return false;
 			}
 			this.shuffle(players);
-			for (const m of matches) {
+			for (let m of matches) {
 				let p1 = players.shift();
 				let p2 = players.shift();
 				if (!p1) throw new Error('Not enough players for assignment');
@@ -295,13 +298,14 @@ class TournamentManager {
 				throw new Error(`${players.length} players left unassigned`);
 			t.matchQueue = matches.filter(m => m.status === 'pending');
 			t.matchQueue.sort((a, b) => a.roundIdx - b.roundIdx);
-			// t.curM = t.matchQueue.shift() || null;
-			db.updateTournament(tournamentId, {
+			t.curM = t.matchQueue.shift() || null;
+			t = db.updateTournament(tournamentId, {
 				round: t.round,
 				matchQueue: t.matchQueue,
-				// curM: t.curM
+				curM: t.curM
 			});
-			console.log(`Round ${t.round} ready: ${t.matchQueue.length + 1} matches`);
+			if (t)
+				console.log(`Round ${t.round} ready: ${t.matchQueue.length} matches`);
 			broadcastTournamentState(tournamentId);
 			return true;
 		} catch (error) {
@@ -422,11 +426,11 @@ class TournamentManager {
 				console.log('Attempting to advance to next round...');
 				if (await this.insertPlayersIntoNextRound(tournamentId)) {
 					t = db.getTournamentById(tournamentId);
-					if (t)
-						t.curM = await this.getCurrentMatch(t.id);
-				}
+					if (t && !t.curM && t.matchQueue && t.matchQueue.length > 0)
+						t.curM = t.matchQueue.shift() || null;
+				} else throw new Error('insertPlayersIntoNextRound failed');
 			}
-			if (t && t.curM) {
+			if (t && t.curM && t.curM.id) {
 				t.curM = db.updateMatch(t.curM);
 				t = db.updateTournament(tournamentId, {
 					curM: t.curM,
@@ -435,7 +439,7 @@ class TournamentManager {
 				if (!t || !t.curM) throw new Error('Failed to update tournament');
 				console.log(`Loaded next match from queue: ${t.curM?.id}`);
 				}
-			if (!t) return null;
+			if (!t || !t.curM) return null;
 			return t.curM;
 		} catch (error) {
 			console.error('getCurrentMatch error:', error);
@@ -474,7 +478,7 @@ class TournamentManager {
 				if (!t) throw new Error('Failed to update tournament');
 			}
 			if (!t.curM) return null;
-			if (t.curM.isBye) {// || (t.curM.p1 && t.curM.p1.tpt === 'ai' && t.curM.p2 && t.curM.p2.tpt === 'ai')) {
+			if (t.curM.isBye) {
 				console.log(`Bye match ${matchId}, auto-completing`);
 				await this.endMatch(matchId);
 				return null;
