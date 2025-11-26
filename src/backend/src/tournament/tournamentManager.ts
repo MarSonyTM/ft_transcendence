@@ -263,13 +263,28 @@ class TournamentManager {
 					m.winnerId = p1.id;
 					m.status = 'completed';
 				}
-				m.status = m.isBye ? 'completed' : 'pending';
+
+				if (!m.isBye && m.p1 && m.p2 && m.p1.tpt === 'ai' && m.p2.tpt === 'ai') {
+					const randomSeed = Math.random();
+					const winner = randomSeed < 0.5 ? m.p1 : m.p2;
+					const loser = winner.id === m.p1.id ? m.p2 : m.p1;
+					m.winnerId = winner.id;
+					m.status = 'completed';
+					m.endedAt = new Date().toISOString();
+					db.updatePlayer({ id: loser.id, eliminated: true });
+				}
+
+				if (!m.status) {
+					m.status = m.isBye ? 'completed' : 'pending';
+				}
+
 				db.updateMatch({
 					id: m.id,
 					p1: m.p1,
 					p2: m.p2,
 					status: m.status,
-					winnerId: m.winnerId
+					winnerId: m.winnerId,
+					endedAt: m.endedAt
 				});
 			}
 			if (players.length > 0)
