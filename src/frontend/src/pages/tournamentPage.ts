@@ -127,8 +127,10 @@ function matchBracketHTML(t: Tournament): string {
 async function waitForNextMatch(tournamentId: number, attempts = 8, delayMs = 500): Promise<boolean> {
     let t = getCurrentTournament();
     if (!t) return false;
-	if (t.curM && t.curM.status === 'completed')
-		t.curM = null;
+	if (t.curM && t.curM.status === 'completed') {
+        hasStartBeenClicked = false;
+        t.curM = null;
+    }
     for (let i = 0; i < attempts; i++) {
         try {
 			console.debug('CURRENT MATCH BEFORE:', t.curM);
