@@ -128,7 +128,6 @@ async function waitForNextMatch(tournamentId: number, attempts = 8, delayMs = 50
     let t = getCurrentTournament();
     if (!t) return false;
 	if (t.curM && t.curM.status === 'completed') {
-        hasStartBeenClicked = false;
         t.curM = null;
     }
     for (let i = 0; i < attempts; i++) {
@@ -350,6 +349,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
                 return;
             }
             box.innerHTML = '<p>Waiting for next round to be scheduled...</p>';
+            hasStartBeenClicked = false;
             return;
         }
     }
@@ -402,6 +402,7 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id)
         return console.debug('No current match or players to render controls for');
 
+    hasStartBeenClicked = false;
 
     box.innerHTML = `
         <p class="t-info-bold">Next Match:</p>
@@ -761,6 +762,7 @@ async function initws(t: Tournament): Promise<void> {
                 }
             } finally {
                 isProcessingMatchEnd = false;
+                hasStartBeenClicked = false;
             }
         },
 
@@ -833,6 +835,7 @@ function cleanupActiveGame(): void {
     }
     
     isGameActive = false;
+    hasStartBeenClicked = false;
     console.log('✅ Tournament game cleaned up');
 }
 
