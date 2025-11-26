@@ -1,75 +1,9 @@
 import { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginOptions } from 'fastify';
 import { tournamentManager } from '../tournament/tournamentManager';
 import { TPT, Tournament, TournamentPlayer } from '../types/index';
-// import { publicTournamentShape, publicMatchShape } from '../websocket/tournamentHandler';
-import { sanitizeAlias } from '../utils/sanitization';
-
-// const state = tournamentManager.startTournament(sanitizedAliases);
-
-// interface StartTournamentBody { aliases: string[]; }
-// interface ResultBody { winnerAlias?: string; winnerId?: number; }
-
-// function serializeState(state: TournamentState): SerializedTournamentState {
-// 	const playerMap = new Map<number, SerializedPlayer>();
-// 	state.players.forEach((player: TournamentPlayer) => {
-// 		playerMap.set(player.id, {
-// 			id: player.id,
-// 			alias: player.alias,
-// 			eliminated: player.eliminated,
-// 			wins: player.wins,
-// 			losses: player.losses
-// 		});
-// 	});
-
-// 	const currentMatch: SerializedMatch | null = state.currentMatch ? {
-// 		matchId: state.currentMatch.matchId,
-// 		player1: playerMap.get(state.currentMatch.player1Id) || null,
-// 		player2: playerMap.get(state.currentMatch.player2Id) || null,
-// 		startedAt: state.currentMatch.startedAt
-// 	} : null;
-
-// 	const queueAliases = state.queue.map((id: number) => playerMap.get(id)?.alias || 'Unknown');
-
-// 	const nextMatches: SerializedNextMatchPreview[] = [];
-// 	const queueCopy = [...state.queue];
-// 	let order = 1;
-// 	while (queueCopy.length > 0) {
-// 		const player1Id = queueCopy.shift();
-// 		const player2Id = queueCopy.shift();
-// 		if (player1Id === undefined) break;
-// 		nextMatches.push({
-// 			order,
-// 			player1: playerMap.get(player1Id)?.alias || 'Unknown',
-// 			player2: player2Id !== undefined ? playerMap.get(player2Id)?.alias || null : null
-// 		});
-// 		order += 1;
-// 	}
-
-// 	const matchHistory: SerializedMatchHistoryItem[] = state.matchHistory.map((match: TournamentMatchRecord) => ({
-// 		matchId: match.id,
-// 		player1: playerMap.get(match.player1Id)?.alias || 'Unknown',
-// 		player2: playerMap.get(match.player2Id)?.alias || 'Unknown',
-// 		winner: match.winnerId ? playerMap.get(match.winnerId)?.alias || 'Unknown' : 'Unknown',
-// 		loser: match.loserId ? playerMap.get(match.loserId)?.alias || 'Unknown' : 'Unknown',
-// 		finishedAt: match.finishedAt
-// 	}));
-
-// 	const championAlias = state.championId ? playerMap.get(state.championId)?.alias || null : null;
-
-// 	return {
-// 		id: state.id,
-// 		status: state.status,
-// 		createdAt: state.createdAt,
-// 		updatedAt: state.updatedAt,
-// 		players: Array.from(playerMap.values()),
-// 		currentMatch,
-// 		queue: queueAliases,
-// 		nextMatches,
-// 		matchHistory,
-// 		championId: state.championId,
-// 		championAlias
-// 	};
-// }
+import { activeGames } from './game';
+import { database } from '../database/index';
+import { BaseGameEngine } from '../game/gameEngine';
 
 async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
@@ -324,41 +258,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		}
 	});
 
-	// // Get archive snapshot
-    // fastify.get('/api/tournament/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {
-    //     try {
-    //         const { tournamentId } = request.params as { tournamentId: string };
-    //         const tId = +tournamentId;
-    //         if (isNaN(tId) || tId <= 0)
-    //             return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-            
-    //         const t = tournamentManager.getTournament(tId);
-    //         if (!t)
-    //             return reply.status(404).send({ success: false, message: 'Tournament not found' });
-            
-    //         return reply.send({ success: true, data: publicTournamentShape(t) });
-    //     } catch (error) {
-    //         fastify.log.error(error);
-    //         return reply.status(500).send({ success: false, message: 'Failed to get archive' });
-    //     }
-    // });
-
-    // // List all archives
-    // fastify.get('/api/tournament/archives', async (_request: FastifyRequest, reply: FastifyReply) => {
-    //     try {
-    //         const allTournaments = tournamentManager.getAllTournaments();
-    //         const completed = allTournaments.filter(t => t.status === 'completed' || t.status === 'archived');
-            
-    //         return reply.send({ 
-    //             success: true, 
-    //             data: completed.map(publicTournamentShape)
-    //         });
-    //     } catch (error) {
-    //         fastify.log.error(error);
-    //         return reply.status(500).send({ success: false, message: 'Failed to list archives' });
-    //     }
-    // });
-
 	// -------------------------------------- MATCHES -------------------------------------- //
 	// Get current match (next in queue) for a tournament
 	fastify.get('/api/tournament/:tournamentId/match/current', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -426,9 +325,81 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const mId = +matchId;
 			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+
 			let m = await tournamentManager.prepareMatch(tId, mId);
-			if (!m)
+			if (!m || !m.gameId)
 				return reply.status(404).send({ success: false, message: 'Failed to prepare match/game' });
+			
+			const gameId = m.gameId;
+			
+
+			let gameEngine = activeGames.get(gameId);
+			
+			if (!gameEngine) {
+				const game = database.games.getGameById(gameId);
+				if (!game) {
+					return reply.status(404).send({ success: false, message: 'Game not found' });
+				}
+
+				let gameStateRow = database.gameState.getGameStateByGameId(gameId);
+				if (!gameStateRow) {
+					gameStateRow = database.gameState.createGameState({ gameId });
+				}
+
+				const initialGameState = {
+					id: mId,
+					gameId: gameId,
+					players: [
+						{ 
+						id: 1, 
+						name: m.p1?.name || 'Player 1', 
+						pos: 70, 
+						score: 0,
+						gameId: gameId,
+						connectionStatus: 'active',
+						lastActivity: new Date().toISOString()
+						},
+						{ 
+						id: 2, 
+						name: m.p2?.name || 'Player 2', 
+						pos: 70, 
+						score: 0,
+						gameId: gameId,
+						connectionStatus: 'active',
+						lastActivity: new Date().toISOString()
+						}
+					],
+					ballPosX: 200,
+					ballPosY: 100,
+					ballVelX: 0,
+					ballVelY: 0,
+					mode: '2P',
+					lastContact: 0,
+					lastActivity: new Date().toISOString(),
+				};
+
+				gameEngine = new BaseGameEngine(initialGameState);
+
+				if (m.p1?.tpt === 'ai') {
+					gameEngine.setPlayerAI(1, true, 'normal');
+				}
+				if (m.p2?.tpt === 'ai') {
+					gameEngine.setPlayerAI(2, true, 'normal');
+				}
+
+				activeGames.set(gameId, gameEngine);
+			}
+
+			if (!gameEngine.isRunning()) {
+				gameEngine.startGame();
+				console.log(`🎮 Tournament match ${mId} game engine ${gameId} started!`);
+				
+				database.games.updateGame(gameId, { 
+					status: 'active',
+					startedAt: new Date().toISOString()
+				});
+			}
+			
 			return reply.send({ success: true, data: m });
 		} catch (error) {
 			fastify.log.error(error);
@@ -459,4 +430,3 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 }
 
 export default tournamentRoutes;
-

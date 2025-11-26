@@ -1,6 +1,6 @@
 import { TPT, TPTmap, Tournament, getApiEndpoint } from '../types';
 import { setCurrentPage } from '../utils/globalState';
-import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
+import { getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
 	createTournament,
 	resetTournament,
@@ -13,6 +13,7 @@ import {
 } from '../utils/tournamentUtils';
 import { renderTournamentPage } from './tournamentPage';
 import { renderApp } from '../main';
+import { PongGame } from '../game/PongGame';
 
 let activeT: Tournament | null = null;
 

@@ -4,6 +4,7 @@ import { getCurrentRoom } from '../utils/roomState';
 import { authService } from '../utils/auth';
 import { baby3D } from './game3D';
 import { RoomWebSocketManager } from '../utils/roomWebSocket';
+import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 
 export class PongGame {
     gameId?: number = 0;

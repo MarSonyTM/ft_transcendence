@@ -16,17 +16,22 @@ interface RoomWebSocketConfig {
     onError?: (error: Error) => void;
 }
 
+export class WebSocketBase {
+    public ws: WebSocket | null = null;
+    public reconnectAttempts = 0;
+    public maxReconnectAttempts = 5;
+    public reconnectDelay = 2000;
+    public heartbeatInterval: number | null = null;
+    public isIntentionalClose = false;
+}
+
 export class RoomWebSocketManager {
-    private ws: WebSocket | null = null;
     private config: RoomWebSocketConfig;
-    private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
-    private reconnectDelay = 2000;
-    private heartbeatInterval: number | null = null;
-    private isIntentionalClose = false;
+    private opt: WebSocketBase
 
     constructor(config: RoomWebSocketConfig) {
         this.config = config;
+        this.opt = new WebSocketBase;
     }
 
     connect(): Promise<void> {
@@ -39,11 +44,11 @@ export class RoomWebSocketManager {
           
                 console.log('🔌 Connecting to:', wsUrl);
           
-                this.ws = new WebSocket(wsUrl);
+                this.opt.ws = new WebSocket(wsUrl);
 
-                this.ws.onopen = () => {
+                this.opt.ws.onopen = () => {
                     console.log('✅ WebSocket connected to room:', this.config.roomId);
-                    this.reconnectAttempts = 0;
+                    this.opt.reconnectAttempts = 0;
                     this.startHeartbeat();
             
                     if (this.config.onConnect) {
@@ -53,7 +58,7 @@ export class RoomWebSocketManager {
                     resolve();
                 };
 
-                this.ws.onmessage = (event) => {
+                this.opt.ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
                         this.handleMessage(message);
@@ -62,7 +67,7 @@ export class RoomWebSocketManager {
                     }
                 };
 
-                this.ws.onclose = (event) => {
+                this.opt.ws.onclose = (event) => {
                     console.log('🔌 WebSocket disconnected:', event.code, event.reason);
                     this.stopHeartbeat();
             
@@ -71,17 +76,17 @@ export class RoomWebSocketManager {
                     }
 
                     // Attempt reconnection if not intentional
-                    if (!this.isIntentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
-                        this.reconnectAttempts++;
-                        console.log(`🔄 Reconnecting... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                    if (!this.opt.isIntentionalClose && this.opt.reconnectAttempts < this.opt.maxReconnectAttempts) {
+                        this.opt.reconnectAttempts++;
+                        console.log(`🔄 Reconnecting... (attempt ${this.opt.reconnectAttempts}/${this.opt.maxReconnectAttempts})`);
               
                         setTimeout(() => {
                             this.connect().catch(console.error);
-                        }, this.reconnectDelay * this.reconnectAttempts);
+                        }, this.opt.reconnectDelay * this.opt.reconnectAttempts);
                     }
                 };
 
-                this.ws.onerror = (error) => {
+                this.opt.ws.onerror = (error) => {
                     console.error('❌ WebSocket error:', error);
             
                     if (this.config.onError) {
@@ -93,10 +98,10 @@ export class RoomWebSocketManager {
 
                 // Connection timeout - reduced to 5 seconds
                 setTimeout(() => {
-                    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+                    if (this.opt.ws && this.opt.ws.readyState !== WebSocket.OPEN) {
                         console.error('WebSocket connection timeout after 5 seconds');
-                        if (this.ws) {
-                            this.ws.close();
+                        if (this.opt.ws) {
+                            this.opt.ws.close();
                         }
                         reject(new Error('WebSocket connection timeout'));
                     }
@@ -255,9 +260,9 @@ export class RoomWebSocketManager {
     }
     // Generic send method
     private send(message: any): void {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (this.opt.ws && this.opt.ws.readyState === WebSocket.OPEN) {
             try {
-                this.ws.send(JSON.stringify(message));
+                this.opt.ws.send(JSON.stringify(message));
             } catch (error) {
                 console.error('Error sending WebSocket message:', error);
             }  
@@ -268,41 +273,41 @@ export class RoomWebSocketManager {
 
     // Start heartbeat to keep connection alive
     private startHeartbeat(): void {
-        this.heartbeatInterval = window.setInterval(() => {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.opt.heartbeatInterval = window.setInterval(() => {
+            if (this.opt.ws && this.opt.ws.readyState === WebSocket.OPEN) {
                 this.send({ type: 'ping', timestamp: Date.now() });
             }
         }, 30000); // Every 30 seconds
     }
 
     private stopHeartbeat(): void {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
+        if (this.opt.heartbeatInterval) {
+            clearInterval(this.opt.heartbeatInterval);
+            this.opt.heartbeatInterval = null;
         }
     }
 
     // Close connection
     disconnect(): void {
-        this.isIntentionalClose = true;
+        this.opt.isIntentionalClose = true;
         this.stopHeartbeat();
       
-        if (this.ws) {
-            this.ws.close(1000, 'Client disconnect');
-            this.ws = null;
+        if (this.opt.ws) {
+            this.opt.ws.close(1000, 'Client disconnect');
+            this.opt.ws = null;
         }
     }
 
     // Check if connected
     isConnected(): boolean {
-        return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+        return this.opt.ws !== null && this.opt.ws.readyState === WebSocket.OPEN;
     }
 
     // Get connection state
     getState(): string {
-        if (!this.ws) return 'DISCONNECTED';
+        if (!this.opt.ws) return 'DISCONNECTED';
       
-        switch (this.ws.readyState) {
+        switch (this.opt.ws.readyState) {
             case WebSocket.CONNECTING: return 'CONNECTING';
             case WebSocket.OPEN: return 'OPEN';
             case WebSocket.CLOSING: return 'CLOSING';

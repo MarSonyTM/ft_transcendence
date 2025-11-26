@@ -1,3 +1,5 @@
+import { WebSocketBase } from "./roomWebSocket";
+
 interface TournamentWebSocketConfig {
     tournamentId: string;
     matchId: string;
@@ -11,6 +13,7 @@ interface TournamentWebSocketConfig {
     onTournamentStart?: (tournamentId: string) => void;
     onTournamentEnd?: (tournamentId: string) => void;
     onGameStart?: (matchId: string, gameId: number) => void;
+    onGameState?: (state: any) => void;
     onCountdown?: () => void;
     onGameEnd?: (data: { matchId?: string; winnerId?: string, players?: any[] }) => void;
     onMatchEnd?: (data: { matchId?: string; winnerId?: string | null, p1?: any, p2?: any }) => void;
@@ -18,17 +21,13 @@ interface TournamentWebSocketConfig {
 }
 
 export class TournamentWebSocketManager {
-    private ws: WebSocket | null = null;
     private tconfig: TournamentWebSocketConfig;
-    private reconnectAttempts: number = 0;
-    private maxReconnectAttempts: number = 5;
-    private reconnectDelay: number = 2000;
-    private heartbeatInterval: number | null = null;
-    private isIntentionalClose: boolean = false;
+    private opt: WebSocketBase;
 
     constructor(tconfig: TournamentWebSocketConfig) {
-        this.tconfig = tconfig;
-    }
+            this.tconfig = tconfig;
+            this.opt = new WebSocketBase;
+        }
 
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -37,18 +36,18 @@ export class TournamentWebSocketManager {
                 const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
                 const wsUrl = `${wsProtocol}//${wsHost}/api/tournament/${this.tconfig.tournamentId}/ws?playerId=${this.tconfig.playerId}`;
                 console.log('Connecting to tournament WebSocket:', wsUrl);
-                this.ws = new WebSocket(wsUrl);
+                this.opt.ws = new WebSocket(wsUrl);
 
-                this.ws.onopen = () => {
+                this.opt.ws.onopen = () => {
                     console.log('WebSocket connected to tournament:', this.tconfig.tournamentId);
-                    this.reconnectAttempts = 0;
+                    this.opt.reconnectAttempts = 0;
                     this.startHeartbeat();
                     if (this.tconfig.onConnect)
                         this.tconfig.onConnect();
                     resolve();
                 };
 
-                this.ws.onmessage = (event) => {
+                this.opt.ws.onmessage = (event) => {
                     try {
                         const message = JSON.parse(event.data);
                         this.handleMessage(message);
@@ -57,21 +56,21 @@ export class TournamentWebSocketManager {
                     }
                 };
 
-                this.ws.onclose = (event) => {
+                this.opt.ws.onclose = (event) => {
                     console.log('WebSocket disconnected:', event.code, event.reason);
                     this.stopHeartbeat();
                     if (this.tconfig.onDisconnect)
                         this.tconfig.onDisconnect();
-                    if (!this.isIntentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
-                        this.reconnectAttempts++;
-                        console.log(`Reconnecting... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                    if (!this.opt.isIntentionalClose && this.opt.reconnectAttempts < this.opt.maxReconnectAttempts) {
+                        this.opt.reconnectAttempts++;
+                        console.log(`Reconnecting... (attempt ${this.opt.reconnectAttempts}/${this.opt.maxReconnectAttempts})`);
                         setTimeout(() => {
                             this.connect().catch(console.error);
-                        }, this.reconnectDelay * this.reconnectAttempts);
+                        }, this.opt.reconnectDelay * this.opt.reconnectAttempts);
                     }
                 };
 
-                this.ws.onerror = (error) => {
+                this.opt.ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
                     if (this.tconfig.onError)
                         this.tconfig.onError(new Error('WebSocket connection error'));
@@ -79,10 +78,10 @@ export class TournamentWebSocketManager {
                 };
 
                 setTimeout(() => {
-                    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+                    if (this.opt.ws && this.opt.ws.readyState !== WebSocket.OPEN) {
                         console.error('WebSocket connection timeout after 5 seconds');
-                        if (this.ws)
-                            this.ws.close();
+                        if (this.opt.ws)
+                            this.opt.ws.close();
                         reject(new Error('WebSocket connection timeout'));
                     }
                 }, 5000);
@@ -205,47 +204,47 @@ export class TournamentWebSocketManager {
     }
 
     private send(message: any): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        console.warn('Tournament WS not open, dropping message:', message);
+    if (!this.opt.ws || this.opt.ws.readyState !== WebSocket.OPEN) {
+        console.warn('Tournament ws not open, dropping message:', message);
         return;
     }
     try {
-        this.ws.send(JSON.stringify(message));
+        this.opt.ws.send(JSON.stringify(message));
     } catch (error) {
         console.error('Error sending WebSocket message:', error);
     }
 }
 
     private startHeartbeat(): void {
-        this.heartbeatInterval = window.setInterval(() => {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN)
+        this.opt.heartbeatInterval = window.setInterval(() => {
+            if (this.opt.ws && this.opt.ws.readyState === WebSocket.OPEN)
                 this.send({ type: 'ping', ts: Date.now() });
         }, 30000);
     }
 
     private stopHeartbeat(): void {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
+        if (this.opt.heartbeatInterval) {
+            clearInterval(this.opt.heartbeatInterval);
+            this.opt.heartbeatInterval = null;
         }
     }
 
     disconnect(): void {
-        this.isIntentionalClose = true;
+        this.opt.isIntentionalClose = true;
         this.stopHeartbeat();
-        if (this.ws) {
-            this.ws.close(1000, 'Client disconnect');
-            this.ws = null;
+        if (this.opt.ws) {
+            this.opt.ws.close(1000, 'Client disconnect');
+            this.opt.ws = null;
         }
     }
 
     isConnected(): boolean {
-        return this.ws?.readyState === WebSocket.OPEN;
+        return this.opt.ws?.readyState === WebSocket.OPEN;
     }
 
     getState(): string {
-        if (!this.ws) return 'DISCONNECTED';
-        switch (this.ws.readyState) {
+        if (!this.opt.ws) return 'DISCONNECTED';
+        switch (this.opt.ws.readyState) {
             case WebSocket.CONNECTING:
                 return 'CONNECTING';
             case WebSocket.OPEN:
@@ -260,22 +259,22 @@ export class TournamentWebSocketManager {
     }
 }
 
-let globalTWS: TournamentWebSocketManager | null = null;
+let globalTws: TournamentWebSocketManager | null = null;
 
 export function initTournamentWebSocket(tconfig: TournamentWebSocketConfig): TournamentWebSocketManager {
-    if (globalTWS)
-        globalTWS.disconnect();
-    globalTWS = new TournamentWebSocketManager(tconfig);
-    return globalTWS;
+    if (globalTws)
+        globalTws.disconnect();
+    globalTws = new TournamentWebSocketManager(tconfig);
+    return globalTws;
 }
 
 export function getTournamentWebSocket(): TournamentWebSocketManager | null {
-    return globalTWS;
+    return globalTws;
 }
 
 export function disconnectTournamentWebSocket(): void {
-    if (globalTWS) {
-        globalTWS.disconnect();
-        globalTWS = null;
+    if (globalTws) {
+        globalTws.disconnect();
+        globalTws = null;
     }
 }

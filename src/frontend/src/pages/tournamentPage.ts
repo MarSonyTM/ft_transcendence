@@ -2,7 +2,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { PongGame } from '../game/PongGame';
 import { authService } from '../utils/auth';
-import { cleanupGame } from '../utils/gameUtils';
+import { cleanupGame, setGameScreen, endGame } from '../utils/gameUtils';
 import { openTournamentArchive } from '../utils/tournamentArchive';
 import {
     unwrapPayload,
@@ -19,15 +19,44 @@ import {
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
 import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
-import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
+import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
-import { render2PlayerGame } from './2PlayerGame';
-import { setCurrentRoom } from '../utils/roomState';
+import { setupKeyboardControls, syncGameStateFromRoom } from './2PlayerGame';
 
-let activeMatch: PongGame | undefined = undefined;
+let pongGame: PongGame | undefined = undefined;
 let isGameActive = false;
-let tWS: TournamentWebSocketManager | null = null;
+let ws: TournamentWebSocketManager | null = null;
 let lastRenderedCurrentMatchId: number | null = null;
+
+async function initTournamentMatchGame(t: Tournament): Promise<void> {
+    if (!t || !t.curM) {
+        console.error('❌ No tournament or match');
+        return;
+    }
+    
+    console.log('🎮 Initializing tournament match game...');
+    
+    pongGame = new PongGame();
+    
+    // Set game mode and ID
+    pongGame.gameState.mode = '2P';
+    pongGame.gameId = t.curM.gameId;
+    
+    // Get canvas ready
+    const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+    if (canvas) {
+        pongGame.canvas = canvas;
+        pongGame.ctx = canvas.getContext('2d');
+    } else {
+        console.error('❌ Canvas not found!');
+        return;
+    }
+    
+    // Note: Game state updates will come through the ws.onGameState callback
+    // which is set up in initws() function
+    
+    console.log('✅ Tournament match game initialized');
+}
 
 function matchBracketHTML(t: Tournament): string {
     const sortedByRound = new Map<number, TournamentMatch[]>();
@@ -152,7 +181,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         content.innerHTML = '<p>No current match available</p>';
         return;
     }
-
+    
     const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
         headers: { 'Content-Type': 'application/json' }
     });
@@ -284,9 +313,15 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         return;
     }
     renderMatchControls(box, t);
-    
-    if (!tWS)
-        initTWS(t);
+    if (!pongGame) {
+        pongGame = new PongGame;
+        pongGame.gameId = t.curM.gameId;
+        setGameScreen(pongGame);
+    }
+    if (!ws)
+        initws(t);
+    if (pongGame)
+        setupKeyboardControls(ws, t.curM.p1.id.toString());
 }
 
 function renderMatchControls(box: HTMLElement, t: Tournament): void {
@@ -363,10 +398,10 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
 			if (!t || !t.curM)
 				throw new Error('No current Tournament');  
             updateReadyUI(t, {startBtn});
-            if (!tWS)
-                await initTWS(t);
-            if (tWS?.isConnected())
-                tWS.requestMatchState();
+            if (!ws)
+                await initws(t);
+            if (ws?.isConnected())
+                ws.requestMatchState();
 			t.curM.pong = new PongGame;
 			if (!t.curM.pong)
 				throw new Error('Create new PongGame for Tournament failed');
@@ -419,7 +454,7 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
         const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
         if (bothReady && t.curM.status !== 'active') {
             opts.startBtn.disabled = false;
-            if (tWS) tWS.sendReady(true);
+            if (ws) ws.sendReady(true);
             t.curM.status = 'ready';
         }
         else opts.startBtn.disabled = true;
@@ -428,7 +463,7 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
         const bothReady = (t.curM.p1.tpt === 'ai' || t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || t.curM.p2.isReady);
         if (bothReady && t.curM.status !== 'active') {
             start.disabled = false;
-            if (tWS) tWS.sendReady(true);
+            if (ws) ws.sendReady(true);
             t.curM.status = 'ready';
         }
         else start.disabled = true;
@@ -462,9 +497,9 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
             updateReadyUI(t, {p1Btn: button});
         else if (t.curM.p2.id === playerId)
             updateReadyUI(t, {p2Btn: button});
-		if (!tWS) initTWS(t);
-        if (tWS && tWS.isConnected()) {
-            tWS.requestMatchState();
+		if (!ws) initws(t);
+        if (ws && ws.isConnected()) {
+            ws.requestMatchState();
         } else {
             console.warn('WS not connected; skipped requestMatchState');
         }
@@ -473,40 +508,49 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
     }
 }
 
-async function initTWS(t: Tournament): Promise<void> {
-    if (tWS) return;
-    if (!t || !t.id) return;
+async function initws(t: Tournament): Promise<void> {
+    if (ws || !t || !t.id) return;
+    if (!pongGame) {
+        console.error('No pongGame instance');
+        return;
+    }
+
     const user = await authService.getCurrentUser();
-    if (!user) return;
+
+    if (!user) {
+        console.error('No authenticated user for room game');
+        return;
+    }
 
     const hostPlayer = t.players.find(p => p.tpt === 'host' || p.user?.id === user.id);
-    const wsPlayerId = hostPlayer?.id != null ? String(hostPlayer.id) : String(user.id);
+    const wsPlayerId = hostPlayer?.id != null ? hostPlayer.id : user.id;
 
-    tWS = initTournamentWebSocket({
+    ws = initTournamentWebSocket({
         tournamentId: t.id.toString(),
         matchId: t.curM?.id?.toString() || '',
-        playerId: wsPlayerId,
-
+        playerId: wsPlayerId!.toString(),
+        
         onConnect: () => {
-            console.log('Tournament WebSocket connected');
-            tWS?.requestState();
+            console.log('✅ Tournament WebSocket connected');
+            ws?.requestState();
+            setupKeyboardControls(ws, wsPlayerId!.toString());
         },
 
-        onTournamentState: (t) => {
+        onTournamentState: (tournament) => {
             const st = document.getElementById('tStatusText');
-            if (st) st.textContent = t.status;
+            if (st) st.textContent = tournament.status;
             const br = document.getElementById('bracketSection');
-            if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
-            const cmId = t.curM?.id;
+            if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(tournament)}`;
+            const cmId = tournament.curM?.id;
             if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
                 lastRenderedCurrentMatchId = cmId;
-                renderTournamentContent(t);
+                renderTournamentContent(tournament);
             }
         },
 
         onMatchState: (match) => {
             if (match) {
-                 const st = document.getElementById('tStatusText');
+                const st = document.getElementById('tStatusText');
                 if (st) st.textContent = t.status;
                 const br = document.getElementById('bracketSection');
                 if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
@@ -518,19 +562,29 @@ async function initTWS(t: Tournament): Promise<void> {
             }
         },
 
+        onDisconnect: () => {
+            console.log('Disconnected from Tournament Match');
+        },
+
+        onGameState: (state) => {
+            if (!pongGame) 
+                return;
+            pongGame.currentGameState = state;
+            syncGameStateFromRoom(state);
+        },
+
         onGameStart: async (matchId, gameId) => {
-            console.log(`Game started: matchId=${matchId}, gameId=${gameId}`);
+            console.log(`🎮 Game started: matchId=${matchId}, gameId=${gameId}`);
             if (!t || !t.curM) return;
             t.curM.gameId = gameId;
             t.curM.status = 'active';
             const gameContainer = document.getElementById('tournamentGameContainer');
             if (gameContainer) gameContainer.style.display = 'block';
             await showMatch(t);
-            await renderTournamentContent(t);
         },
 
         onGameEnd: async (data) => {
-            console.log('Game ended:', data);
+            console.log('🏁 Game ended:', data);
             if (!t || !data.matchId) return;
             cleanupActiveGame();
             const gameContainer = document.getElementById('tournamentGameContainer');
@@ -543,12 +597,6 @@ async function initTWS(t: Tournament): Promise<void> {
         onMatchEnd: async (data) => {
             console.log('Match ended:', data);
             if (!t || !t.id) return;
-            t.curM = t.allMatches.find(m => m.id === Number(data.matchId)) || null;
-            if (t.curM) {
-                t.curM.winnerId = Number(data.winnerId) || null;
-                t.curM.status = 'completed';
-            }
-            if (!t.id) return;
             const found = await waitForNextMatch(t.id);
             if (found)
                 await renderTournamentContent(t);
@@ -565,28 +613,58 @@ async function initTWS(t: Tournament): Promise<void> {
             console.error('[Tournament] WebSocket error:', err);
         }
     });
-    tWS.connect().catch(err => console.error('[Tournament] Failed to connect WebSocket:', err));
+    try {
+        await ws.connect();
+    } catch (e) {
+        console.error("[Tournament] Failed to connect WebSocket:", e);
+    }
 }
 
 async function showMatch(t: Tournament): Promise<void> {
-    if (!t || !t.curM || !t.curM.pong) return console.error('No tournament or current Match found');
-    if (!t.curM.room) return console.error('No current room found');
+    if (!t || !t.curM) {
+        console.error('❌ No tournament or current match found');
+        return;
+    }
+    
+    console.log('🎮 Starting tournament match display...');
+    
     const gameContainer = document.getElementById('tournamentGameContainer');
-    if (gameContainer)
+    if (gameContainer) {
         gameContainer.style.display = 'block';
-    setCurrentRoom(t.curM.room);
-    await render2PlayerGame();
-	t.curM.pong.startServerGame();
+    }
+    
+    // Initialize tournament-specific game
+    await initTournamentMatchGame(t);
+    
+    // Start the game
+    try {
+        if (pongGame) {
+            await pongGame.startServerGame();
+            
+            // Start render loop
+            if (pongGame.startRenderLoop) {
+                pongGame.startRenderLoop();
+            }
+        }
+    } catch {
+        throw new Error();
+    }
+    
     isGameActive = true;
-	
+    console.log('✅ Tournament match game started');
 }
 
 function cleanupActiveGame(): void {
-    if (activeMatch) {
-        cleanupGame(activeMatch);
-        activeMatch = undefined;
+    console.log('🧹 Cleaning up tournament game...');
+    
+    if (pongGame) {
+        cleanupGame(pongGame);
+        pongGame = undefined;
     }
+    
+    
     isGameActive = false;
+    console.log('✅ Tournament game cleaned up');
 }
 
 export async function renderTournamentPage(): Promise<void> {
@@ -615,10 +693,10 @@ export async function renderTournamentPage(): Promise<void> {
 
 export function cleanupTournamentPage(): void {
     cleanupActiveGame();
-    if (tWS) {
+    if (ws) {
         try {
-            tWS.disconnect();
+            ws.disconnect();
         } catch {}
-        tWS = null;
+        ws = null;
     }
 }
