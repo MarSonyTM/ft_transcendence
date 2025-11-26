@@ -62,7 +62,8 @@ const start = async (): Promise<void> => {
                 /^https:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+(:\d+)?$/,
                 
                 'http://frontend:8080',
-                'https://play.google.com'
+                'https://play.google.com',
+                'http://localhost:5173'
             ];
             
             const isAllowed = allowedPatterns.some(pattern => {
