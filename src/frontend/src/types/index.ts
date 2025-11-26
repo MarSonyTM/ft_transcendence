@@ -70,7 +70,7 @@ export interface Tournament {
     players: TournamentPlayer[];
     allMatches: TournamentMatch[];
     curM: TournamentMatch | null;
-    matchQueue?: TournamentMatch[];
+    matchQueue?: Array<TournamentMatch>;
     championId: number | null;
     round?: number;
     createdAt?: string;

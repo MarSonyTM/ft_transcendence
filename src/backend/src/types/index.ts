@@ -16,7 +16,7 @@ export interface Tournament {
 	status: TournamentStatus;
 	players: TournamentPlayer[];
 	allMatches: TournamentMatch[];
-	matchQueue: TournamentMatch[];
+	matchQueue: Array<TournamentMatch>;
 	curM: TournamentMatch | null;
 	round: number;
 	championId: number | null;

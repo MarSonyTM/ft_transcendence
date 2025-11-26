@@ -390,12 +390,12 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				});
 			}
 			
-			// if (m && m.id) {
-			// 	m.status = 'active';
-			// 	m = database.tournaments.updateMatch(m);
-			// 	if (!m)
-			// 		return reply.status(400).send({ success: false, message: 'Failed to update match' });
-			// }
+			if (m && m.id) {
+				m.status = 'active';
+				m = database.tournaments.updateMatch(m);
+				if (!m)
+					return reply.status(400).send({ success: false, message: 'Failed to update match' });
+			}
 
 			return reply.send({ success: true, data: m });
 		} catch (error) {
