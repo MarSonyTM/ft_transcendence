@@ -29,7 +29,7 @@ export class TournamentEngine {
 	}
 
 	private loop = async () => {
-		const next = TManager.getCurrentMatch(this.state.tournamentId);
+		const next = await TManager.getCurrentMatch(this.state.tournamentId);
 		if (next) {
 			broadcastToTournament(this.state.tournamentId, {
 				type: 'nextMatch',

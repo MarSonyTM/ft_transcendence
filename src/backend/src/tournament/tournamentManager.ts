@@ -389,6 +389,9 @@ class TournamentManager {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return null;
+
+			console.log(`getCurrentMatch: curM=${t.curM?.id || 'null'}, queueLength=${t.matchQueue?.length || 0}, round=${t.round}`);
+
 			if (!t.curM && t.matchQueue.length > 0) {
 				t.curM = t.matchQueue.shift() || null;
 				t = db.updateTournament(tournamentId, {
@@ -489,10 +492,18 @@ class TournamentManager {
 			match = db.updateMatch(match);
 			if (!match) throw new Error('Failed to update match');
 			console.log(`Match ${matchId} completed. Winner: ${match.winnerId}`);
+			
 			const roomId = this.matchRooms.get(matchId);
 			if (roomId)
 				this.matchRooms.delete(matchId);
 			if (!match.winnerId) throw new Error('Winner not set after computation');
+			
+			const t = db.getTournamentById(match.tournamentId);
+			if (t) {
+				db.updateTournament(match.tournamentId, { curM: null });
+				console.log(`Cleared curM for tournament ${match.tournamentId}, ready for next match`);
+			}
+			
 			broadcastMatchEndToTournament(match.tournamentId, matchId, match.winnerId);
 			return true;
 		} catch (error) {
@@ -605,29 +616,40 @@ class TournamentManager {
         }
     }
 
-	hydrateTournament(t: Tournament | null): Tournament | null {
-        if (!t) return null;
+	hydrateTournament(t: any): Tournament | null {
+    if (!t) return null;
+    
+    try {
+        if (typeof t.players === 'string')
+            t.players = JSON.parse(t.players);
+        if (typeof t.allMatches === 'string')
+            t.allMatches = JSON.parse(t.allMatches);
+        if (typeof t.matchQueue === 'string')
+            t.matchQueue = JSON.parse(t.matchQueue);
+        if (typeof t.curM === 'string')
+            t.curM = JSON.parse(t.curM);
+        const players = db.getAllPlayers(t.id);
+        if (players.length > 0)
+            t.players = players;
+        const matches = db.getAllMatches(t.id);
+        if (matches.length > 0)
+            t.allMatches = matches;
         
-        try {
-            if (typeof t.players === 'string')
-                t.players = JSON.parse(t.players);
-            if (typeof t.allMatches === 'string')
-                t.allMatches = JSON.parse(t.allMatches);
-            if (typeof t.matchQueue === 'string')
-                t.matchQueue = JSON.parse(t.matchQueue);
-            if (typeof t.curM === 'string')
-                t.curM = JSON.parse(t.curM);
-            const players = db.getAllPlayers(t.id);
-            if (players.length > 0)
-                t.players = players;
-			t.allMatches = this.hydrateAllMatches(t.allMatches);
-			t.matchQueue = this.hydrateAllMatches(t.matchQueue);
-            return t;
-        } catch (error) {
-            console.error('Error hydrating tournament:', error);
-            return t;
-        }
+        const mqueue = t.allMatches.filter((m: TournamentMatch) => 
+            m.round === t.round && m.status !== 'completed' && m.status !== 'active'
+        );
+        if (mqueue.length > 0)
+            t.matchQueue = mqueue;
+        else
+            t.matchQueue = [];  // ⭐ Ensure empty array if no pending matches
+            
+        t.curM = this.hydrateMatch(t.curM);
+        return t as Tournament;
+    } catch (error) {
+        console.error('Error hydrating tournament:', error);
+        return t;
     }
+}
 
 	async deleteTournament(tId: number): Promise<void> {
 		try {

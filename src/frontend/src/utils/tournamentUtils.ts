@@ -274,11 +274,8 @@ export async function postTournamentMatchWinner(tournamentId: number, matchId: n
             console.error('Failed to post match winner:', resp.status);
             return false;
         }
-        const data = await resp.json();
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return false;
-        const t = normalizeTournament(raw);
-        setCurrentTournament(t);
+
+        await setEffectiveTournament(tournamentId);
         return true;
     } catch (e) {
         console.error('Failed to post match winner:', e);

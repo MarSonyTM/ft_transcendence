@@ -4,7 +4,6 @@ import { getCurrentRoom } from '../utils/roomState';
 import { authService } from '../utils/auth';
 import { baby3D } from './game3D';
 import { RoomWebSocketManager } from '../utils/roomWebSocket';
-import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 
 export class PongGame {
     gameId?: number = 0;
@@ -123,7 +122,7 @@ export class PongGame {
         this.stateListeners = this.stateListeners.filter(l => l !== cb);
     }
 
-    private notifyStateListeners(): void {
+    public notifyStateListeners(): void {
         for (const l of this.stateListeners) {
             try { l(this.gameState, this); } catch (e) { /* swallow listener errors */ }
         }

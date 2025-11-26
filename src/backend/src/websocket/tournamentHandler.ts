@@ -276,19 +276,24 @@ export function broadcastScoreToMatch(matchId: number, scores: any): void {
 
 export function broadcastGameEndToMatch(matchId: number, winnerId: number): void {
 	const m = tournamentManager.getMatch(matchId);
+	const players = [m?.p1, m?.p2]
 	if (!m) return;
 	broadcastToTournament(m.tournamentId, {
 		type: 'gameEnd',
 		matchId,
 		winnerId,
+		players
 	});
 }
 
 export function broadcastMatchEndToTournament(tournamentId: number, matchId: number, winnerId: number): void {
+	const m = tournamentManager.getMatch(matchId);
+	const players = [m?.p1, m?.p2]
 	broadcastToTournament(tournamentId, {
 		type: 'matchEnd',
 		matchId,
 		winnerId,
+		players
 	});
 	const t = tournamentManager.getTournament(tournamentId);
 	if (t) {

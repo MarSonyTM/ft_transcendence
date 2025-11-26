@@ -17,6 +17,8 @@ interface TournamentWebSocketConfig {
     onCountdown?: () => void;
     onGameEnd?: (data: { matchId?: string; winnerId?: string, players?: any[] }) => void;
     onMatchEnd?: (data: { matchId?: string; winnerId?: string | null, p1?: any, p2?: any }) => void;
+    onScore?: (scoreData: any) => void;
+    onPlayerMove?: (playerId: number, position: number) => void;
     onError?: (error: Error) => void;
 }
 
@@ -106,6 +108,26 @@ export class TournamentWebSocketManager {
                     this.tconfig.onCountdown();
                 break;
 
+            case 'gameState':
+                if (this.tconfig.onGameState)
+                this.tconfig.onGameState(message.state);
+            break;
+
+            case 'score':
+                if (this.tconfig.onScore)
+                    this.tconfig.onScore(message);
+                break;
+
+            case 'ballReset':
+                if (this.tconfig.onGameState)
+                    this.tconfig.onGameState(message.state || message);
+                break;
+
+            case 'playerMove':
+                if (this.tconfig.onPlayerMove)
+                    this.tconfig.onPlayerMove(message.playerId, message.position);
+                break;
+
             case 'tournamentState':
                 if (this.tconfig.onTournamentState)
                     this.tconfig.onTournamentState(message.tournament);
@@ -149,8 +171,8 @@ export class TournamentWebSocketManager {
                 if (this.tconfig.onMatchEnd) {
                     const winnerId = message.winnerId != null ? String(message.winnerId) : null;
                     const matchId = String(message.matchId || this.tconfig.matchId || '');
-                    const p1 = message.p1 || null;
-                    const p2 = message.p2 || null;
+                    const p1 = message.players[0] || null;
+                    const p2 = message.players[1] || null;
                     this.tconfig.onMatchEnd({ matchId, winnerId, p1, p2 });
                 }
                 break;
@@ -181,12 +203,10 @@ export class TournamentWebSocketManager {
     }
 
     requestMatchState(): void {
-        console.debug('REQUEST MATCH STATE');
         this.send({ type: 'requestMatchState' });
     }
 
-    sendReady(isReady: boolean): void {
-        console.debug('SENDREADY');
+    sendReady(isReady: boolean): void {;
         this.send({ type: 'ready', isReady });
     }
 

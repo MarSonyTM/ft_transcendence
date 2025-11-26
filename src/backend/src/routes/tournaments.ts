@@ -4,6 +4,7 @@ import { TPT, Tournament, TournamentPlayer } from '../types/index';
 import { activeGames } from './game';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
+import { registerTournamentGame } from '../websocket/websocketHandler';
 
 async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
@@ -67,20 +68,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const setup = await tournamentManager.setupMatches(tId);
 			if (!setup)
 				return reply.status(400).send({ success: false, message: 'Failed to setup matches before starting tournament' });
-			
-			// // ✅ SANITIZE ALL ALIASES (XSS Protection)//TODO insert
-			// const sanitizedAliases = body.aliases.map(alias => sanitizeAlias(alias));
-
-			// // Validate aliases
-			// if (sanitizedAliases.some(alias => !alias || alias.length < 1 || alias.length > 50)) {
-			// 	reply.code(400);
-			// 	return { success: false, message: 'All aliases must be 1-50 characters' };
-			// }
-
-			// if (sanitizedAliases.length < 2) {
-			// 	reply.code(400);
-			// 	return { success: false, message: 'At least 2 players required for tournament' };
-			// }
 			
 			const started = await tournamentManager.startTournament(tId);
 			if (!started)
@@ -388,11 +375,14 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				}
 
 				activeGames.set(gameId, gameEngine);
+				registerTournamentGame(gameId, mId);
 			}
 
 			if (!gameEngine.isRunning()) {
 				gameEngine.startGame();
 				console.log(`🎮 Tournament match ${mId} game engine ${gameId} started!`);
+
+				registerTournamentGame(gameId, mId);
 				
 				database.games.updateGame(gameId, { 
 					status: 'active',
@@ -411,10 +401,20 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	fastify.post('/api/tournament/:tournamentId/match/:matchId/end', async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
+			const { winnerId } = request.body as { winnerId?: number };
 			const tId = +tournamentId;
 			const mId = +matchId;
 			if (isNaN(tId) || isNaN(mId) || tId <= 0 || mId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
+			
+			if (winnerId) {
+				const match = tournamentManager.getMatch(mId);
+				if (match) {
+					match.winnerId = winnerId;
+					database.tournaments.updateMatch({ id: mId, winnerId });
+				}
+			}
+			
 			const ok = await tournamentManager.endMatch(mId);
 			if (!ok)
 				return reply.status(400).send({ success: false, message: 'Failed to end match' });

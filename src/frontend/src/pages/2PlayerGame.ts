@@ -199,7 +199,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
     }
 
     const playerId = user?.id?.toString() || room.players[0].id.toString() || `guest-${Date.now()}`;
-    const gameMode = getCurrentGameMode();
 
     // Initialize WebSocket connection to room
     pongGame.roomWS = initRoomWebSocket({
@@ -257,7 +256,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
 
 // Setup keyboard controls
 export function setupKeyboardControls(ws: any, playerId: string): void {
-    // Clean up any existing handlers first!
     if (keyboardCleanup) {
         console.log('🧹 Cleaning up old keyboard handlers');
         keyboardCleanup();
@@ -267,11 +265,8 @@ export function setupKeyboardControls(ws: any, playerId: string): void {
     const hasLocal = pongGame && pongGame.hasLocal;
     const gameMode = getCurrentGameMode();
     
-    // DEBUG: Check what's in the room
     const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
     
-    // Verify this player is in the room
     if (room) {
         const playerInRoom = room.players.find((p: any) => p.id === playerId);
         if (!playerInRoom) {
@@ -301,7 +296,6 @@ export function setupKeyboardControls(ws: any, playerId: string): void {
             } else if (!isGuestKey) {
                 ws.sendKeyState(key, true, false);
             }
-            console.log("Down")
         }
     };
 
@@ -317,7 +311,6 @@ export function setupKeyboardControls(ws: any, playerId: string): void {
             } else if (!isGuestKey) {
                 ws.sendKeyState(key, false, false);
             }
-            console.log("Up")
         }
     };
 

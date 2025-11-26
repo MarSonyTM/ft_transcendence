@@ -173,7 +173,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			}
 			setCurrentTournament(activeT);
 			setCurrentMatch(activeT.curM!);
-			renderTournamentPage();
+			await renderTournamentPage();
 			console.debug('[Tournament] Rendering tournament page');
 		}
 	});
