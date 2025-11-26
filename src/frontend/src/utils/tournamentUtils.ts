@@ -227,7 +227,6 @@ export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
         const t = getCurrentTournament();
         if (!t || !t.id) return null;
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/current`, {
-            method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
         const data = await resp.json();

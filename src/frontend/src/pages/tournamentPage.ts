@@ -111,10 +111,17 @@ function matchBracketHTML(t: Tournament): string {
 async function waitForNextMatch(tournamentId: number, attempts = 8, delayMs = 500): Promise<boolean> {
     let t = getCurrentTournament();
     if (!t) return false;
+	if (t.curM && t.curM.status === 'completed')
+		t.curM = null;
     for (let i = 0; i < attempts; i++) {
         try {
+			console.debug('CURRENT MATCH BEFORE:', t.curM);
             t.curM = await loadCurrentMatch();
-            if (t.curM) return true;
+			console.debug('CURRENT MATCH AFTER:', t.curM);
+            if (t.curM) {
+				setCurrentMatch(t.curM);
+				return true;
+			}
         } catch {}
         await new Promise(res => setTimeout(res, delayMs));
     }
@@ -174,7 +181,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         statusComplete(content);
         return;
     }
-    if (!t.curM) {
+    if (!t.curM || t.curM.status === 'completed') {
         content.innerHTML = '<p>Loading match data...</p>';
         try {
             t.curM = await loadCurrentMatch();
@@ -184,6 +191,9 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
                     return;
                 }
             }
+			if (t.curM) {
+				setCurrentMatch(t.curM);
+			}
         } catch (e) {
             console.error('[Tournament] Error loading match:', e);
         }
@@ -430,6 +440,8 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
             updateReadyUI(t, {startBtn});
             if (!ws)
                 await initws(t);
+			t.curM.status = 'active';
+			setCurrentMatch(t.curM);
             if (ws?.isConnected())
                 ws.requestMatchState();
             await showMatch(t);
@@ -632,6 +644,8 @@ async function initws(t: Tournament): Promise<void> {
             t.curM.status = 'active';
             const gameContainer = document.getElementById('tournamentGameContainer');
             if (gameContainer) gameContainer.style.display = 'block';
+			t.curM.status = 'active';
+			setCurrentMatch(t.curM);
             await showMatch(t);
         },
 
@@ -648,7 +662,9 @@ async function initws(t: Tournament): Promise<void> {
                 
                 if (data.winnerId)
                     await postTournamentMatchWinner(t.id!, Number(data.matchId), Number(data.winnerId));
-                
+				
+				if (t.curM)
+					t.curM.status = 'completed';
                 const updatedT = await setEffectiveTournament(t.id!);
                 if (updatedT) {
                     t = updatedT;
@@ -662,6 +678,8 @@ async function initws(t: Tournament): Promise<void> {
         onMatchEnd: async (data) => {
             console.log('Match ended:', data);
             if (!t || !t.id) return;
+			if (t.curM && t.curM.status !== 'completed')
+				t.curM.status = 'completed';
             
             const updatedT = await setEffectiveTournament(t.id);
             if (updatedT) {
@@ -726,11 +744,11 @@ function cleanupActiveGame(): void {
     const t = getCurrentTournament();
     if (!t ||!t.curM)
         return;
+	t.curM.status = 'completed';
     if (t.curM.pong) {
         cleanupGame(t.curM.pong);
         t.curM.pong = undefined;
     }
-    
     
     isGameActive = false;
     console.log('✅ Tournament game cleaned up');
