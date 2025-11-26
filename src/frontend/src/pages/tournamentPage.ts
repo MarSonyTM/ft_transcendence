@@ -30,6 +30,7 @@ let ws: TournamentWebSocketManager | null = null;
 let lastRenderedCurrentMatchId: number | null = null;
 
 let isProcessingMatchEnd = false;
+let hasStartBeenClicked = false;
 
 async function initTournamentMatchGame(t: Tournament): Promise<void> {
     if (!t || !t.curM) {
@@ -422,6 +423,9 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
 
     startBtn.addEventListener('click', async () => {//TODO use onGameStart?
         if (!t || !t.curM) return console.debug('[Tournament] No current match to start');
+        // Disable button to prevent multiple clicks
+        startBtn.disabled = true;
+        hasStartBeenClicked = true;
         try {
             const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.curM.id}/start`, {
                 method: 'POST',
@@ -489,7 +493,7 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
     }
     if (opts.startBtn) {
         const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
-        if (bothReady && t.curM.status !== 'active') {
+        if (bothReady && t.curM.status !== 'active' && !hasStartBeenClicked) {
             opts.startBtn.disabled = false;
             if (ws) ws.sendReady(true);
             t.curM.status = 'ready';
@@ -498,7 +502,7 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
     }
     else if (start) {
         const bothReady = (t.curM.p1.tpt === 'ai' || t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || t.curM.p2.isReady);
-        if (bothReady && t.curM.status !== 'active') {
+        if (bothReady && t.curM.status !== 'active' && !hasStartBeenClicked) {
             start.disabled = false;
             if (ws) ws.sendReady(true);
             t.curM.status = 'ready';
