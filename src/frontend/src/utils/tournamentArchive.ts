@@ -1,5 +1,7 @@
 import { getApiEndpoint, Tournament, TournamentPlayer } from "../types/index";
 
+let list: Partial<Tournament>[];
+
 export interface TournamentArchiveEntry {
 	tournamentId: number;
 	players: TournamentPlayer[];//maybe simplify?
@@ -69,7 +71,6 @@ function closeTournamentArchive(): void {
 }
 
 async function populateArchive(): Promise<void> {
-	let list: any[] = [];
 	const archive = await fetchTournamentList();
 	list = archive.map((t: any) => ({
 		tournamentId: t.id,
@@ -85,6 +86,9 @@ async function populateArchive(): Promise<void> {
 	
 	list = list.filter(filterByArchive);
 
+	for (let i = 0; i < list.length; i++) {
+		list[i].id = list.length - i;
+	}
 
 	const tListArchive = document.getElementById('tArchiveList');
 	if (!tListArchive) return;
@@ -96,18 +100,12 @@ async function populateArchive(): Promise<void> {
 	tListArchive.innerHTML =
 		`<ul class="t-archive-ul">
 		${list.map((t: any) => {
-			const hasChampion = !!t.championAlias;
 			return `
-				<li class="t-archive-item">
-				<button class="t-archive-row" data-id="${t.tournamentId}" data-source="${t._source}" data-display-id="${t.displayId ?? t.tournamentId}">
-				<span class="t-arch-id">#${t.displayId ?? t.tournamentId}</span>
-				<span class="t-arch-status ${t.status}">${t.status}</span>
-				<span class="t-arch-meta">${new Date(t.createdAt).toLocaleString()}</span>
-				<span class="t-arch-players">${t.players} players</span>
-				<span class="t-arch-matches">${t.matches} matches</span>
-				${hasChampion ? `<span class="t-arch-champion">🏆</span>` : ''}
-				</button>
-			</li>`;
+				<div>
+					<button class="t-archive-row" data-id="${t.tournamentId}" data-source="${t._source}" data-display-id="${t.id ?? t.tournamentId}">
+							Tournament #${t.id}
+					</button>
+				</div>`;
 		}).join('')}
 		</ul>`;
 
@@ -120,7 +118,7 @@ async function populateArchive(): Promise<void> {
 	});
 }
 
-function filterByArchive(item: Tournament) {
+function filterByArchive(item: Partial<Tournament>) {
   if (item.status === 'archived') {
     return true;
   }
@@ -128,45 +126,199 @@ function filterByArchive(item: Tournament) {
 }
 
 async function showTournamentDetail(id: number): Promise<void> {
-	const tDetailArchive = document.getElementById('tArchiveDetail');
-	if (!tDetailArchive) return;
-	tDetailArchive.innerHTML = `<p class="t-archive-loading">Loading tournament #${id}...</p>`;
-	const data = await fetchTournamentById(id);
-	if (!data) {
-		tDetailArchive.innerHTML = `<p class="t-archive-error">Failed to load tournament.</p>`;
-		return;
-	}
+    const tDetailArchive = document.getElementById('tArchiveDetail');
+    if (!tDetailArchive) return;
+    
+    tDetailArchive.innerHTML = `<p class="t-archive-loading">Loading tournament #${id}...</p>`;
+    const data = await fetchTournamentById(id);
+    
+    if (!data) {
+        tDetailArchive.innerHTML = `<p class="t-archive-error">Failed to load tournament.</p>`;
+        return;
+    }
+    
+    const history = data.allMatches || [];
+    const players = data.players || [];
+    const champion = data.champion;
+    const champName = champion?.name || null;
+    
+    // Create match list HTML
+    const matchListHtml = history.length ? history.map((match: any) => {
+        // p1 and p2 are objects - extract the name property
+        const p1Name = match.p1?.name || ' (Bye)';
+        const p2Name = match.p2?.name ? ' vs ' + match.p2?.name : ' (Bye)';
+        
+        // Find winner by winnerId
+        const winner = players.find((p: any) => p.id === match.winnerId);
+        
+        return `
+            <div class="t-match-item" data-match-id="${match.gameId}">
+                <div class="t-match-players">${p1Name}${p2Name}</div>
+            </div>`;
+    }).join('') : '<p class="t-no-matches">No matches played yet</p>';
+    // Create main layout
+    tDetailArchive.innerHTML = `
+        <div class="t-archive-detail-inner">
+            <div class="t-detail-header">
+                <h4>Tournament #${selectedDisplayId ?? data.id}</h4>
+                <p class="t-status">
+                    ${champName ? `<span class="t-champion">🏆 Champion: <strong>${champName}</strong></span>` : ''}
+                </p>
+            </div>
+            
+            <div class="t-detail-content">
+                <!-- Left Panel: Match List -->
+                <div class="t-matches-panel">
+                    <h5>Match History (${history.length})</h5>
+                    <div class="t-matches-list">
+                        ${matchListHtml}
+                    </div>
+                </div>
+                
+                <!-- Right Panel: Match Details -->
+                <div class="t-match-detail-panel">
+                    <div class="t-match-detail-placeholder">
+                        <p>Select a match to view details</p>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    
+    // Add click handlers for matches
+    if (history.length > 0) {
+        const matchItems = tDetailArchive.querySelectorAll('.t-match-item');
+        matchItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const matchId = parseInt(item.getAttribute('data-match-id') || '0');
+                const match = history.find((h: any) => h.gameId === matchId);
+                if (match) {
+                    matchItems.forEach(mi => mi.classList.remove('active'));
+                    item.classList.add('active');
+                    showMatchDetail(match, history, players, data);
+                }
+            });
+        });
+    }
+}
 
-	const playersHtml = (data.players || []).map((p: any) => {
-		const stats = `${p.wins ?? 0}W-${p.losses ?? 0}L`;
-		return `<li>${p.name} ${p.eliminated ? '✖' : '✓'} (${stats})</li>`;
-	}).join('');
+function showMatchDetail(match: any, allMatches: any[], players: any[], tournamentData: any): void {
+    const detailPanel = document.querySelector('.t-match-detail-panel');
+    if (!detailPanel) return;
+    
+    // Extract player names from p1/p2 objects
+    const p1Name = match.p1?.name || match.p1?.username || 'Player 1';
+    const p2Name = match.p2?.name || match.p2?.username || 'Player 2';
+    
+    // Find winner by winnerId
+    const winner = players.find((p: any) => p.id === match.winnerId);
+    const winnerName = winner?.name || null;
+    
+    // Get player stats from the p1/p2 objects (they might have stats)
+    // or find them in the players array
+    const p1Stats = match.p1?.wins !== undefined 
+        ? `${match.p1.wins ?? 0}W - ${match.p1.losses ?? 0}L`
+        : '';
+    const p2Stats = match.p2?.wins !== undefined 
+        ? `${match.p2.wins ?? 0}W - ${match.p2.losses ?? 0}L`
+        : '';
+    
+    // Generate bracket visualization
+    const bracketHtml = generateBracketVisualization(allMatches, players);
+    
+    detailPanel.innerHTML = bracketHtml;
+        // <div class="t-match-detail-content">          
+        //     <!-- Player Grid (1x2) -->
+        //     <div class="t-players-grid">
+        //         <div class="t-player-card ${match.winnerId === match.p1?.id ? 'winner' : 'loser'}">
+        //             <div class="t-player-name">${p1Name}</div>
+        //             <div class="t-player-stats">${p1Stats}</div>
+        //             ${match.winnerId === match.p1?.id ? '<div class="t-winner-badge">🏆 Winner</div>' : '<div class="t-loser-badge">Loser</div>'}
+        //         </div>
+                
+        //         <div class="t-player-card ${match.winnerId === match.p2?.id ? 'winner' : 'loser'}">
+        //             <div class="t-player-name">${p2Name}</div>
+        //             <div class="t-player-stats">${p2Stats}</div>
+        //             ${match.winnerId === match.p2?.id ? '<div class="t-winner-badge">🏆 Winner</div>' : '<div class="t-loser-badge">Loser</div>'}
+        //         </div>
+        //     </div>
+            
+        //     <!-- Bracket Visualization -->
+        //     <div class="t-bracket-section">
+        //         <h6>Tournament Bracket</h6>
+        //         ${bracketHtml}
+        //     </div>
+        // </div>`;
+}
 
-	const history = data.matchHistory || [];
-	const historyHtml = history.length ? history.map((h: any) => {
-		const p1 = h.p1 || '?';
-		const p2 = h.p2 || '?';
-		const w = h.winner || '?';
-		return `<li>#${h.id} ${p1} vs ${p2} → <strong>${w}</strong></li>
-				<details open>
-				<p>Created At: ${h.createdAt}</p>
-				<p>Started At: ${h.startedAt ? h.startedAt : 'N/A'}</p>
-				<p>Finished At: ${h.endedAt ? h.endedAt : 'N/A'}</p>
-				</details>`;
-	}).join('') : '<li>(no matches)</li>';
-	const champName = data.champion?.name;
+function generateBracketVisualization(matches: any[], players: any[]): string {
+    if (!matches.length) return '<p class="t-no-bracket">No bracket data available</p>';
+    
+    // Group matches by round
+    const rounds: any[][] = [];
+    const maxRound = Math.max(...matches.map((m: any) => m.round || 0));
+    
+    if (maxRound > 0) {
+        for (let r = 1; r <= maxRound; r++) {
+            const roundMatches = matches.filter((m: any) => m.round === r);
+            if (roundMatches.length) rounds.push(roundMatches);
+        }
+    } else {
+        // Fallback: group by progression
+        let roundSize = Math.ceil(players.length / 2);
+        let matchIndex = 0;
+        
+        while (roundSize >= 1 && matchIndex < matches.length) {
+            const roundMatches = matches.slice(matchIndex, matchIndex + roundSize);
+            if (roundMatches.length) rounds.push(roundMatches);
+            matchIndex += roundSize;
+            roundSize = Math.ceil(roundSize / 2);
+        }
+    }
+    
+    // Generate bracket HTML
+    let bracketHtml = '<div class="t-bracket-container">';
+    
+    rounds.forEach((round, roundIdx) => {
+        bracketHtml += `
+            <div class="t-bracket-round">
+                <div class="t-round-label">${getRoundLabel(roundIdx, rounds.length)}</div>
+                <div class="t-round-matches">`;
+        
+        round.forEach(match => {
+            const p1Name = match.p1?.name || match.p1?.username || '(Bye)';
+            const p2Name = match.p2?.name || match.p2?.username || '(Bye)';
+            
+            bracketHtml += `
+                <div class="t-bracket-match ${match.isBye ? 'bye-match' : ''}">
+                    <div class="t-bracket-player ${match.winnerId === match.p1?.id ? 'won' : 'lost'}">${p1Name}</div>
+                    <div class="t-bracket-player ${match.winnerId === match.p2?.id ? 'won' : 'lost'}">${p2Name}</div>
+                </div>`;
+        });
+        
+        bracketHtml += `
+                </div>
+            </div>`;
+    });
+    
+    bracketHtml += '</div>';
+    return bracketHtml;
+}
 
-	tDetailArchive.innerHTML =
-		`<div class="t-archive-detail-inner">
-		<h4>Tournament #${selectedDisplayId ?? data.id}</h4>
-		<p>Status: <strong>${data.status}</strong> ${champName ? ` | Champion: <strong>${champName}</strong>` : ''}</p>
-		<details open>
-			<summary><strong>Players (${data.players.length})</strong></summary>
-			<ul class="t-archive-players">${playersHtml}</ul>
-		</details>
-		<details open>
-			<summary><strong>Match History (${history.length})</strong></summary>
-			<ul class="t-archive-history">${historyHtml}</ul>
-		</details>
-		</div>`;
+function getRoundLabel(roundIdx: number, totalRounds: number): string {
+    const roundsFromEnd = totalRounds - roundIdx - 1;
+    if (roundsFromEnd === 0) return 'Final';
+    if (roundsFromEnd === 1) return 'Semi-Final';
+    if (roundsFromEnd === 2) return 'Quarter-Final';
+    return `Round ${roundIdx + 1}`;
+}
+
+function formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
 }

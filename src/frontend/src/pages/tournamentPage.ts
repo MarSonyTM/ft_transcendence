@@ -794,11 +794,12 @@ async function initws(t: Tournament): Promise<void> {
             }
         },
 
-        onTournamentEnd: (tournamentId) => {
+        onTournamentEnd: async (tournamentId) => {
             console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
-                showTournamentEndScreen(t.championId);
+                showTournamentEndScreen(t.championId); //TODO: Here
+            await resetTournament();
         },
 
         onError: (err) => {
