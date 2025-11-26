@@ -255,14 +255,16 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls
-export function setupKeyboardControls(ws: any, playerId: string): void {
+export function setupKeyboardControls(ws: any, playerId: string, pongInstance?: PongGame): void {
     if (keyboardCleanup) {
         console.log('🧹 Cleaning up old keyboard handlers');
         keyboardCleanup();
     }
 
     const keys: { [key: string]: boolean } = {};
-    const hasLocal = pongGame && pongGame.hasLocal;
+    // Use provided pong instance (for tournaments) or fall back to global pongGame
+    const activePong = pongInstance || pongGame;
+    const hasLocal = activePong && activePong.hasLocal;
     const gameMode = getCurrentGameMode();
     
     const room = getCurrentRoom();

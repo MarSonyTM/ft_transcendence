@@ -133,7 +133,14 @@ async function handleTournamentMessage(tournamentId: number, playerId: number, m
 			if (keyMatch && keyMatch.gameId) {
 				const gameEngine = activeGames.get(keyMatch.gameId);
 				if (gameEngine && typeof gameEngine.setPlayerKeyState === 'function') {
-					const playerNumber = getMatchPlayerNumber(keyMatch, playerId);
+					// If isGuest is true, this is the local player (player 2), otherwise use the websocket playerId
+					let playerNumber;
+					if (message.isGuest) {
+						// Local player is always player 2
+						playerNumber = 2;
+					} else {
+						playerNumber = getMatchPlayerNumber(keyMatch, playerId);
+					}
 					gameEngine.setPlayerKeyState(playerNumber, message.key, message.pressed);
 				}
 			}

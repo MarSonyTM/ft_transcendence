@@ -374,6 +374,12 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         t.curM.pong.gameState.mode = '2P';
         t.curM.pong.gameId = t.curM.gameId;
         
+        // Check if we have local players and set hasLocal flag
+        const hasLocalP1 = t.curM.p1?.tpt === 'local';
+        const hasLocalP2 = t.curM.p2?.tpt === 'local';
+        t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
+        console.log(`🎮 Tournament match has local players: ${t.curM.pong.hasLocal} (P1: ${t.curM.p1?.tpt}, P2: ${t.curM.p2?.tpt})`);
+        
         // Initialize players array
         t.curM.pong.gameState.players = [
             { pos: 70, score: 0, name: t.curM.p1?.name || 'Player 1' },
@@ -393,7 +399,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         await initws(t);
 
     if (t.curM.pong)
-        setupKeyboardControls(ws, t.curM.p1.id.toString());
+        setupKeyboardControls(ws, t.curM.p1.id.toString(), t.curM.pong);
 
     removePingPongBalls();
 }
@@ -612,7 +618,7 @@ async function initws(t: Tournament): Promise<void> {
         onConnect: () => {
             console.log('✅ Tournament WebSocket connected');
             ws?.requestState();
-            setupKeyboardControls(ws, wsPlayerId!.toString());
+            setupKeyboardControls(ws, wsPlayerId!.toString(), t.curM?.pong);
         },
 
         onTournamentState: (tournament) => {
@@ -691,9 +697,14 @@ async function initws(t: Tournament): Promise<void> {
             t.curM.status = 'active';
             setCurrentMatch(t.curM);
             
-            // Update pong instance gameId if it exists
+            // Update pong instance gameId and hasLocal flag if it exists
             if (t.curM.pong) {
                 t.curM.pong.gameId = gameId;
+                // Ensure hasLocal is set for keyboard controls
+                const hasLocalP1 = t.curM.p1?.tpt === 'local';
+                const hasLocalP2 = t.curM.p2?.tpt === 'local';
+                t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
+                console.log(`🎮 hasLocal flag set to ${t.curM.pong.hasLocal} for keyboard controls`);
             }
             
             // Show the game container FIRST

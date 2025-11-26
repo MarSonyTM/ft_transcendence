@@ -219,8 +219,8 @@ export class TournamentWebSocketManager {
         this.send({ type: 'move', position });
     }
 
-    sendKeyState(key: string, pressed: boolean): void {
-        this.send({ type: 'keyState', key, pressed });
+    sendKeyState(key: string, pressed: boolean, isGuest: boolean = false): void {
+        this.send({ type: 'keyState', key, pressed, isGuest });
     }
 
     private send(message: any): void {
