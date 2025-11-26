@@ -1,4 +1,4 @@
-import { database, GameState, Player } from "../database/index";
+import { database, TournamentArchiveEntry } from "../database/index";
 import { Tournament, TournamentMatch, TournamentPlayer, TPT } from "../types/index";
 import { BaseGameEngine, createGameEngine } from "../game/gameEngine";
 // import { Player } from "../../../shared/gameTypes";
@@ -397,7 +397,7 @@ class TournamentManager {
 			console.log(`Ending tournament ${tournamentId}`);
 			this.computeChampionIfPossible(tournamentId);
 			const t = db.updateTournament(tournamentId, {
-				status: 'completed',
+				status: 'archived',
 				endedAt: new Date().toISOString()
 			});
 			if (!t) throw new Error('Failed to update tournament');

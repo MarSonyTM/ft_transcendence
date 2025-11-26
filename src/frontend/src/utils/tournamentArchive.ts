@@ -1,4 +1,4 @@
-import { getApiEndpoint, TournamentPlayer } from "../types/index";
+import { getApiEndpoint, Tournament, TournamentPlayer } from "../types/index";
 
 export interface TournamentArchiveEntry {
 	tournamentId: number;
@@ -82,6 +82,9 @@ async function populateArchive(): Promise<void> {
 		startedAt: t.startedAt,
 		endedAt: t.endedAt,
 	}));
+	
+	list = list.filter(filterByArchive);
+
 
 	const tListArchive = document.getElementById('tArchiveList');
 	if (!tListArchive) return;
@@ -115,6 +118,13 @@ async function populateArchive(): Promise<void> {
 			await showTournamentDetail(id);
 		});
 	});
+}
+
+function filterByArchive(item: Tournament) {
+  if (item.status === 'archived') {
+    return true;
+  }
+  return false;
 }
 
 async function showTournamentDetail(id: number): Promise<void> {

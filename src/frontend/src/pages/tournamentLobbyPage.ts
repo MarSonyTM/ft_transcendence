@@ -12,6 +12,7 @@ import {
 	deleteTournament
 } from '../utils/tournamentUtils';
 import { renderTournamentPage } from './tournamentPage';
+import { openTournamentArchive } from '../utils/tournamentArchive'
 import { renderApp } from '../main';
 import { PongGame } from '../game/PongGame';
 
@@ -62,12 +63,15 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">x</button></ul>
 			<div class="t-footer">
 				<div class="t-actions">
+					<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
 					<button id="clearBtn" class="btn btn-end t-flex-1">Clear</button>
 					<button id="startBtn" class="btn btn-start t-flex-1">Start Tournament</button>
 					<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
 				</div>
 			</div>
 		</div>`;
+
+	document.getElementById('archiveBtn')?.addEventListener('click', () => openTournamentArchive());
 
 	const listEl = document.getElementById('playersList') as HTMLUListElement;
 	const rerender = async () => {
