@@ -32,40 +32,55 @@ let lastRenderedCurrentMatchId: number | null = null;
 let isProcessingMatchEnd = false;
 let hasStartBeenClicked = false;
 
+// This function is now only called from showMatch() when the canvas is visible
 async function initTournamentMatchGame(t: Tournament): Promise<void> {
     if (!t || !t.curM) {
         console.error('❌ No tournament or match');
         return;
     }
     
-    console.log('🎮 Initializing tournament match game...');
+    console.log('🎮 Initializing tournament match 3D scene...');
     
-    t.curM.pong = new PongGame();
-    
-    // Set game mode and ID
-    t.curM.pong.gameState.mode = '2P';
-    t.curM.pong.gameId = t.curM.gameId;
+    // Pong instance should already exist, just initialize 3D
+    if (!t.curM.pong) {
+        console.error('❌ PongGame instance should already exist!');
+        return;
+    }
     
     // Get canvas ready
     const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
-    if (canvas) {
-        t.curM.pong.canvas = canvas;
-        t.curM.pong.ctx = canvas.getContext('2d');
-        
-        try {
-            const baby = new baby3D(t.curM.pong);
-            await baby.createScene();
-            t.curM.pong.babylonGame = baby;
-            console.log('✅ 3D renderer created for tournament');
-        } catch (e) {
-            console.error('❌ Failed to start 3D renderer:', e);
-        }
-    } else {
+    if (!canvas) {
         console.error('❌ Canvas not found!');
         return;
     }
     
-    console.log('✅ Tournament match game initialized');
+    // Check if canvas is visible
+    const container = document.getElementById('tournamentGameContainer');
+    if (!container || container.style.display === 'none') {
+        console.error('❌ Canvas container is not visible!');
+        return;
+    }
+    
+    t.curM.pong.canvas = canvas;
+    t.curM.pong.ctx = canvas.getContext('2d');
+    
+    try {
+        const baby = new baby3D(t.curM.pong);
+        await baby.createScene();
+        t.curM.pong.babylonGame = baby;
+        console.log('✅ 3D renderer created for tournament');
+        
+        // Start render loop immediately
+        if (t.curM.pong.startRenderLoop) {
+            t.curM.pong.startRenderLoop();
+            console.log('✅ Render loop started');
+        }
+    } catch (e) {
+        console.error('❌ Failed to start 3D renderer:', e);
+        throw e;
+    }
+    
+    console.log('✅ Tournament match 3D scene initialized');
 }
 
 function matchBracketHTML(t: Tournament): string {
@@ -349,9 +364,26 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     }
 
     renderMatchControls(box, t);
+    
+    // Create a basic PongGame instance but DON'T initialize 3D yet (canvas is hidden)
     if (!t.curM.pong) {
-        t.curM.pong = new PongGame;
-        t.curM.pong!.gameId = t.curM.gameId;
+        console.log('🎮 Creating PongGame instance (3D will initialize when game starts)');
+        t.curM.pong = new PongGame();
+        t.curM.pong.gameState.mode = '2P';
+        t.curM.pong.gameId = t.curM.gameId;
+        
+        // Initialize players array
+        t.curM.pong.gameState.players = [
+            { pos: 70, score: 0, name: t.curM.p1?.name || 'Player 1' },
+            { pos: 70, score: 0, name: t.curM.p2?.name || 'Player 2' }
+        ] as any;
+        
+        // Initialize ball state
+        t.curM.pong.gameState.ballPosX = 200;
+        t.curM.pong.gameState.ballPosY = 100;
+        t.curM.pong.gameState.ballVelX = 0;
+        t.curM.pong.gameState.ballVelY = 0;
+        
         setGameScreen(t.curM.pong);
     }
 
@@ -362,7 +394,6 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         setupKeyboardControls(ws, t.curM.p1.id.toString());
 
     removePingPongBalls();
-    t.curM.pong.createGame();
 }
 
 function renderMatchControls(box: HTMLElement, t: Tournament): void {
@@ -614,9 +645,15 @@ async function initws(t: Tournament): Promise<void> {
         onGameState: (state) => {
             if (!t.curM || !t.curM.pong) return;
             
+            // Update ball position
             if (state.ballPosX !== undefined) t.curM.pong.gameState.ballPosX = state.ballPosX;
             if (state.ballPosY !== undefined) t.curM.pong.gameState.ballPosY = state.ballPosY;
+            
+            // Update ball velocity (critical for rendering!)
+            if (state.ballVelX !== undefined) t.curM.pong.gameState.ballVelX = state.ballVelX;
+            if (state.ballVelY !== undefined) t.curM.pong.gameState.ballVelY = state.ballVelY;
 
+            // Update player positions and scores
             if (state.players) {
                 for (let i = 0; i < state.players.length; i++) {
                     if (!t.curM.pong.gameState.players[i]) {
@@ -631,6 +668,7 @@ async function initws(t: Tournament): Promise<void> {
                 }
             }
             
+            // Update score display
             const p1Score = document.getElementById('player1score');
             const p2Score = document.getElementById('player2score');
             if (p1Score && t.curM.pong.gameState.players[0]?.score !== undefined) {
@@ -644,13 +682,58 @@ async function initws(t: Tournament): Promise<void> {
         onGameStart: async (matchId, gameId) => {
             console.log(`🎮 Game started: matchId=${matchId}, gameId=${gameId}`);
             if (!t || !t.curM) return;
+            
+            // Update game ID and status
             t.curM.gameId = gameId;
             t.curM.status = 'active';
+            setCurrentMatch(t.curM);
+            
+            // Update pong instance gameId if it exists
+            if (t.curM.pong) {
+                t.curM.pong.gameId = gameId;
+            }
+            
+            // Show the game container FIRST
             const gameContainer = document.getElementById('tournamentGameContainer');
-            if (gameContainer) gameContainer.style.display = 'block';
-			t.curM.status = 'active';
-			setCurrentMatch(t.curM);
-            await showMatch(t);
+            if (gameContainer) {
+                gameContainer.style.display = 'block';
+            }
+            
+            // Wait a frame to ensure canvas is laid out
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            
+            // NOW initialize the 3D scene (canvas is visible)
+            if (t.curM.pong && !t.curM.pong.babylonGame) {
+                console.log('🎮 Initializing 3D scene now that container is visible...');
+                const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+                if (canvas) {
+                    t.curM.pong.canvas = canvas;
+                    t.curM.pong.ctx = canvas.getContext('2d');
+                    
+                    try {
+                        const baby = new baby3D(t.curM.pong);
+                        await baby.createScene();
+                        t.curM.pong.babylonGame = baby;
+                        console.log('✅ 3D renderer created for tournament');
+                        
+                        // Start render loop
+                        if (t.curM.pong.startRenderLoop) {
+                            t.curM.pong.startRenderLoop();
+                            console.log('✅ Render loop started');
+                        }
+                    } catch (e) {
+                        console.error('❌ Failed to start 3D renderer:', e);
+                    }
+                }
+            }
+            
+            // Make sure pong is active
+            if (t.curM.pong) {
+                t.curM.pong.isActive = true;
+                console.log('✅ Game is now active and ready');
+            } else {
+                console.error('❌ No pong instance found when game started!');
+            }
         },
 
         onGameEnd: async (data) => {
@@ -720,27 +803,20 @@ async function showMatch(t: Tournament): Promise<void> {
         return;
     }
     
-    console.log('🎮 Starting tournament match display...');
+    console.log('🎮 showMatch called - but 3D initialization happens in onGameStart now');
     
+    // Just ensure the container is visible
     const gameContainer = document.getElementById('tournamentGameContainer');
     if (gameContainer) {
         gameContainer.style.display = 'block';
     }
     
-    // Initialize tournament-specific game
-    await initTournamentMatchGame(t);
-    
     if (t.curM.pong) {
         t.curM.pong.isActive = true;
-        
-        // Start render loop
-        if (t.curM.pong.startRenderLoop) {
-            t.curM.pong.startRenderLoop();
-        }
     }
     
     isGameActive = true;
-    console.log('✅ Tournament match game started');
+    console.log('✅ Match display ready');
 }
 
 function cleanupActiveGame(): void {

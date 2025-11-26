@@ -5,6 +5,7 @@ import { activeGames } from './game';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { registerTournamentGame } from '../websocket/websocketHandler';
+import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 
 async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions) {
 
@@ -390,12 +391,28 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				});
 			}
 			
-			// if (m && m.id) {
-			// 	m.status = 'active';
-			// 	m = database.tournaments.updateMatch(m);
-			// 	if (!m)
-			// 		return reply.status(400).send({ success: false, message: 'Failed to update match' });
-			// }
+			// Update match status to 'active'
+			if (m && m.id) {
+				m.status = 'active';
+				m.startedAt = new Date().toISOString();
+				m = database.tournaments.updateMatch(m);
+				if (!m)
+					return reply.status(400).send({ success: false, message: 'Failed to update match status' });
+				
+				// Update the tournament's current match reference
+				const tournamentUpdate = database.tournaments.updateTournament(tId, { curM: m });
+				if (!tournamentUpdate) {
+					console.error(`Failed to update tournament ${tId} with new match status`);
+				}
+			}
+
+			// Broadcast game start to all tournament players
+			broadcastGameStartToMatch(mId, gameId);
+			console.log(`📡 Broadcasted game start for match ${mId}, game ${gameId}`);
+
+			// Broadcast updated tournament state to all players so UI updates
+			broadcastTournamentState(tId);
+			console.log(`📡 Broadcasted tournament state update for tournament ${tId}`);
 
 			return reply.send({ success: true, data: m });
 		} catch (error) {
