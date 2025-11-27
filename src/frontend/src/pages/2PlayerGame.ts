@@ -5,6 +5,7 @@ import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
+import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 
 export let pongGame: PongGame | null = null;
 let keyboardCleanup: (() => void) | null = null;
@@ -16,7 +17,6 @@ export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     	pongGame = new PongGame();
 	else
 		pongGame = pong;
-	console.warn(pongGame);
 
     if (room)
         pongGame.hasLocal = room.players.some(p => p.id === 'local');
@@ -185,31 +185,19 @@ export async function setupGameButtons(pongGame: PongGame): Promise<void> {
 }
 
 // Initialize room-based multiplayer game
-export async function initRoomBasedGame(room: any, pong?: PongGame, isT: boolean = false): Promise<void> {
+async function initRoomBasedGame(room: any): Promise<void> {
     if (!pongGame) {
-        if (pong)
-            pongGame = pong || null;
-        if (!pongGame) {
-            console.error('No pongGame instance');
-            return;
-        }
+        console.error('No pongGame instance');
+        return;
     }
+    
     const user = await authService.getCurrentUser();
     
     if (!user) {
         console.error('No authenticated user for room game');
         return;
     }
-
-    const playerId = room.players[0].id.toString() || user?.id?.toString() || `guest-${Date.now()}`;
-    const gameMode = getCurrentGameMode();
-
-    console.log('Initializing room-based game:', {
-        roomId: room.roomId,
-        playerId,
-        gameId: room.gameId,
-        gameMode
-    });
+    const playerId = user?.id?.toString() || room.players[0].id.toString() || `guest-${Date.now()}`;
 
     // Initialize WebSocket connection to room
     pongGame.roomWS = initRoomWebSocket({
@@ -254,8 +242,7 @@ export async function initRoomBasedGame(room: any, pong?: PongGame, isT: boolean
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
         
-            if (!isT)
-                showGameEndScreen(winnerId, winnerName, pongGame!);
+            showGameEndScreen(winnerId, winnerName, pongGame!);
         },
     });
 
@@ -267,30 +254,20 @@ export async function initRoomBasedGame(room: any, pong?: PongGame, isT: boolean
 }
 
 // Setup keyboard controls
-export function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
-    // Clean up any existing handlers first!
+export function setupKeyboardControls(ws: any, playerId: string, pongInstance?: PongGame): void {
     if (keyboardCleanup) {
         console.log('🧹 Cleaning up old keyboard handlers');
         keyboardCleanup();
     }
 
     const keys: { [key: string]: boolean } = {};
-    const hasLocal = pongGame && pongGame.hasLocal;
+    // Use provided pong instance (for tournaments) or fall back to global pongGame
+    const activePong = pongInstance || pongGame;
+    const hasLocal = activePong && activePong.hasLocal;
     const gameMode = getCurrentGameMode();
     
-    // DEBUG: Check what's in the room
     const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
     
-    console.log('🔍 DEBUG Setup Controls:', { 
-        playerId,
-        userFromAuth: user,
-        roomPlayers: room?.players,
-        hasLocal,
-        gameMode
-    });
-    
-    // Verify this player is in the room
     if (room) {
         const playerInRoom = room.players.find((p: any) => p.id === playerId);
         if (!playerInRoom) {
@@ -351,7 +328,7 @@ export function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string
 
 
 // Sync game state from room WebSocket
-function syncGameStateFromRoom(state: any): void {
+export function syncGameStateFromRoom(state: any): void {
     if (!pongGame || !pongGame.gameState) return;
 
     // Merge delta updates - only update fields that are present

@@ -2,13 +2,9 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { PongGame } from '../game/PongGame';
 import { authService } from '../utils/auth';
-import { cleanupGame } from '../utils/gameUtils';
+import { cleanupGame, setGameScreen } from '../utils/gameUtils';
 import { openTournamentArchive } from '../utils/tournamentArchive';
 import {
-    unwrapPayload,
-    normalizeMatch,
-    normalizePlayer,
-    normalizeTournament,
     findPlayer,
     resetTournament,
     loadCurrentMatch,
@@ -16,41 +12,45 @@ import {
     setEffectiveTournament,
     postTournamentMatchWinner,
     showTournamentEndScreen,
+    deleteTournament
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
-import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
+import { MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
 import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
-import { initRoomBasedGame, setupGameButtons, setupKeyboardControls } from './2PlayerGame';
-import { setCurrentRoom } from '../utils/roomState';
+import { setupKeyboardControls } from './2PlayerGame';
+import { removePingPongBalls } from '../utils/pingPongBalls';
+import { baby3D } from '../game/game3D';
 
-let activeMatch: PongGame | undefined = undefined;
 let isGameActive = false;
-let tWS: TournamentWebSocketManager | null = null;
+let ws: TournamentWebSocketManager | null = null;
 let lastRenderedCurrentMatchId: number | null = null;
 
+let isProcessingMatchEnd = false;
+
 function matchBracketHTML(t: Tournament): string {
-    const sortedByRound = new Map<number, TournamentMatch[]>();
-    let round: TournamentMatch[] = [];
-    for (let i = 1; round = t.allMatches.filter(m => m.round === i).slice(); i++) {
-        if (round.length > 0) break;
-        sortedByRound.set(i, round);
+    if (!t.allMatches || t.allMatches.length === 0) {
+        return '<div class="t-bracket"><p>No matches yet</p></div>';
     }
-    const curRound = t.curM?.round || t.round || 1;
+    
     const rounds = new Map<number, TournamentMatch[]>();
-    for (let [r, matches] of sortedByRound.entries()) {
-        if (r >= curRound)
-            rounds.set(r, matches);
+    for (const m of t.allMatches) {
+        const r = m.round || 1;
+        if (!rounds.has(r)) {
+            rounds.set(r, []);
+        }
+        rounds.get(r)!.push(m);
     }
 
     let roundHtml = '';
-    for (let r of rounds.keys()) {
-        let matches = rounds.get(r);
-        if (!matches) break;
+    const sortedRounds = Array.from(rounds.keys()).sort((a, b) => a - b);
+    
+    for (const r of sortedRounds) {
+        const matches = rounds.get(r) || [];
         const cards = matches.map(m => {
             const p1 = m.p1?.name || '—';
             const p2 = m.p2?.name || '—';
-            const status = MSmap.get(m.status) || '—';
+            const status = MSmap.get(m.status) || m.status || '—';
             const isCurrent = t.curM && t.curM.id === m.id;
             
             return `<div class="t-match-card ${m.status} ${isCurrent ? 'current' : ''}">
@@ -65,16 +65,23 @@ function matchBracketHTML(t: Tournament): string {
         }).join('');
         roundHtml += `<div class="t-bracket-round"><h4>Round ${r}</h4><div class="t-bracket-grid">${cards}</div></div>`;
     }
+    
     return `<div class="t-bracket">${roundHtml}</div>`; 
 }
 
-async function waitForNextMatch(tournamentId: number, attempts = 8, delayMs = 500): Promise<boolean> {
+async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
     let t = getCurrentTournament();
     if (!t) return false;
+	if (t.curM && t.curM.status === 'completed') {
+        t.curM = null;
+    }
     for (let i = 0; i < attempts; i++) {
         try {
             t.curM = await loadCurrentMatch();
-            if (t.curM) return true;
+            if (t.curM) {
+				setCurrentMatch(t.curM);
+				return true;
+			}
         } catch {}
         await new Promise(res => setTimeout(res, delayMs));
     }
@@ -119,33 +126,35 @@ function statusComplete(content: HTMLElement): void {
     });
 }
 
-export async function renderTournamentContent(t?: Tournament): Promise<void> {
-    if (!t)
-        t = getCurrentTournament() || undefined;
+export async function renderTournamentContent(t: Tournament): Promise<void> {
     const content = document.getElementById('tournamentContent');
     if (!content) {
         console.error('[Tournament] No tournament content element found');
         return;
     }
-    if (!t) return;
+    if (!t)
+        return;
     if (t.status === 'setup') {
         await renderSetup(content);
         return;
     }
     if (t.status === 'completed') {
-        statusComplete(content);
+        statusComplete(content);//TODO switch to showTournamentEndScreen
         return;
     }
-    if (!t.curM) {
+    if (!t.curM || t.curM.status === 'completed') {
         content.innerHTML = '<p>Loading match data...</p>';
         try {
             t.curM = await loadCurrentMatch();
             if (!t.curM && t.status === 'active') {
-                if (!(await waitForNextMatch(t.id!))) {
+                if (!(await waitForNextMatch())) {
                     content.innerHTML = '<p>No current match available</p>';
                     return;
                 }
             }
+			if (t.curM) {
+				setCurrentMatch(t.curM);
+			}
         } catch (e) {
             console.error('[Tournament] Error loading match:', e);
         }
@@ -154,32 +163,26 @@ export async function renderTournamentContent(t?: Tournament): Promise<void> {
         content.innerHTML = '<p>No current match available</p>';
         return;
     }
+    
+    const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
+        headers: { 'Content-Type': 'application/json' }
+    });
 
-    if (!t.players) {
-        const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/player`, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (!resp.ok) {
-            console.error('[Tournament] Failed to fetch tournament players:', resp.status);
-            return;
-        }
-        const data = await resp.json();
-        if (!data || !data.data) {
-            console.error('[Tournament] Invalid player data received:', data);
-            return;
-        }
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return;
-        t.players = raw.map(normalizePlayer);
-        if (!t.players || t.players.length === 0) {
-            console.debug('[Tournament] No players found in tournament after fetch');
-            content.innerHTML = '<p>No players found in tournament</p>';
-            return;
-        }
+    if (!resp.ok) {
+        console.error('[Tournament] Failed to fetch tournament players:', resp.status);
+        return;
     }
-    if (!t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id) {
-        console.debug('[Tournament] Current match players not fully assigned yet');
+    const data = await resp.json();
+    if (!data || !data.data) {
+        console.error('[Tournament] Invalid player data received:', data);
+        return;
+    }
+    t = data.data as Tournament;
+    if (!t || !t.players || t.players.length === 0) {
+        content.innerHTML = '<p>No players found in tournament</p>';
+        return;
+    }
+    if (!t.curM || !t.curM.p1 || !t.curM.p2) {
         content.innerHTML = '<p>Waiting for players to be assigned...</p>';
         return;
     }
@@ -195,9 +198,6 @@ export async function renderTournamentContent(t?: Tournament): Promise<void> {
         <div id="tournamentGameContainer" class="t-game-container" style="display: none">
             <div id="pureGameContainer">
                 <h3 class="t-game-title">Live Match</h3>
-                <div class="game-status">
-                    <div>Status: <span id="gameStatus" class="status-text">Initializing...</span></div>
-                </div>
                 <div class="player-info">
                     <div class="player-names">
                         <span id="player1Name" class="player1-name">${t.curM.p1.name || 'Player 1'}</span>
@@ -241,15 +241,15 @@ export async function renderTournamentContent(t?: Tournament): Promise<void> {
             console.log('[Tournament] No active game to show/hide');
             return;
         }
-        const isVisible = pure.style.display !== 'none';//TODO
+        const isVisible = pure.style.display !== 'none';
         pure.style.display = isVisible ? 'none' : 'block';
         btn.textContent = isVisible ? 'Show Game' : 'Hide Game';
     });
 
     document.getElementById('backBtn')?.addEventListener('click', async () => {
-        if (confirm('Leave tournament page? Any active games will be ended.')) {
+        if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
-            await resetTournament();
+            await deleteTournament(getCurrentTournament()?.id!);
             history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
             setCurrentPage('gameSelect');
             await renderApp();
@@ -271,32 +271,81 @@ export async function renderTournamentContent(t?: Tournament): Promise<void> {
 	});
 
     const box = document.getElementById('currentMatchBox')!;
-    if (t.id && t.curM.status === 'completed') {
-        box.innerHTML = '<p>Match completed. Loading next match...</p>';
-        if (await waitForNextMatch(t.id))
-            await renderTournamentContent(t);
-        return;
+
+    if (!t.curM || t.curM.status === 'completed') {
+        box.innerHTML = '<p>Loading next match...</p>';
+        const nextMatch = await loadCurrentMatch();
+        if (nextMatch && nextMatch.status !== 'completed') {
+            t.curM = nextMatch;
+            setCurrentMatch(nextMatch);
+            renderMatchControls(box, t);
+            if (!ws || !ws.isConnected())
+                await initws(t);
+            return;
+        } else if (!nextMatch) {
+            const refreshedT = await setEffectiveTournament(t.id!);
+            if (refreshedT && refreshedT.status === 'completed') {
+                statusComplete(document.getElementById('tournamentContent')!);
+                return;
+            }
+            box.innerHTML = '<p>Waiting for next round to be scheduled...</p>';
+            return;
+        }
     }
+
     if (t.curM.status === 'active') {
         box.innerHTML = '<p>Match in progress...</p>';
         await showMatch(t);
-        // await renderTournamentContent(t);
         return;
     }
+
     if (!t.curM.p1 || !t.curM.p1.id || !t.curM.p2 || !t.curM.p2.id) {
         box.innerHTML = '<p>Waiting for players to be assigned...</p>';
         return;
     }
+
     renderMatchControls(box, t);
     
-    if (!tWS)
-        initTWS(t);
+    // Create a basic PongGame instance but DON'T initialize 3D yet (canvas is hidden)
+    if (!t.curM.pong) {
+        console.log('🎮 Creating PongGame instance (3D will initialize when game starts)');
+        t.curM.pong = new PongGame();
+        t.curM.pong.gameState.mode = '2P';
+        t.curM.pong.gameId = t.curM.gameId;
+        
+        // Check if we have local players and set hasLocal flag
+        const hasLocalP1 = t.curM.p1?.tpt === 'local';
+        const hasLocalP2 = t.curM.p2?.tpt === 'local';
+        t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
+        console.log(`🎮 Tournament match has local players: ${t.curM.pong.hasLocal} (P1: ${t.curM.p1?.tpt}, P2: ${t.curM.p2?.tpt})`);
+        
+        // Initialize players array
+        t.curM.pong.gameState.players = [
+            { pos: 70, score: 0, name: t.curM.p1?.name || 'Player 1' },
+            { pos: 70, score: 0, name: t.curM.p2?.name || 'Player 2' }
+        ] as any;
+        
+        // Initialize ball state
+        t.curM.pong.gameState.ballPosX = 200;
+        t.curM.pong.gameState.ballPosY = 100;
+        t.curM.pong.gameState.ballVelX = 0;
+        t.curM.pong.gameState.ballVelY = 0;
+        
+        setGameScreen(t.curM.pong);
+    }
+
+    if (!ws || !ws.isConnected())
+        await initws(t);
+
+    if (t.curM.pong)
+        setupKeyboardControls(ws, t.curM.p1.id.toString(), t.curM.pong);
+
+    removePingPongBalls();
 }
 
 function renderMatchControls(box: HTMLElement, t: Tournament): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id)
         return console.debug('No current match or players to render controls for');
-
 
     box.innerHTML = `
         <p class="t-info-bold">Next Match:</p>
@@ -325,7 +374,7 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
     updateReadyUI(t, {p1Btn, p2Btn, startBtn});
     
 
-    p1Btn.addEventListener('click', () => {//TODO
+    p1Btn.addEventListener('click', () => {
         const target = p1Btn;
         const pidStr = target.getAttribute('data-player');
         const pid = pidStr ? Number(pidStr) : NaN;
@@ -349,8 +398,11 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
         }
     });
 
-    startBtn.addEventListener('click', async () => {//TODO use onGameStart?
-        if (!t || !t.curM) return console.debug('[Tournament] No current match to start');
+    startBtn.addEventListener('click', async () => {
+        if (!t || !t.curM)
+            return console.debug('No current match to start');
+        // Disable button to prevent multiple clicks
+        startBtn.disabled = true;
         try {
             const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.curM.id}/start`, {
                 method: 'POST',
@@ -361,23 +413,17 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
                 alert(data?.message || `Failed to start (HTTP ${resp.status})`);
                 return;
             }
-            const raw = unwrapPayload<any>(data);
-            if (!raw) return null;
-            t.curM = normalizeMatch(raw);
-			if (!t || !t.curM)
-				throw new Error('No current Tournament');  
+            t.curM = data.data as TournamentMatch;
+			if (!t.curM)
+				return;
             updateReadyUI(t, {startBtn});
-            if (!tWS)
-                await initTWS(t);
-            if (tWS?.isConnected())
-                tWS.requestMatchState();
-			t.curM.pong = new PongGame;
-			if (!t.curM.pong)
-				throw new Error('Create new PongGame for Tournament failed');
-			t.curM.pong.gameId = t.curM.gameId;
-			t.curM.pong.createGame();
+            if (!ws)
+                await initws(t);
+			t.curM.status = 'active';
+			setCurrentMatch(t.curM);
+            if (ws?.isConnected())
+                ws.requestMatchState();
             await showMatch(t);
-            // await renderTournamentContent(t);
             console.log('[Tournament] Match start initiated');
         } catch (e) {
             console.error('[Tournament] Failed to start match:', e);
@@ -419,28 +465,26 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
             opts.p2Btn.textContent = '...ready?';
         }
     }
-    if (opts.startBtn) {
-        const bothReady = (t.curM.p1.tpt === 'ai' || !!t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || !!t.curM.p2.isReady);
-        if (bothReady && t.curM.status !== 'active') {
-            opts.startBtn.disabled = false;
-            if (tWS) tWS.sendReady(true);
-            t.curM.status = 'ready';
-        }
-        else opts.startBtn.disabled = true;
-    }
-    else if (start) {
+    if (opts.startBtn || start) {
+        let startBtn: HTMLButtonElement = opts.startBtn ? opts.startBtn : start;
         const bothReady = (t.curM.p1.tpt === 'ai' || t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || t.curM.p2.isReady);
-        if (bothReady && t.curM.status !== 'active') {
-            start.disabled = false;
-            if (tWS) tWS.sendReady(true);
+        if (bothReady && t.curM.status !== 'active' && t.curM.status !== 'completed') {
+            startBtn.disabled = false;
+            if (ws)
+                ws.sendReady(true);
             t.curM.status = 'ready';
         }
-        else start.disabled = true;
+        else {
+            startBtn.disabled = true;
+            // if (ws)
+            //     ws.sendReady(false);
+            // t.curM.status = 'pending';
+        }
     }
     updateMatchInTournament(t.curM);
 }
 
-async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLButtonElement | null): Promise<void> {
+async function togglePlayerReady(t: Tournament | null, playerId: number, button: HTMLButtonElement | null): Promise<void> {
     if (!button) return;
     if (!t || !t.curM) return;
     try {
@@ -453,22 +497,20 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
             return;
         }
         const data = await resp.json();
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return;
-        t = normalizeTournament(raw);
-        setCurrentTournament(t);
+        t = data.data as Tournament;
         if (!t || !t.id)
             return;
         t = await setEffectiveTournament(t.id);
         if (!t || !t.id || !t.curM || !t.curM.p1 || !t.curM.p2) return;
 
-        if (t.curM.p1.id === playerId)
+        if (t.curM.p1 && t.curM.p1.id === playerId)
             updateReadyUI(t, {p1Btn: button});
-        else if (t.curM.p2.id === playerId)
+        else if (t.curM.p2 && t.curM.p2.id === playerId)
             updateReadyUI(t, {p2Btn: button});
-		if (!tWS) initTWS(t);
-        if (tWS && tWS.isConnected()) {
-            tWS.requestMatchState();
+		if (!ws)
+            initws(t);
+        if (ws && ws.isConnected()) {
+            ws.requestMatchState();
         } else {
             console.warn('WS not connected; skipped requestMatchState');
         }
@@ -477,40 +519,56 @@ async function togglePlayerReady(t: Tournament, playerId: number, button: HTMLBu
     }
 }
 
-async function initTWS(t: Tournament): Promise<void> {
-    if (tWS) return;
+async function initws(t: Tournament): Promise<void> {
+    if (ws && ws.isConnected()) {
+        console.log('WebSocket already connected, skipping init');
+        return;
+    }
     if (!t || !t.id) return;
+    if (!t.curM!.pong) {
+        console.error('No t.curM.pong instance');
+        return;
+    }
+
     const user = await authService.getCurrentUser();
-    if (!user) return;
+
+    if (!user) {
+        console.error('No authenticated user for room game');
+        return;
+    }
 
     const hostPlayer = t.players.find(p => p.tpt === 'host' || p.user?.id === user.id);
-    const wsPlayerId = hostPlayer?.id != null ? String(hostPlayer.id) : String(user.id);
+    const wsPlayerId = hostPlayer?.id != null ? hostPlayer.id : user.id;
 
-    tWS = initTournamentWebSocket({
+    ws = initTournamentWebSocket({
         tournamentId: t.id.toString(),
         matchId: t.curM?.id?.toString() || '',
-        playerId: wsPlayerId,
-
+        playerId: wsPlayerId!.toString(),
+        
         onConnect: () => {
-            console.log('Tournament WebSocket connected');
-            tWS?.requestState();
+            console.log('✅ Tournament WebSocket connected');
+            ws?.requestState();
+            setupKeyboardControls(ws, wsPlayerId!.toString(), t.curM?.pong);
         },
 
-        onTournamentState: (t) => {
+        onTournamentState: (tournament) => {
             const st = document.getElementById('tStatusText');
-            if (st) st.textContent = t.status;
+            if (st) st.textContent = tournament.status;
             const br = document.getElementById('bracketSection');
-            if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
-            const cmId = t.curM?.id;
+            if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(tournament)}`;
+            const cmId = tournament.curM?.id;
             if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
                 lastRenderedCurrentMatchId = cmId;
-                renderTournamentContent(t);
+                renderTournamentContent(tournament);
             }
         },
 
         onMatchState: (match) => {
             if (match) {
-                 const st = document.getElementById('tStatusText');
+                let t = getCurrentTournament();
+                if (!t) return;
+                t.curM = match;
+                const st = document.getElementById('tStatusText');
                 if (st) st.textContent = t.status;
                 const br = document.getElementById('bracketSection');
                 if (br) br.innerHTML = `<summary><strong>Bracket View</strong></summary>${matchBracketHTML(t)}`;
@@ -522,82 +580,205 @@ async function initTWS(t: Tournament): Promise<void> {
             }
         },
 
+        onDisconnect: () => {
+            console.log('Disconnected from Tournament Match');
+        },
+
+        onGameState: (state) => {
+            if (!t.curM || !t.curM.pong) return;
+            
+            // Update ball position
+            if (state.ballPosX !== undefined) t.curM.pong.gameState.ballPosX = state.ballPosX;
+            if (state.ballPosY !== undefined) t.curM.pong.gameState.ballPosY = state.ballPosY;
+            
+            // Update ball velocity (critical for rendering!)
+            if (state.ballVelX !== undefined) t.curM.pong.gameState.ballVelX = state.ballVelX;
+            if (state.ballVelY !== undefined) t.curM.pong.gameState.ballVelY = state.ballVelY;
+
+            // Update player positions and scores
+            if (state.players) {
+                for (let i = 0; i < state.players.length; i++) {
+                    if (!t.curM.pong.gameState.players[i]) {
+                        t.curM.pong.gameState.players[i] = { pos: 70, score: 0 } as any;
+                    }
+                    if (state.players[i]?.pos !== undefined) {
+                        t.curM.pong.gameState.players[i].pos = state.players[i].pos;
+                    }
+                    if (state.players[i]?.score !== undefined) {
+                        t.curM.pong.gameState.players[i].score = state.players[i].score;
+                    }
+                }
+            }
+            
+            // Update score display
+            const p1Score = document.getElementById('player1score');
+            const p2Score = document.getElementById('player2score');
+            if (p1Score && t.curM.pong.gameState.players[0]?.score !== undefined) {
+                p1Score.textContent = String(t.curM.pong.gameState.players[0].score);
+            }
+            if (p2Score && t.curM.pong.gameState.players[1]?.score !== undefined) {
+                p2Score.textContent = String(t.curM.pong.gameState.players[1].score);
+            }
+        },
+
         onGameStart: async (matchId, gameId) => {
-            console.log(`Game started: matchId=${matchId}, gameId=${gameId}`);
+            console.log(`🎮 Game started: matchId=${matchId}, gameId=${gameId}`);
             if (!t || !t.curM) return;
+            
+            // Update game ID and status
             t.curM.gameId = gameId;
             t.curM.status = 'active';
+            setCurrentMatch(t.curM);
+            
+            // Update pong instance gameId and hasLocal flag if it exists
+            if (t.curM.pong) {
+                t.curM.pong.gameId = gameId;
+                // Ensure hasLocal is set for keyboard controls
+                const hasLocalP1 = t.curM.p1?.tpt === 'local';
+                const hasLocalP2 = t.curM.p2?.tpt === 'local';
+                t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
+                console.log(`🎮 hasLocal flag set to ${t.curM.pong.hasLocal} for keyboard controls`);
+            }
+            
+            // Show the game container FIRST
             const gameContainer = document.getElementById('tournamentGameContainer');
-            if (gameContainer) gameContainer.style.display = 'block';
-            await showMatch(t);
-            await renderTournamentContent(t);
+            if (gameContainer) {
+                gameContainer.style.display = 'block';
+            }
+            
+            // Wait a frame to ensure canvas is laid out
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            
+            // NOW initialize the 3D scene (canvas is visible)
+            if (t.curM.pong && !t.curM.pong.babylonGame) {
+                console.log('🎮 Initializing 3D scene now that container is visible...');
+                const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+                if (canvas) {
+                    t.curM.pong.canvas = canvas;
+                    t.curM.pong.ctx = canvas.getContext('2d');
+                    
+                    try {
+                        const baby = new baby3D(t.curM.pong);
+                        await baby.createScene();
+                        t.curM.pong.babylonGame = baby;
+                        console.log('✅ 3D renderer created for tournament');
+                        
+                        // Start render loop
+                        if (t.curM.pong.startRenderLoop) {
+                            t.curM.pong.startRenderLoop();
+                            console.log('✅ Render loop started');
+                        }
+                    } catch (e) {
+                        console.error('❌ Failed to start 3D renderer:', e);
+                    }
+                }
+            }
+            
+            // Make sure pong is active
+            if (t.curM.pong) {
+                t.curM.pong.isActive = true;
+                console.log('✅ Game is now active and ready');
+            } else {
+                console.error('❌ No pong instance found when game started!');
+            }
         },
 
         onGameEnd: async (data) => {
-            console.log('Game ended:', data);
-            if (!t || !data.matchId) return;
-            cleanupActiveGame();
-            const gameContainer = document.getElementById('tournamentGameContainer');
-            if (gameContainer) gameContainer.style.display = 'none';
-            if (data.winnerId)
-                await postTournamentMatchWinner(t.id!, Number(data.matchId), Number(data.winnerId));
-            await renderTournamentContent(t);
+            console.log('🏁 Game ended:', data);
+            if (!t || !data.matchId || isProcessingMatchEnd) return;
+            
+            isProcessingMatchEnd = true;
+            
+            try {
+                cleanupActiveGame();
+                const gameContainer = document.getElementById('tournamentGameContainer');
+                if (gameContainer) gameContainer.style.display = 'none';
+                
+                if (data.winnerId)
+                    await postTournamentMatchWinner(t.id!, Number(data.matchId), Number(data.winnerId));
+				
+				if (t.curM)
+					t.curM.status = 'completed';
+                const updatedT = await setEffectiveTournament(t.id!);
+                if (updatedT) {
+                    t = updatedT;
+                    await renderTournamentContent(t);
+                }
+            } finally {
+                isProcessingMatchEnd = false;
+            }
         },
 
         onMatchEnd: async (data) => {
-            console.log('Match ended:', data);
             if (!t || !t.id) return;
-            t.curM = t.allMatches.find(m => m.id === Number(data.matchId)) || null;
-            if (t.curM) {
-                t.curM.winnerId = Number(data.winnerId) || null;
-                t.curM.status = 'completed';
+			if (t.curM && t.curM.status !== 'completed')
+				t.curM.status = 'completed';
+            
+            const updatedT = await setEffectiveTournament(t.id);
+            if (updatedT) {
+                t = updatedT;
+                if (t.curM) {
+                    await renderTournamentContent(t);
+                } else if (t.status === 'completed') {
+                    await renderTournamentContent(t);
+                }
             }
-            if (!t.id) return;
-            const found = await waitForNextMatch(t.id);
-            if (found)
-                await renderTournamentContent(t);
         },
 
-        onTournamentEnd: (tournamentId) => {
+        onTournamentEnd: async (tournamentId) => {
             console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
-                showTournamentEndScreen(t.championId);
+                showTournamentEndScreen(t.championId); //TODO: Here
+            await resetTournament();
         },
 
         onError: (err) => {
             console.error('[Tournament] WebSocket error:', err);
         }
     });
-    tWS.connect().catch(err => console.error('[Tournament] Failed to connect WebSocket:', err));
+    try {
+        await ws.connect();
+    } catch (e) {
+        console.error("[Tournament] Failed to connect WebSocket:", e);
+    }
 }
 
 async function showMatch(t: Tournament): Promise<void> {
-    if (!t || !t.curM || !t.curM.pong) return console.error('No tournament or current Match found');
-    if (!t.curM.room) return console.error('No current room found');
+    if (!t || !t.curM) {
+        console.error('❌ No tournament or current match found');
+        return;
+    }
+    
+    console.log('🎮 showMatch called - but 3D initialization happens in onGameStart now');
+    
+    // Just ensure the container is visible
     const gameContainer = document.getElementById('tournamentGameContainer');
-    if (gameContainer)
+    if (gameContainer) {
         gameContainer.style.display = 'block';
-    setCurrentRoom(t.curM.room);
-    if (!t.curM || !t.curM.p1 || !t.curM.p2) return;
-    t.curM.pong.hasLocal = t.curM.p1.tpt === 'local' || t.curM.p2.tpt === 'local';
-    await setupGameButtons(t.curM.pong);
-    t.curM.pong.init();//TODO maybe this and the next lines -> wrong order?
-    initRoomBasedGame(t.curM.room, t.curM.pong, true);
-    setupKeyboardControls(t.curM.pong.roomWS!, t.curM.pong.players[0].id.toString());
-    await initRoomBasedGame(t.curM.room, t.curM.pong, true);
-	t.curM.pong.startServerGame();//dont have a start button
+    }
+    
+    if (t.curM.pong) {
+        t.curM.pong.isActive = true;
+    }
+    
     isGameActive = true;
-	
+    console.log('✅ Match display ready');
 }
-//TODO keyboardCleanup, cleanupGame, endGame
 
 function cleanupActiveGame(): void {
-    if (activeMatch) {
-        cleanupGame(activeMatch);
-        activeMatch = undefined;
+    console.log('🧹 Cleaning up tournament game...');
+    const t = getCurrentTournament();
+    if (!t ||!t.curM)
+        return;
+	t.curM.status = 'completed';
+    if (t.curM.pong) {
+        cleanupGame(t.curM.pong);
+        t.curM.pong = undefined;
     }
+    
     isGameActive = false;
+    console.log('✅ Tournament game cleaned up');
 }
 
 export async function renderTournamentPage(): Promise<void> {
@@ -612,7 +793,6 @@ export async function renderTournamentPage(): Promise<void> {
     let t = getCurrentTournament();
     if (!t) {
         t = await createTournament();
-        // setCurrentTournament(t);
         if (!t) {
             console.error('[Tournament] Failed to create or retrieve tournament');
             return;
@@ -626,10 +806,10 @@ export async function renderTournamentPage(): Promise<void> {
 
 export function cleanupTournamentPage(): void {
     cleanupActiveGame();
-    if (tWS) {
+    if (ws) {
         try {
-            tWS.disconnect();
+            ws.disconnect();
         } catch {}
-        tWS = null;
+        ws = null;
     }
 }

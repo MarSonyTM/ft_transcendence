@@ -254,7 +254,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.post('/new', async (request, reply) => {
         try {
             const gameData = request.body as CreateGameInput;
-            
+            console.warn("!!!!!!!!!!HERE")
             // Get authenticated user ID from JWT token
             const userId = getUserIdFromRequest(request);
             

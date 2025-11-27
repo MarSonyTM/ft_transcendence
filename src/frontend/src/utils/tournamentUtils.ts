@@ -1,68 +1,8 @@
 import { Tournament, TournamentMatch, TournamentPlayer, TPT, getApiEndpoint } from '../types';
-import { getCurrentTournament, setCurrentTournament, setCurrentMatch, getCurrentMatch } from './tournamentState';
+import { getCurrentTournament, setCurrentTournament, setCurrentMatch } from './tournamentState';
 import { authService } from './auth';
 import { setCurrentPage } from './globalState';
 import { renderApp } from '../main';
-
-export function unwrapPayload<T>(raw: any): T | null {
-    if (!raw) return null;
-    if (raw.success !== undefined) {
-        if (!raw.success) return null;
-        return (raw.data ?? null) as T | null;
-    }
-    return raw as T;
-}
-
-export function normalizePlayer(raw: any): TournamentPlayer {
-    return {
-        id: raw.id,
-        tournamentId: raw.tournamentId,
-        name: raw.name,
-        tpt: raw.tpt,
-        user: raw.user,
-        isReady: !!raw.isReady,
-        eliminated: !!raw.eliminated,
-        score: raw.score ?? 0,
-        createdAt: raw.createdAt,
-        updatedAt: raw.updatedAt
-    } as TournamentPlayer;
-}
-
-export function normalizeMatch(raw: any): TournamentMatch {
-    return {
-        id: raw.id,
-        tournamentId: raw.tournamentId,
-        gameId: raw.gameId,
-        room: raw.room,
-		gameState: raw.gameState,
-        status: raw.status,
-        isBye: raw.isBye ?? false,
-        p1: raw.p1,
-        p2: raw.p2,
-        winnerId: raw.winnerId ?? null,
-        round: typeof raw.round === 'number' ? raw.round : 0,
-        roundIdx: typeof raw.roundIdx === 'number' ? raw.roundIdx : 0,
-        createdAt: raw.createdAt,
-        startedAt: raw.startedAt,
-        endedAt: raw.endedAt
-    } as TournamentMatch;
-}
-
-export function normalizeTournament(raw: any): Tournament {
-    return {
-        id: raw.id,
-        status: raw.status,
-        players: (raw.players || []).map(normalizePlayer),
-        allMatches: (raw.allMatches || []).map(normalizeMatch),
-        championId: raw.championId ?? null,
-        curM: raw.curM ? normalizeMatch(raw.curM) : null,
-        matchQueue: (raw.matchQueue || []).map(normalizeMatch),
-        round: raw.round,
-        createdAt: raw.createdAt,
-        startedAt: raw.startedAt,
-        endedAt: raw.endedAt
-    } as Tournament;
-}
 
 export async function createTournament(): Promise<Tournament | null> {
     try {
@@ -84,9 +24,9 @@ export async function createTournament(): Promise<Tournament | null> {
             console.error('Failed to create tournament:', data);
             return null;
         }
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return null;
-        const t = normalizeTournament(raw);
+        const t: Tournament = data.data as Tournament;
+        if (!t)
+            return null;
         setCurrentTournament(t);
         return t;
     } catch (err) {
@@ -149,9 +89,7 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
             console.error('Failed to add player:', data);
             return null;
         }
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return null;
-        const t = normalizeTournament(raw);
+        const t: Tournament = data.data as Tournament;
         return t.players.find(p => p.name === name) || null;
     } catch (error) {
         console.error('addPlayerToTournament error:', error);
@@ -209,11 +147,10 @@ export async function startTournament(): Promise<boolean> {
             console.error('Failed to start tournament:', data?.message || `HTTP ${resp.status}`);
             return false;
         }
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return false;
-        t = normalizeTournament(raw);
+        t = data.data as Tournament;
+        if (!t)
+            return false;
         setCurrentTournament(t);
-        // await setEffectiveTournament(t.id);
         console.log(`Tournament ${t.id} started`);
         return true;
     } catch (e) {
@@ -227,14 +164,15 @@ export async function loadCurrentMatch(): Promise<TournamentMatch | null> {
         const t = getCurrentTournament();
         if (!t || !t.id) return null;
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/current`, {
-            method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
         const data = await resp.json();
-        if (!resp.ok) return null;
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return null;
-        const m = normalizeMatch(raw);
+        if (!resp.ok)
+            return null;
+        const m: TournamentMatch = data.data as TournamentMatch;
+        if (!m)
+            return null;
+        t.curM = m;
         setCurrentMatch(m);
         return m;
     } catch (error) {
@@ -250,9 +188,9 @@ export async function setEffectiveTournament(tournamentId: number): Promise<Tour
         });
         const data = await resp.json();
         if (!resp.ok) return null as any;
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return null as any;
-        const t = normalizeTournament(raw);
+        const t: Tournament = data.data as Tournament;
+        if (!t)
+            return null as any;
         setCurrentTournament(t);
         t.curM = await loadCurrentMatch();
         console.log(`Loaded tournament ${tournamentId} with ${t.players.length} players and ${t.allMatches.length} matches`);
@@ -274,11 +212,8 @@ export async function postTournamentMatchWinner(tournamentId: number, matchId: n
             console.error('Failed to post match winner:', resp.status);
             return false;
         }
-        const data = await resp.json();
-        const raw = unwrapPayload<any>(data);
-        if (!raw) return false;
-        const t = normalizeTournament(raw);
-        setCurrentTournament(t);
+
+        await setEffectiveTournament(tournamentId);
         return true;
     } catch (e) {
         console.error('Failed to post match winner:', e);
@@ -294,7 +229,7 @@ export function finalizeTournament(championId: number | null): void {
     setCurrentTournament(t);
 }
 
-export function showTournamentEndScreen(championId: number, championName?: string): void {
+export function showTournamentEndScreen(championId: number, championName?: string): void {//TODO
     const existingOverlay = document.getElementById('tournamentEndOverlay');
     if (existingOverlay) existingOverlay.remove();
     const overlay = document.createElement('div');

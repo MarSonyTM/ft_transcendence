@@ -1,16 +1,28 @@
-# BUGS IN CODE
+# BUGS ETC. IN CODE
 
-[X] fix ball glitches!!
+[ ] center names in tournament (lobby)
+[X] set match to ready when both players ready (before start is clicked)
+[ ] tournament end screen
+[ ] add home button to dropdown?
+[X] fix alert for 10 players
+[X] unwrapPayload-> simplify
 
-[ ] when adding AI-players and then eg. removing the first one to change the difficulty
-	-> when adding another one again there are AI-Bot-2, AI-Bot-3 and AI-Bot-3
+# all files
 
-[X] sometimes the ball spawns at random point?
+## backend:
+[ ] database/index
+[ ] routes/tournaments
+[ ] tournament/tournamentEngine
+[ ] tournament/tournamentManager
+[ ] tournament/tournamentState
+[ ] types/index
+[ ] websocket/tournamentHandler
 
-[X] profile doesnt update the games played/won/lost
-
-[X] button styles to make them pop on hover missing
-
-[ ] lift paddles on top of table instead of being inside table(?)
-
-[X] maybe add logout button if logged in but not verified? otherwise you get stuck
+## frontend:
+[ ] pages/tournamentLobbyPage
+[ ] pages/tournamentPage
+[ ] types/index
+[ ] utils/tournamentArchive
+[ ] utils/tournamentState
+[ ] utils/tournamentUtils
+[ ] utils/tournamentWebSocket

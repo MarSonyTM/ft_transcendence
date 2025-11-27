@@ -109,6 +109,16 @@ export interface UsernameChange {
     createdAt: string;
 }
 
+export interface TournamentArchiveEntry {
+	tournamentId: number;
+	players: TournamentPlayer[];//maybe simplify?
+	matches: any[];//maybe simplify?
+	champion: TournamentPlayer | null;
+	createdAt: string;
+	startedAt?: string;
+	endedAt?: string;
+}
+
 // Base database manager class
 abstract class BaseDatabaseManager {
     protected db: Database.Database;
@@ -1693,24 +1703,6 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
         this.db.exec(createTArchiveT);
 
-        // const createMatchSummaryT = `
-        //     CREATE TABLE IF NOT EXISTS t_match_summaries (
-        //         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        //         matchId INTEGER NOT NULL,
-        //         player1Id INTEGER,
-        //         player2Id INTEGER,
-        //         winnerId INTEGER,
-        //         loserId INTEGER,
-        //         createdAt DATETIME,
-        //         startedAt DATETIME,
-        //         endedAt DATETIME,
-        //         FOREIGN KEY (player1Id) REFERENCES t_players(id) ON DELETE SET NULL,
-        //         FOREIGN KEY (player2Id) REFERENCES t_players(id) ON DELETE SET NULL,
-        //         FOREIGN KEY (winnerId) REFERENCES t_players(id) ON DELETE SET NULL,
-        //         FOREIGN KEY (loserId) REFERENCES t_players(id) ON DELETE SET NULL
-        //     )
-        // `;
-        // this.db.exec(createMatchSummaryT);
         this.createTriggers();
     }
     

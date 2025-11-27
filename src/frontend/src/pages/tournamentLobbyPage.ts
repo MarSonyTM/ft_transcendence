@@ -1,6 +1,6 @@
-import { TPT, TPTmap, Tournament, getApiEndpoint } from '../types';
+import { TPT, TPTmap, Tournament } from '../types';
 import { setCurrentPage } from '../utils/globalState';
-import { getCurrentMatch, getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
+import { getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
 	createTournament,
 	resetTournament,
@@ -12,6 +12,7 @@ import {
 	deleteTournament
 } from '../utils/tournamentUtils';
 import { renderTournamentPage } from './tournamentPage';
+import { openTournamentArchive } from '../utils/tournamentArchive'
 import { renderApp } from '../main';
 
 let activeT: Tournament | null = null;
@@ -57,17 +58,19 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			<div class="t-flex-1">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
-				<button id="addRemoteBtn" class="btn btn-add">${TPTmap.get('remote')} Invite Remote Player?</button>
 			</div>
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">x</button></ul>
 			<div class="t-footer">
 				<div class="t-actions">
+					<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
 					<button id="clearBtn" class="btn btn-end t-flex-1">Clear</button>
 					<button id="startBtn" class="btn btn-start t-flex-1">Start Tournament</button>
 					<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
 				</div>
 			</div>
 		</div>`;
+
+	document.getElementById('archiveBtn')?.addEventListener('click', () => openTournamentArchive());
 
 	const listEl = document.getElementById('playersList') as HTMLUListElement;
 	const rerender = async () => {
@@ -78,7 +81,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		if (!activeT) return;
 		if (activeT.players.length === 0) {
 			listEl.innerHTML = `<li class="empty">No players yet</li>`;
-		} else if (activeT.players.length >= 10) {
+		} else if (activeT.players.length > 10) {
 			alert('Maximum of 10 players reached');
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
@@ -172,7 +175,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			}
 			setCurrentTournament(activeT);
 			setCurrentMatch(activeT.curM!);
-			renderTournamentPage();
+			await renderTournamentPage();
 			console.debug('[Tournament] Rendering tournament page');
 		}
 	});

@@ -122,7 +122,7 @@ export class PongGame {
         this.stateListeners = this.stateListeners.filter(l => l !== cb);
     }
 
-    private notifyStateListeners(): void {
+    public notifyStateListeners(): void {
         for (const l of this.stateListeners) {
             try { l(this.gameState, this); } catch (e) { /* swallow listener errors */ }
         }

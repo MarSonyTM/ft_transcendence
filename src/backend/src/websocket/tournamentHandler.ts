@@ -133,7 +133,14 @@ async function handleTournamentMessage(tournamentId: number, playerId: number, m
 			if (keyMatch && keyMatch.gameId) {
 				const gameEngine = activeGames.get(keyMatch.gameId);
 				if (gameEngine && typeof gameEngine.setPlayerKeyState === 'function') {
-					const playerNumber = getMatchPlayerNumber(keyMatch, playerId);
+					// If isGuest is true, this is the local player (player 2), otherwise use the websocket playerId
+					let playerNumber;
+					if (message.isGuest) {
+						// Local player is always player 2
+						playerNumber = 2;
+					} else {
+						playerNumber = getMatchPlayerNumber(keyMatch, playerId);
+					}
 					gameEngine.setPlayerKeyState(playerNumber, message.key, message.pressed);
 				}
 			}
@@ -276,19 +283,24 @@ export function broadcastScoreToMatch(matchId: number, scores: any): void {
 
 export function broadcastGameEndToMatch(matchId: number, winnerId: number): void {
 	const m = tournamentManager.getMatch(matchId);
+	const players = [m?.p1, m?.p2]
 	if (!m) return;
 	broadcastToTournament(m.tournamentId, {
 		type: 'gameEnd',
 		matchId,
 		winnerId,
+		players
 	});
 }
 
 export function broadcastMatchEndToTournament(tournamentId: number, matchId: number, winnerId: number): void {
+	const m = tournamentManager.getMatch(matchId);
+	const players = [m?.p1, m?.p2]
 	broadcastToTournament(tournamentId, {
 		type: 'matchEnd',
 		matchId,
 		winnerId,
+		players
 	});
 	const t = tournamentManager.getTournament(tournamentId);
 	if (t) {
