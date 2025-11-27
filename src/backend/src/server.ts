@@ -34,22 +34,6 @@ const server: FastifyInstance = fastify({
     }
 });
 
-
-
-server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, payload, done) => {
-    try {
-        const text = (payload || '').toString();
-        if (!text || text.trim() === '') {
-            done(null, {});
-            return;
-        }
-        const parsed = JSON.parse(text);
-        done(null, parsed);
-    } catch (err) {
-        done(err as Error);
-    }
-});
-
 server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, payload, done) => {
     try {
         const text = (payload || '').toString();

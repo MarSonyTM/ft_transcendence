@@ -13,9 +13,9 @@ export async function renderGameSelectPage(): Promise<Promise<void>> {
         ${userNavHTML}
         <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
             <div class="grid-anim"></div>
-            <div class="glass-card" style="padding:2em 2em; text-align:center; width:100%;">
+            <div class="glass-card" style="padding:2em 2em; width:100%;">
                 <h2 class="select-title title-neon">Choose Game Mode</h2>
-                <div class="game-mode-options" style="align-items:center;">
+                <div class="game-mode-options" style="display:flex;">
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
                     <button id="tournamentBtn" class="btn-neon primary" style="font-size: 1.2em;">Tournament</button>
