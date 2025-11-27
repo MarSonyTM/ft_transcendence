@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { Tournament, TournamentMatch, TournamentPlayer } from '../types/index';
 
-const DATABASE_PATH = process.env.DATABASE_PATH || "/app/database/database.db";
+const DATABASE_PATH = process.env.DATABASE_PATH || "./app/database/database.db";
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
 
 export interface User {
@@ -71,6 +71,16 @@ export interface Friend {
     updatedAt: string;
 }
 
+export interface GameInvitation {
+    id: number;
+    fromUserId: number;
+    toUserId: number;
+    roomId: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+}
+
 export interface EmailVerification {
     id: number;
     userId: number;
@@ -99,6 +109,16 @@ export interface UsernameChange {
     createdAt: string;
 }
 
+export interface GameInvitation {
+    id: number;
+    fromUserId: number;
+    toUserId: number;
+    roomId: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+}
+
 export interface TournamentArchiveEntry {
 	tournamentId: number;
 	players: TournamentPlayer[];//maybe simplify?
@@ -121,7 +141,10 @@ abstract class BaseDatabaseManager {
             }
           
             this.db = new Database(DATABASE_PATH);
+            
+            // Enable WAL mode for better performance
             this.db.pragma('journal_mode = WAL');
+            
             this.initializeTables();
         } catch (error) {
             console.error(`Failed to initialize database:`, error);
@@ -1412,6 +1435,7 @@ export class DatabaseManager extends BaseDatabaseManager {
     public gameState: GameStateDatabaseManager;
     public players: PlayerDatabaseManager;
     public friends: FriendDatabaseManager;
+    public invitations: InvitationDatabaseManager;
     public emailVerifications: EmailVerificationDatabaseManager;
     public twoFactorVerifications: TwoFactorVerificationDatabaseManager;
     public usernameChanges: UsernameChangeDatabaseManager;
@@ -1424,6 +1448,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.gameState = new GameStateDatabaseManager(this.db);
         this.players = new PlayerDatabaseManager(this.db);
         this.friends = new FriendDatabaseManager(this.db);
+        this.invitations = new InvitationDatabaseManager(this.db);
         this.emailVerifications = new EmailVerificationDatabaseManager(this.db);
         this.twoFactorVerifications = new TwoFactorVerificationDatabaseManager(this.db);
         this.usernameChanges = new UsernameChangeDatabaseManager(this.db);
@@ -1436,6 +1461,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.initializePlayersTable();
         this.initializeGameStateTable();
         this.initializeFriendsTable();
+        this.initializeInvitationsTable();
         this.initializeEmailVerificationsTable();
         this.initializeTwoFactorVerificationsTable();
         this.initializeUsernameChangesTable();
@@ -1540,6 +1566,24 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
       
         this.db.exec(createFriendsTable);
+    }
+
+    private initializeInvitationsTable() {
+        const createInvitationsTable = `
+            CREATE TABLE IF NOT EXISTS game_invitations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fromUserId INTEGER NOT NULL,
+                toUserId INTEGER NOT NULL,
+                roomId TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'rejected', 'expired')) DEFAULT 'pending',
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expiresAt DATETIME NOT NULL,
+                FOREIGN KEY (fromUserId) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (toUserId) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `;
+      
+        this.db.exec(createInvitationsTable);
     }
 
     private initializeEmailVerificationsTable() {
