@@ -109,8 +109,8 @@ function statusComplete(): void {
             <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
             <div class="t-actions">
 				<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
-				<button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
-				<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
+				<button id="resetBtn" class="btn btn-reset t-flex-1">Start New Tournament</button>
+				<button id="backBtn" class="btn btn-t-back t-flex-1">Back Home</button>
 			</div>
         </div>
     `;
@@ -120,6 +120,7 @@ function statusComplete(): void {
     	document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
 		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+			overlay.remove();
 			await resetTournament();
 			let t = getCurrentTournament();
 			if (!t || !t.id) {
@@ -130,8 +131,9 @@ function statusComplete(): void {
 		});
 		
 		document.getElementById('backBtn')?.addEventListener('click', async () => {
-			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-			setCurrentPage('gameSelect');
+			overlay.remove();
+			history.pushState({ page: 'landing' }, '', '/landing');
+			setCurrentPage('landing');
 			await renderApp();
 		});
 	}, 0);
@@ -741,8 +743,6 @@ async function initws(t: Tournament): Promise<void> {
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
 				statusComplete();
-                // showTournamentEndScreen(t.championId); //TODO: Here
-            // await resetTournament();
         },
 
         onError: (err) => {
