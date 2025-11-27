@@ -3,6 +3,7 @@ import { renderApp } from '../main';
 import { authService } from '../utils/auth';
 import { createPingPongBalls } from '../utils/pingPongBalls';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
+import { presenceService } from '../utils/presenceService';
 
 export async function renderLandingPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -12,7 +13,6 @@ export async function renderLandingPage(): Promise<void> {
     // to avoid briefly showing guest/login UI when a valid session exists.
     await authService.whenReady();
     const res = await authService.fetchUserProfile();
-
     if (!res) {
         // Public landing for unauthenticated users
         root.innerHTML = `
@@ -54,7 +54,6 @@ export async function renderLandingPage(): Promise<void> {
         }
         // Add ping pong balls animation
         createPingPongBalls();
-        // Leaderboard is only available for authenticated users
         return;
     }
 
@@ -133,4 +132,5 @@ export async function renderLandingPage(): Promise<void> {
     
     // Add ping pong balls animation
     createPingPongBalls();
+	  await presenceService.setOnline();
 }

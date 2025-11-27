@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
-// Determine .env file path: Docker uses /app/.env, local dev uses .env in backend folder
 const dockerEnvPath = '/app/.env';
 const localEnvPath = path.resolve(process.cwd(), '.env');
 const envPath = fs.existsSync(dockerEnvPath) ? dockerEnvPath : localEnvPath;

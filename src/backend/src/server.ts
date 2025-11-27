@@ -13,6 +13,7 @@ import tournamentRoutes from './routes/tournaments';
 import tournamentWebSocketRoutes from './websocket/tournamentHandler';
 import { authGuard } from './middleware';
 import friendRoutes from './routes/friends';
+import { registerPresenceStatusRoute } from './routes/presence'
 import cookie from '@fastify/cookie';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -21,14 +22,15 @@ const HOST = process.env.HOST || '0.0.0.0';
 const server: FastifyInstance = fastify({
     logger: {
         level: 'info',
-        transport: process.env.NODE_ENV === 'development' ? {
-        target: 'pino-pretty',
-        options: {
-            translateTime: 'HH:MM:ss Z',
-            ignore: 'pid',
-            colorize: true
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+                colorize: true,
+                singleLine: false
+            }
         }
-        } : undefined
     }
 });
 
@@ -59,13 +61,21 @@ const start = async (): Promise<void> => {
             
             // Allow any localhost or local network IP
             const allowedPatterns = [
+                // HTTP patterns
                 /^http:\/\/localhost:\d+$/,
                 /^http:\/\/127\.0\.0\.1:\d+$/,
                 /^http:\/\/0\.0\.0\.0:\d+$/,
                 /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
                 /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
                 /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
-                /^https:\/\/localhost$/,
+                
+                // HTTPS patterns
+                /^https:\/\/localhost(:\d+)?$/,
+                /^https:\/\/127\.0\.0\.1(:\d+)?$/,
+                /^https:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
+                /^https:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/,
+                /^https:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+(:\d+)?$/,
+                
                 'http://frontend:8080',
                 'https://play.google.com',
                 '10.18.178.53:5173',
@@ -147,6 +157,7 @@ const start = async (): Promise<void> => {
     await server.register(auth, { prefix: '/api/auth' });
     await server.register(roomRoutes);
     await server.register(friendRoutes, { prefix: '/api/friends' });
+    await server.register(registerPresenceStatusRoute)
 
     // API Routes
     await server.register(async function (fastify: FastifyInstance) {

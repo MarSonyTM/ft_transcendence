@@ -109,6 +109,16 @@ export interface UsernameChange {
     createdAt: string;
 }
 
+export interface GameInvitation {
+    id: number;
+    fromUserId: number;
+    toUserId: number;
+    roomId: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+}
+
 export interface TournamentArchiveEntry {
 	tournamentId: number;
 	players: TournamentPlayer[];//maybe simplify?

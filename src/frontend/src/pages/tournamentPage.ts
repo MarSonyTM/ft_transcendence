@@ -11,12 +11,11 @@ import {
     createTournament,
     setEffectiveTournament,
     postTournamentMatchWinner,
-    // showTournamentEndScreen,
     deleteTournament
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
-import { MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
-import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
+import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
+import { getCurrentTournament, setCurrentMatch, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 import { setupKeyboardControls } from './2PlayerGame';
 import { removePingPongBalls } from '../utils/pingPongBalls';
@@ -130,10 +129,10 @@ function statusComplete(): void {
 			await renderTournamentContent(t);
 		});
 		
-		document.getElementById('backBtn')?.addEventListener('click', () => {
+		document.getElementById('backBtn')?.addEventListener('click', async () => {
 			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
 			setCurrentPage('gameSelect');
-			renderApp();
+			await renderApp();
 		});
 	}, 0);
 }
@@ -151,7 +150,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         return;
     }
     if (t.status === 'completed') {
-        statusComplete();//TODO switch to showTournamentEndScreen
+        statusComplete();
         return;
     }
     if (!t.curM || t.curM.status === 'completed') {
@@ -278,8 +277,8 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         }
     });
 
-    document.getElementById('archiveBtn')?.addEventListener('click', () => {
-		openTournamentArchive();
+    document.getElementById('archiveBtn')?.addEventListener('click', async () => {
+		await openTournamentArchive();
 	});
 
     const box = document.getElementById('currentMatchBox')!;

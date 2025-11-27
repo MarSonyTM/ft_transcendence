@@ -96,7 +96,7 @@ export class RoomWebSocketManager {
                     reject(error);
                 };
 
-                // Connection timeout - reduced to 5 seconds
+                // Connection timeout
                 setTimeout(() => {
                     if (this.opt.ws && this.opt.ws.readyState !== WebSocket.OPEN) {
                         console.error('WebSocket connection timeout after 5 seconds');
@@ -115,10 +115,8 @@ export class RoomWebSocketManager {
     }
 
     private handleMessage(message: any): void {
-
         switch (message.type) {
             case 'connected':
-                console.log('✅ Connected to room:', message.roomId);
                 break;
 
             case 'pong':
@@ -163,40 +161,24 @@ export class RoomWebSocketManager {
 
             case 'score':
                 if (this.config.onScore) {
-                    // Support both old format (scorePlayer1, etc.) and new format (players array)
-                    if (Array.isArray(message.players)) {
-                        this.config.onScore({
-                            scorePlayer1: message.players[0]?.score || 0,
-                            scorePlayer2: message.players[1]?.score || 0,
-                            scorePlayer3: message.players[2]?.score || 0,
-                            scorePlayer4: message.players[3]?.score || 0
-                        });
-                    } else {
-                        // Fallback to old format for backward compatibility
-                        this.config.onScore({
-                            scorePlayer1: message.scorePlayer1 || 0,
-                            scorePlayer2: message.scorePlayer2 || 0,
-                            scorePlayer3: message.scorePlayer3 || 0,
-                            scorePlayer4: message.scorePlayer4 || 0
-                        });
-                    }
-                }
-                break;
-
-            case 'gameEnd':
-                if (this.config.onGameEnd) {
-                    this.config.onGameEnd({
-                        winnerId: message.winner || message.winnerId,
-                        winnerSeat: message.winnerSeat,
-                        winnerName: message.winnerName,
-                        players: message.players,
-                    });
+                    this.config.onScore(message);
                 }
                 break;
 
             case 'gameStart':
                 if (this.config.onGameStart) {
                     this.config.onGameStart(message.gameId);
+                }
+                break;
+
+            case 'gameEnd':
+                if (this.config.onGameEnd) {
+                    this.config.onGameEnd({
+                        winnerId: message.winnerId,
+                        winnerSeat: message.winnerSeat,
+                        winnerName: message.winnerName,
+                        players: message.players
+                    });
                 }
                 break;
 
@@ -258,6 +240,7 @@ export class RoomWebSocketManager {
             isGuest,
         });
     }
+
     // Generic send method
     private send(message: any): void {
         if (this.opt.ws && this.opt.ws.readyState === WebSocket.OPEN) {
@@ -339,4 +322,3 @@ export function disconnectRoomWebSocket(): void {
         globalRoomWS = null;
     }
 }
-

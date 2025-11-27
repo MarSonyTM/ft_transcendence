@@ -85,7 +85,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     });
 
     // Get room details
-    fastify.get('/api/room/:roomId', async (request, reply) => {
+    fastify.get('/api/room/:roomId', async (request: FastifyRequest, reply: FastifyReply) => {
         let { roomId } = request.params as { roomId: string };
         
         // ✅ SANITIZE ROOM ID (XSS Protection)
@@ -309,7 +309,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     });
 
     // Start game in room
-    fastify.post('/api/room/:roomId/start', async (request, reply) => {
+    fastify.post('/api/room/:roomId/start', async (request: FastifyRequest, reply: FastifyReply) => {
         let { roomId } = request.params as { roomId: string };
         let { hostId } = request.body as { hostId: string };
 
@@ -406,6 +406,7 @@ async function roomRoutes(fastify: FastifyInstance) {
                         const playerId = index + 1;
                         if (player.isAI) {
                             const difficulty = (player.difficulty as any) || 'normal';
+                            console.warn(playerId);
                             gameEngine.setPlayerAI(playerId, true, difficulty);
                         }
                     });
@@ -435,7 +436,7 @@ async function roomRoutes(fastify: FastifyInstance) {
     });
 
     // End the current game and reset room to waiting for a fresh start
-    fastify.post('/api/room/:roomId/end', async (request, reply) => {
+    fastify.post('/api/room/:roomId/end', async (request: FastifyRequest, reply: FastifyReply) => {
         let { roomId } = request.params as { roomId: string };
         
         // ✅ SANITIZE ROOM ID (XSS Protection)

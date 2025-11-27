@@ -1,6 +1,6 @@
 server {
     # Listen on port 443 for HTTPS traffic (IPv4 and IPv6)
-    listen 443 ssl;
+    listen 0.0.0.0:443 ssl;
     listen [::]:443 ssl;
     
     # Domain name
@@ -43,9 +43,9 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
     
-    # WebSocket support for real-time features
-    location /ws {
-        proxy_pass http://backend:3000/api/;
+    # WebSocket support for room-based connections
+    location ~ ^/room/[^/]+/ws$ {
+        proxy_pass http://backend:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -53,6 +53,33 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;  # 24 hour timeout for long-lived connections
+    }
+    
+    # WebSocket support for game-based connections (legacy)
+    location ~ ^/game/[0-9]+/ws$ {
+        proxy_pass http://backend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;  # 24 hour timeout for long-lived connections
+    }
+    
+    # WebSocket support for general real-time features
+    location /ws {
+        proxy_pass http://backend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;  # 24 hour timeout
     }
     
     # Static files caching
