@@ -855,9 +855,12 @@ export async function renderTournamentPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <div class="t-section">
-            <h2>Tournament Mode</h2>
-            <div id="tournamentContent" class="t-content">Loading...</div>
+        <div class="neon-grid">
+            <div class="grid-anim"></div>
+            <div class="t-section">
+                <h2 class="title-neon">Tournament Mode</h2>
+                <div id="tournamentContent" class="t-content">Loading...</div>
+            </div>
         </div>
     `;
     let t = getCurrentTournament();
