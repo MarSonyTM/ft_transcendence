@@ -11,12 +11,11 @@ import {
     createTournament,
     setEffectiveTournament,
     postTournamentMatchWinner,
-    // showTournamentEndScreen,
     deleteTournament
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
-import { MSmap, TournamentMatch, getApiEndpoint, Tournament, TournamentPlayer } from '../types';
-import { getCurrentTournament, setCurrentMatch, setCurrentTournament, updateMatchInTournament } from '../utils/tournamentState';
+import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
+import { getCurrentTournament, setCurrentMatch, updateMatchInTournament } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 import { setupKeyboardControls } from './2PlayerGame';
 import { removePingPongBalls } from '../utils/pingPongBalls';
@@ -110,17 +109,18 @@ function statusComplete(): void {
             <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
             <div class="t-actions">
 				<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
-				<button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
-				<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
+				<button id="resetBtn" class="btn btn-reset t-flex-1">Start New Tournament</button>
+				<button id="backBtn" class="btn btn-t-back t-flex-1">Back Home</button>
 			</div>
         </div>
     `;
     document.body.appendChild(overlay);
     setTimeout(() => {
     
-		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
+    	document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
 		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+			overlay.remove();
 			await resetTournament();
 			let t = getCurrentTournament();
 			if (!t || !t.id) {
@@ -130,10 +130,11 @@ function statusComplete(): void {
 			await renderTournamentContent(t);
 		});
 		
-		document.getElementById('backBtn')?.addEventListener('click', () => {
-			history.pushState({ page: 'gameSelect' }, '', '/game-select');
-			setCurrentPage('gameSelect');
-			renderApp();
+		document.getElementById('backBtn')?.addEventListener('click', async () => {
+			overlay.remove();
+			history.pushState({ page: 'landing' }, '', '/landing');
+			setCurrentPage('landing');
+			await renderApp();
 		});
 	}, 0);
 }
@@ -151,7 +152,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         return;
     }
     if (t.status === 'completed') {
-        statusComplete();//TODO switch to showTournamentEndScreen
+        statusComplete();
         return;
     }
     if (!t.curM || t.curM.status === 'completed') {
@@ -278,8 +279,8 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         }
     });
 
-    document.getElementById('archiveBtn')?.addEventListener('click', () => {
-		openTournamentArchive();
+    document.getElementById('archiveBtn')?.addEventListener('click', async () => {
+		await openTournamentArchive();
 	});
 
     const box = document.getElementById('currentMatchBox')!;
@@ -742,8 +743,6 @@ async function initws(t: Tournament): Promise<void> {
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
 				statusComplete();
-                // showTournamentEndScreen(t.championId); //TODO: Here
-            // await resetTournament();
         },
 
         onError: (err) => {
@@ -798,9 +797,12 @@ export async function renderTournamentPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <div class="t-section">
-            <h2>Tournament Mode</h2>
-            <div id="tournamentContent" class="t-content">Loading...</div>
+        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+            <div class="grid-anim"></div>
+            <div style="width:100%; display:flex; flex-direction:column; align-items:center; gap:1em; padding:0.75em 1.5em 0.5em 1.5em; justify-content: center; min-height: 80vh;">
+                <h2 class="title-neon" style="font-size:2.5rem; margin-bottom:0.5em;">Tournament Mode</h2>
+                <div id="tournamentContent" class="glass-card" style="width:100%; max-width:1000px; padding:2em;">Loading...</div>
+            </div>
         </div>
     `;
     let t = getCurrentTournament();

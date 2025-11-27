@@ -221,9 +221,8 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			
-			const setup = await tournamentManager.setupMatches(tId);
-			if (!setup)
+
+			if (!await tournamentManager.setupMatches(tId))
 				return reply.status(400).send({ success: false, message: 'Failed to setup matches before starting tournament' });
 
 			if (!await tournamentManager.startTournament(tId))
@@ -257,12 +256,15 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			if (pId <= 0)
+
+			const { playerId } = request.body as { playerId: string };
+			const pId = +playerId;
+			if (isNaN(pId) || pId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid player id' });
-			
-			const ok = tournamentManager.leaveTournament(tId, pId);
-			if (!ok)
-				return reply.status(404).send({ success: false, message: 'Tournament or player not found' });
+
+			if (!tournamentManager.leaveTournament(tId, pId))
+				return reply.status(404).send({ success: false, message: 'Unable to leave Tournament' });
+
 			return reply.send({ success: true, message: 'Left tournament' });
 		} catch (error) {
 			fastify.log.error(error);
@@ -283,10 +285,10 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			
-			const ok = await tournamentManager.endTournament(tId);
-			if (!ok)
-				return reply.status(404).send({ success: false, message: 'Tournament not found or already ended' });
+
+			if (!await tournamentManager.endTournament(tId))
+				return reply.status(400).send({ success: false, message: 'Unable to end Tournament' });
+
 			const t = tournamentManager.getTournament(tId);
 			if (!t)
 				return reply.status(404).send({ success: false, message: 'Tournament not found' });
@@ -310,7 +312,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			
+
 			await tournamentManager.deleteTournament(tId);
 			return reply.send({ success: true, message: 'Tournament deleted' });
 		} catch (err) {
@@ -333,7 +335,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			
+
 			const t = tournamentManager.getTournament(tId);
 			if (!t)
 				return reply.status(404).send({ success: false, message: 'Tournament not found' });
@@ -361,7 +363,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const sanitizedTpt = sanitizeString(tpt) as TPT;
 			const tId = sanitizeId(tournamentId);
 			
-			if (tId <= 0)
+			if (isNaN(tId) || tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
 			if (!sanitizedName || !sanitizedTpt)
 				return reply.status(400).send({ success: false, message: 'Name and player type are required' });
@@ -373,7 +375,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			// Validate id
 			if (id !== '-' && sanitizeId(id) <= 0)
 				return reply.status(401).send({ success: false, message: 'Not authenticated' });
-			
+
 			let success;
 			if (id === '-')
 				success = await tournamentManager.addPlayerToTournament(tId, sanitizedName, sanitizedTpt);
@@ -410,11 +412,12 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			
 			if (tId <= 0 || mId <= 0 || pId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
-			
-			let m = tournamentManager.getMatch(mId);
+
+			let m = tournamentManager.getMatch(+matchId);
 			if (!m)
 				return reply.status(404).send({ success: false, message: 'Match not found' });
-			
+
+			let pId = +playerId;
 			if (!m.p1 || !m.p2)
 				return reply.status(404).send({ success: false, message: 'Match player(s) not found' });
 
@@ -424,10 +427,8 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 
 			if (!tournamentManager.toggleMatchPlayerReady(m.tournamentId, m.id, pId))
 				return reply.status(400).send({ success: false, message: 'Unable to toggle player ready' });
-			m = tournamentManager.getMatch(mId);
-			if (!m || !m.tournamentId)
-				return reply.status(404).send({ success: false, message: 'Match not found' });
-			let t = tournamentManager.getTournament(m.tournamentId);
+
+			let t = tournamentManager.getTournament(+tournamentId);
 			if (!t)
 				return reply.status(404).send({ success: false, message: 'Tournament not found' });
 			
@@ -509,7 +510,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-			
+
 			const m = await tournamentManager.getCurrentMatch(tId);
 			if (!m)
 				return reply.status(404).send({ success: false, message: 'No current match available' });
@@ -536,7 +537,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			
 			if (tId <= 0 || mId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
-			
+
 			const match = tournamentManager.getMatch(mId);
 			if (!match)
 				return reply.status(404).send({ success: false, message: 'Match not found' });
@@ -568,7 +569,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			
 			if (tId <= 0 || mId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
-			
+
 			const match = tournamentManager.getMatch(mId);
 			if (!match)
 				return reply.status(404).send({ success: false, message: 'Match not found' });

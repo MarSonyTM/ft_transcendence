@@ -5,7 +5,6 @@ import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers, getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket,  RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame, cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
-import { toggleTournaments } from '../tournament';
 import { presenceService } from '../utils/presenceService';
 
 export let pongGame: PongGame | null = null;

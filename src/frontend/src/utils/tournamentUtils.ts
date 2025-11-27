@@ -55,7 +55,7 @@ export async function deleteTournament(tId: number): Promise<void> {
 
 export async function resetTournament(): Promise<void> {
     let t = getCurrentTournament();
-    if (t && t.id)
+    if (t && t.id && t.status === 'setup')
         deleteTournament(t.id);
 	setCurrentTournament(null);
     setCurrentMatch(null);

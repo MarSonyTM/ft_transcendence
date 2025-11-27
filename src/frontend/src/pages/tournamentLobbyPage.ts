@@ -53,9 +53,9 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	}
 	if (!activeT) return;
 	content.innerHTML = `
-		<p class="t-msg">Create a new tournament</p>
+		<p class="t-msg" style="text-align: center;">Create a new tournament</p>
 			<div class="t-setup">
-			<div class="t-flex-1">
+			<div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
 			</div>
@@ -183,7 +183,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	document.getElementById('backBtn')?.addEventListener('click', async () => {
 		if (activeT && activeT.id)
 			await deleteTournament(activeT.id);
-		history.pushState({ page: 'gameSelect' }, '', '/game-select');
+		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
 		setCurrentPage('gameSelect');
 		renderApp();
 	});
