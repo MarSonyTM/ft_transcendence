@@ -119,7 +119,7 @@ function statusComplete(): void {
     document.body.appendChild(overlay);
     setTimeout(() => {
     
-		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
+    document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
     document.getElementById('resetBtn')?.addEventListener('click', async () => {
         await resetTournament();
@@ -743,9 +743,8 @@ async function initws(t: Tournament): Promise<void> {
             console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
-				statusComplete();
-                // showTournamentEndScreen(t.championId); //TODO: Here
-            // await resetTournament();
+                showTournamentEndScreen(t.championId); //TODO: Here
+            //await resetTournament();
         },
 
         onError: (err) => {
