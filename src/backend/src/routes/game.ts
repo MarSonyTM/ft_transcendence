@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database, Game, Player } from '../database/index';
 import { createGameEngine } from '../game/gameEngine';
 import type { BaseGameEngine } from '../game/gameEngine';
-
 import { JWT_SECRET } from '../config/index';
 import jwt from 'jsonwebtoken';
 
@@ -255,7 +254,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.post('/new', async (request, reply) => {
         try {
             const gameData = request.body as CreateGameInput;
-            
+            console.warn("!!!!!!!!!!HERE")
             // Get authenticated user ID from JWT token
             const userId = getUserIdFromRequest(request);
             
@@ -268,7 +267,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                     const gameStateData = {
                         gameId: newGame.id,
                         ballPosX: 200,
-                        ballPosY: 100,
+                        ballPosY: gameData.mode === '4P' ? 200 : 100,
                         ballVelX: 0,
                         ballVelY: 0,
                         players: [{

@@ -7,7 +7,7 @@ export class GameState {
     ballVelX: number = 0;
     ballVelY: number = 0;
     players: Player[] = [];
-    gameMode: string = "";
+    mode: string = "";
 
     getBallPosX() {
         return this.ballPosX;
@@ -48,10 +48,10 @@ export class GameState {
             players: this.players.map(player => ({
                 id: player.id,
                 name: player.name,
-                position: player.pos,
+                pos: player.pos,
                 score: player.score
             })),
-            gameMode: this.gameMode
+            mode: this.mode
         };
     }
 }
