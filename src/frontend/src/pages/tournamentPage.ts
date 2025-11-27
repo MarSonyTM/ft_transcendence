@@ -20,6 +20,7 @@ import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/to
 import { setupKeyboardControls } from './2PlayerGame';
 import { removePingPongBalls } from '../utils/pingPongBalls';
 import { baby3D } from '../game/game3D';
+import { presenceService } from '../utils/presenceService';
 
 let isGameActive = false;
 let ws: TournamentWebSocketManager | null = null;
@@ -690,6 +691,7 @@ async function initws(t: Tournament): Promise<void> {
             // Make sure pong is active
             if (t.curM.pong) {
                 t.curM.pong.isActive = true;
+                presenceService.setInGame();
                 console.log('✅ Game is now active and ready');
             } else {
                 console.error('❌ No pong instance found when game started!');
@@ -719,6 +721,7 @@ async function initws(t: Tournament): Promise<void> {
                 }
             } finally {
                 isProcessingMatchEnd = false;
+                presenceService.setOnline;
             }
         },
 
