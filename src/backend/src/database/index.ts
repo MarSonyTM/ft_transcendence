@@ -71,6 +71,16 @@ export interface Friend {
     updatedAt: string;
 }
 
+export interface GameInvitation {
+    id: number;
+    fromUserId: number;
+    toUserId: number;
+    roomId: string;
+    status: 'pending' | 'accepted' | 'rejected' | 'expired';
+    createdAt: string;
+    expiresAt: string;
+}
+
 export interface EmailVerification {
     id: number;
     userId: number;
@@ -131,7 +141,10 @@ abstract class BaseDatabaseManager {
             }
           
             this.db = new Database(DATABASE_PATH);
+            
+            // Enable WAL mode for better performance
             this.db.pragma('journal_mode = WAL');
+            
             this.initializeTables();
         } catch (error) {
             console.error(`Failed to initialize database:`, error);
@@ -1422,6 +1435,7 @@ export class DatabaseManager extends BaseDatabaseManager {
     public gameState: GameStateDatabaseManager;
     public players: PlayerDatabaseManager;
     public friends: FriendDatabaseManager;
+    public invitations: InvitationDatabaseManager;
     public emailVerifications: EmailVerificationDatabaseManager;
     public twoFactorVerifications: TwoFactorVerificationDatabaseManager;
     public usernameChanges: UsernameChangeDatabaseManager;
@@ -1434,6 +1448,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.gameState = new GameStateDatabaseManager(this.db);
         this.players = new PlayerDatabaseManager(this.db);
         this.friends = new FriendDatabaseManager(this.db);
+        this.invitations = new InvitationDatabaseManager(this.db);
         this.emailVerifications = new EmailVerificationDatabaseManager(this.db);
         this.twoFactorVerifications = new TwoFactorVerificationDatabaseManager(this.db);
         this.usernameChanges = new UsernameChangeDatabaseManager(this.db);
@@ -1446,6 +1461,7 @@ export class DatabaseManager extends BaseDatabaseManager {
         this.initializePlayersTable();
         this.initializeGameStateTable();
         this.initializeFriendsTable();
+        this.initializeInvitationsTable();
         this.initializeEmailVerificationsTable();
         this.initializeTwoFactorVerificationsTable();
         this.initializeUsernameChangesTable();
@@ -1550,6 +1566,24 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
       
         this.db.exec(createFriendsTable);
+    }
+
+    private initializeInvitationsTable() {
+        const createInvitationsTable = `
+            CREATE TABLE IF NOT EXISTS game_invitations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fromUserId INTEGER NOT NULL,
+                toUserId INTEGER NOT NULL,
+                roomId TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('pending', 'accepted', 'rejected', 'expired')) DEFAULT 'pending',
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expiresAt DATETIME NOT NULL,
+                FOREIGN KEY (fromUserId) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (toUserId) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `;
+      
+        this.db.exec(createInvitationsTable);
     }
 
     private initializeEmailVerificationsTable() {
@@ -1679,6 +1713,24 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
         this.db.exec(createTArchiveT);
 
+        // const createMatchSummaryT = `
+        //     CREATE TABLE IF NOT EXISTS t_match_summaries (
+        //         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        //         matchId INTEGER NOT NULL,
+        //         player1Id INTEGER,
+        //         player2Id INTEGER,
+        //         winnerId INTEGER,
+        //         loserId INTEGER,
+        //         createdAt DATETIME,
+        //         startedAt DATETIME,
+        //         endedAt DATETIME,
+        //         FOREIGN KEY (player1Id) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (player2Id) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (winnerId) REFERENCES t_players(id) ON DELETE SET NULL,
+        //         FOREIGN KEY (loserId) REFERENCES t_players(id) ON DELETE SET NULL
+        //     )
+        // `;
+        // this.db.exec(createMatchSummaryT);
         this.createTriggers();
     }
     

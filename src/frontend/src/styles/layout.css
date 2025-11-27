@@ -28,6 +28,27 @@ body {
   padding: 1.25rem; /* p-5 */
 }
 
+.neon-grid.landing-tight::before {
+  inset: -12px -24px -12px -24px; /* top right bottom left - symmetric top/bottom */
+}
+
+.neon-grid .grid-anim {
+  position: fixed; /* stretch across the entire viewport */
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px);
+  background-size: 36px 36px, 36px 36px;
+  transform: perspective(700px) rotateX(60deg) translateY(-20%);
+  transform-origin: top center;
+  filter: drop-shadow(0 0 12px rgba(99,102,241,0.25));
+  animation: scrollGrid 12s linear infinite;
+  opacity: .55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+
 /* Neon grid background overlay */
 /* Neon grid (enabled) */
 .neon-grid {
@@ -59,10 +80,7 @@ body {
   box-shadow: 0 0 24px rgba(99,102,241,0.18), 0 0 36px rgba(236,72,153,0.14);
 }
 
-/* Landing page: tighten bottom a bit more to match visual top spacing */
-.neon-grid.landing-tight::before {
-  inset: -12px -24px -12px -24px; /* top right bottom left - symmetric top/bottom */
-}
+
 
 .neon-grid .grid-anim {
   position: fixed; /* stretch across the entire viewport */
@@ -78,6 +96,15 @@ body {
   opacity: .55;
   pointer-events: none;
   z-index: 0;
+}
+
+body:has(.neon-grid.landing-tight) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.neon-grid.landing-tight {
+  min-height: auto !important;
 }
 
 @keyframes scrollGrid {
