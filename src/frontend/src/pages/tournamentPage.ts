@@ -164,7 +164,7 @@ function statusComplete(content: HTMLElement): void {
         </div>
     `;
     
-    document.getElementById('archiveBtn')?.addEventListener('click', () => openTournamentArchive());
+    document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
     document.getElementById('resetBtn')?.addEventListener('click', async () => {
         await resetTournament();
@@ -799,7 +799,7 @@ async function initws(t: Tournament): Promise<void> {
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
                 showTournamentEndScreen(t.championId); //TODO: Here
-            await resetTournament();
+            //await resetTournament();
         },
 
         onError: (err) => {
