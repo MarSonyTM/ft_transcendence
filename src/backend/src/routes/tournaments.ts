@@ -248,17 +248,18 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest ,reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const { playerId } = request.body as { playerId: number };
+			const { playerId } = request.body as { playerId: string };
+			let pId = +playerId;
 			
 			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
-			const pId = sanitizeId(playerId);
+			pId = sanitizeId(playerId);
 			
-			if (tId <= 0)
+			if (isNaN(tId) || tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
 
-			const { playerId } = request.body as { playerId: string };
-			const pId = +playerId;
+			
+			
 			if (isNaN(pId) || pId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid player id' });
 
@@ -404,11 +405,12 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId, playerId } = request.params as { tournamentId: string; matchId: string; playerId: string };
+			let pId = +playerId;
 			
 			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
-			const pId = sanitizeId(playerId);
+			pId = sanitizeId(playerId);
 			
 			if (tId <= 0 || mId <= 0 || pId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
@@ -417,7 +419,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			if (!m)
 				return reply.status(404).send({ success: false, message: 'Match not found' });
 
-			let pId = +playerId;
 			if (!m.p1 || !m.p2)
 				return reply.status(404).send({ success: false, message: 'Match player(s) not found' });
 
