@@ -121,22 +121,21 @@ function statusComplete(): void {
     
 		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
-		document.getElementById('resetBtn')?.addEventListener('click', async () => {
-			await resetTournament();
-			let t = getCurrentTournament();
-			if (!t || !t.id) {
-				console.debug('[Tournament] No tournament found after reset, creating new one');
-				return;
-			}
-			await renderTournamentContent(t);
-		});
-		
-		document.getElementById('backBtn')?.addEventListener('click', () => {
-			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-			setCurrentPage('gameSelect');
-			renderApp();
-		});
-	}, 0);
+    document.getElementById('resetBtn')?.addEventListener('click', async () => {
+        await resetTournament();
+        let t = getCurrentTournament();
+        if (!t || !t.id) {
+            console.debug('[Tournament] No tournament found after reset, creating new one');
+            return;
+        }
+        await renderTournamentContent(t);
+    });
+    
+    document.getElementById('backBtn')?.addEventListener('click', () => {
+        history.pushState({ page: 'gameSelect' }, '', '/game-select');
+        setCurrentPage('gameSelect');
+        renderApp();
+    });
 }
 
 export async function renderTournamentContent(t: Tournament): Promise<void> {
@@ -262,8 +261,8 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     document.getElementById('backBtn')?.addEventListener('click', async () => {
         if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
-            await deleteTournament(getCurrentTournament()?.id!);
-            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+            await resetTournament();
+            history.pushState({ page: 'gameSelect' }, '', '/game-select');
             setCurrentPage('gameSelect');
             await renderApp();
         }
