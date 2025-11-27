@@ -117,7 +117,7 @@ function statusComplete(): void {
     document.body.appendChild(overlay);
     setTimeout(() => {
     
-		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
+    	document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
 		document.getElementById('resetBtn')?.addEventListener('click', async () => {
 			await resetTournament();
