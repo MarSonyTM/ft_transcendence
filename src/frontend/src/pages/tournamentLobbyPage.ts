@@ -183,7 +183,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	document.getElementById('backBtn')?.addEventListener('click', async () => {
 		if (activeT && activeT.id)
 			await deleteTournament(activeT.id);
-		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+		history.pushState({ page: 'gameSelect' }, '', '/game-select');
 		setCurrentPage('gameSelect');
 		renderApp();
 	});

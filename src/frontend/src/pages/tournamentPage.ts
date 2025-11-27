@@ -131,7 +131,7 @@ function statusComplete(): void {
 		});
 		
 		document.getElementById('backBtn')?.addEventListener('click', () => {
-			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+			history.pushState({ page: 'gameSelect' }, '', '/game-select');
 			setCurrentPage('gameSelect');
 			renderApp();
 		});
@@ -262,7 +262,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
             await deleteTournament(getCurrentTournament()?.id!);
-            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+            history.pushState({ page: 'gameSelect' }, '', '/game-select');
             setCurrentPage('gameSelect');
             await renderApp();
         }
