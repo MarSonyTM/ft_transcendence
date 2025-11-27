@@ -138,7 +138,7 @@ export class PongGame {
         
         this.updateStatus("Ready to start...");
         
-        const currentUser = await authService.getCurrentUser();//TODO had to add await but wasnt part of DEV??
+        const currentUser = await authService.getCurrentUser();
         if (currentUser && currentUser.id)
             this.playerId = parseInt(currentUser.id);
         

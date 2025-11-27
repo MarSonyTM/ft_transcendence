@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from 'fastify';
 import { database, User } from '../database/index';
 import jwt from 'jsonwebtoken';
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import {
   JWT_SECRET,
   GOOGLE_CLIENT_ID,
@@ -764,7 +764,7 @@ async function userRoutes(
       // Redirect to frontend with token
       const frontendUrl = FRONTEND_URL || "http://localhost:5173";
       reply.redirect(
-        `${frontendUrl}/auth/callback?token=${token}&success=true&email=${email}${
+        `${frontendUrl}auth/callback?token=${token}&success=true&email=${email}${
           needEmailVerification ? "&needEmailVerification=true" : ""
         }`
       );
@@ -772,7 +772,7 @@ async function userRoutes(
       fastify.log.error(error);
       const frontendUrl = FRONTEND_URL || "http://localhost:5173";
       reply.redirect(
-        `${frontendUrl}/auth/callback?success=false&error=Authentication failed`
+        `${frontendUrl}auth/callback?success=false&error=Authentication failed`
       );
     }
   });

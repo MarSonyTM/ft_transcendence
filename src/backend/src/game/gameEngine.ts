@@ -257,7 +257,6 @@ export class BaseGameEngine {
         }
         
         database.games.updateGame(this.gameState.gameId, updateData);
-        console.log(`✅ Game ${this.gameState.gameId} ended - Winner: ${updateData.winner}, Players saved: ${playersData.length}`);
 
         // Update user statistics for all players
         gamePlayers.forEach((player: any) => {
@@ -268,7 +267,6 @@ export class BaseGameEngine {
                     // Check if this player won
                     const didWin = player.positionId === winnerId;
                     database.users.updateUserStats(player.playerId, didWin);
-                    console.log(`📊 Updated stats for user ${user.username}: ${didWin ? 'WON' : 'LOST'}`);
                 }
             }
         });

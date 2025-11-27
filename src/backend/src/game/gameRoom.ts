@@ -53,7 +53,6 @@ class GameRoomManager {
         };
 
         this.rooms.set(roomId, room);
-        console.log(`✅ Room created: ${roomId} by ${hostUsername}`);
         return room;
     }
 
@@ -94,7 +93,6 @@ class GameRoomManager {
             difficulty: difficulty
         });
 
-        console.log(`✅ ${username} ${isAI ? `(${difficulty || 'normal'}) (AI)` : ''} joined room ${roomId}`);
         return { success: true, message: 'Joined successfully', room };
     }
 
@@ -154,7 +152,6 @@ class GameRoomManager {
 
         room.status = 'playing';
         room.gameId = gameId;
-        console.log(` Game started in room ${roomId}`);
         return true;
     }
 
@@ -164,7 +161,6 @@ class GameRoomManager {
         if (!room) return false;
 
         room.status = 'finished';
-        console.log(`🏁 Game ended in room ${roomId}`);
       
         // Clean up room after 30 seconds
         setTimeout(() => {

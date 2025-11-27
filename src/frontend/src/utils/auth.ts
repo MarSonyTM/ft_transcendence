@@ -109,7 +109,7 @@ export class AuthService {
     // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
     // (Auth callback will call this after setting the token cookie)
     if (publicPages.includes(path) && !path.includes('/auth/callback')) {
-      console.log('⏭️ Skipping profile fetch on public page:', path);
+
       return null;
     }
 
