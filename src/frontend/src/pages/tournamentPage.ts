@@ -20,6 +20,7 @@ import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/to
 import { setupKeyboardControls } from './2PlayerGame';
 import { removePingPongBalls } from '../utils/pingPongBalls';
 import { baby3D } from '../game/game3D';
+import { presenceService } from '../utils/presenceService';
 
 let isGameActive = false;
 let ws: TournamentWebSocketManager | null = null;
@@ -263,7 +264,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
             await deleteTournament(getCurrentTournament()?.id!);
-            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+            history.pushState({ page: 'gameSelect' }, '', '/game-select');
             setCurrentPage('gameSelect');
             await renderApp();
         }
@@ -690,6 +691,7 @@ async function initws(t: Tournament): Promise<void> {
             // Make sure pong is active
             if (t.curM.pong) {
                 t.curM.pong.isActive = true;
+                presenceService.setInGame();
                 console.log('✅ Game is now active and ready');
             } else {
                 console.error('❌ No pong instance found when game started!');
@@ -719,6 +721,7 @@ async function initws(t: Tournament): Promise<void> {
                 }
             } finally {
                 isProcessingMatchEnd = false;
+                presenceService.setOnline;
             }
         },
 
