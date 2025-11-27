@@ -27,7 +27,7 @@ import { renderTwoFactorAuthPage } from './pages/twoAuth';
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
 
 
 // Centralized routing handler
@@ -102,7 +102,6 @@ async function handleRouting(): Promise<void> {
         setCurrentPage('friends');
         break;
     case '/auth/callback':
-    case '//auth/callback':
       setCurrentPage('authCallback');
       break;
     case '/2PGame':
