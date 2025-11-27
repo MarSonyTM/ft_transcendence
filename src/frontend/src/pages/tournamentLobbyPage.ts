@@ -53,9 +53,9 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	}
 	if (!activeT) return;
 	content.innerHTML = `
-		<p class="t-msg" style="text-align: center;">Create a new tournament</p>
+		<p class="t-msg">Create a new tournament</p>
 			<div class="t-setup">
-			<div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+			<div class="t-flex-1">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
 			</div>
@@ -102,8 +102,8 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const alias = prompt('Local player alias', `Local_${x}`)?.trim();
 		if (!alias) return;
 		console.log('[Tournament] Add local player:', alias);
-		await addPlayerToTournament(activeT.id!, alias, 'local');
-		await rerender();
+		addPlayerToTournament(activeT.id!, alias, 'local');
+		rerender();
 	});
 
 	document.getElementById('addAIBtn')?.addEventListener('click', async () => {
@@ -112,8 +112,18 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const alias = `AI_${x}`;
 		if (!alias) return;
 		console.log('[Tournament] Add AI player:', alias);
-		await addPlayerToTournament(activeT.id!, alias, 'ai');
-		await rerender();
+		addPlayerToTournament(activeT.id!, alias, 'ai');
+		rerender();
+	});
+
+	document.getElementById('addRemoteBtn')?.addEventListener('click', async () => {
+		if (!activeT) return;
+		let x = getNextId(internalRemoteIds);
+		const alias = prompt('Remote player alias', `Remote_${x}`)?.trim();
+		if (!alias) return;
+		console.log('[Tournament] Add remote player:', alias);
+		addPlayerToTournament(activeT.id!, alias, 'remote');
+		rerender();
 	});
 
 	listEl.addEventListener('click', async (e) => {
@@ -173,7 +183,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	document.getElementById('backBtn')?.addEventListener('click', async () => {
 		if (activeT && activeT.id)
 			await deleteTournament(activeT.id);
-		history.pushState({ page: 'gameSelect' }, '', '/game-select');
+		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
 		setCurrentPage('gameSelect');
 		renderApp();
 	});

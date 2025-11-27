@@ -71,6 +71,7 @@ function matchBracketHTML(t: Tournament): string {
 }
 
 async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
+async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
     let t = getCurrentTournament();
     if (!t) return false;
 	if (t.curM && t.curM.status === 'completed') {
@@ -89,6 +90,8 @@ async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
     return false;
 }
 
+function statusComplete(): void {
+	const t = getCurrentTournament();
 function statusComplete(): void {
 	const t = getCurrentTournament();
     if (!t || !t.id) return;
@@ -114,28 +117,50 @@ function statusComplete(): void {
 				<button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
 				<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
 			</div>
+    const existingOverlay = document.getElementById('tournamentEndOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'tournamentEndOverlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+        display: flex; align-items: center; justify-content: center; z-index: 1000;
+    `;
+    const name = champ || (t?.players.find(p => p.id === t.championId)?.name) || `Player ${t.championId}`;
+    overlay.innerHTML = `
+        <div style="background: rgb(55 65 81); padding: 3em; border-radius: 12px; text-align: center; max-width: 560px;">
+            <div style="font-size: 4em; margin-bottom: 0.2em;">🏆</div>
+            <h2 style="color: rgb(52 211 153); font-size: 2.4em; margin: 0 0 0.3em 0;">Tournament Finished</h2>
+            <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
+            <div class="t-actions">
+				<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
+				<button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
+				<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
+			</div>
         </div>
     `;
     document.body.appendChild(overlay);
     setTimeout(() => {
+    document.body.appendChild(overlay);
+    setTimeout(() => {
     
-    document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
+		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
-    document.getElementById('resetBtn')?.addEventListener('click', async () => {
-        await resetTournament();
-        let t = getCurrentTournament();
-        if (!t || !t.id) {
-            console.debug('[Tournament] No tournament found after reset, creating new one');
-            return;
-        }
-        await renderTournamentContent(t);
-    });
-    
-    document.getElementById('backBtn')?.addEventListener('click', () => {
-        history.pushState({ page: 'gameSelect' }, '', '/game-select');
-        setCurrentPage('gameSelect');
-        renderApp();
-    });
+		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+			await resetTournament();
+			let t = getCurrentTournament();
+			if (!t || !t.id) {
+				console.debug('[Tournament] No tournament found after reset, creating new one');
+				return;
+			}
+			await renderTournamentContent(t);
+		});
+		
+		document.getElementById('backBtn')?.addEventListener('click', () => {
+			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+			setCurrentPage('gameSelect');
+			renderApp();
+		});
+	}, 0);
 }
 
 export async function renderTournamentContent(t: Tournament): Promise<void> {
@@ -146,11 +171,14 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     }
     if (!t)
         return;
+    if (!t)
+        return;
     if (t.status === 'setup') {
         await renderSetup(content);
         return;
     }
     if (t.status === 'completed') {
+        statusComplete();//TODO switch to showTournamentEndScreen
         statusComplete();//TODO switch to showTournamentEndScreen
         return;
     }
@@ -159,6 +187,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         try {
             t.curM = await loadCurrentMatch();
             if (!t.curM && t.status === 'active') {
+                if (!(await waitForNextMatch())) {
                 if (!(await waitForNextMatch())) {
                     content.innerHTML = '<p>No current match available</p>';
                     return;
@@ -191,9 +220,12 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     }
     t = data.data as Tournament;
     if (!t || !t.players || t.players.length === 0) {
+    t = data.data as Tournament;
+    if (!t || !t.players || t.players.length === 0) {
         content.innerHTML = '<p>No players found in tournament</p>';
         return;
     }
+    if (!t.curM || !t.curM.p1 || !t.curM.p2) {
     if (!t.curM || !t.curM.p1 || !t.curM.p2) {
         content.innerHTML = '<p>Waiting for players to be assigned...</p>';
         return;
@@ -207,6 +239,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         
         <div id="currentMatchBox" class="t-match-controls"></div>
         
+        <div id="tournamentGameContainer" class="t-game-container" style="display: none">
         <div id="tournamentGameContainer" class="t-game-container" style="display: none">
             <div id="pureGameContainer">
                 <h3 class="t-game-title">Live Match</h3>
@@ -254,15 +287,17 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
             return;
         }
         const isVisible = pure.style.display !== 'none';
+        const isVisible = pure.style.display !== 'none';
         pure.style.display = isVisible ? 'none' : 'block';
         btn.textContent = isVisible ? 'Show Game' : 'Hide Game';
     });
 
     document.getElementById('backBtn')?.addEventListener('click', async () => {
         if (confirm('Leave tournament page? Any active matches will be ended.')) {
+        if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
-            await resetTournament();
-            history.pushState({ page: 'gameSelect' }, '', '/game-select');
+            await deleteTournament(getCurrentTournament()?.id!);
+            history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
             setCurrentPage('gameSelect');
             await renderApp();
         }
@@ -297,6 +332,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         } else if (!nextMatch) {
             const refreshedT = await setEffectiveTournament(t.id!);
             if (refreshedT && refreshedT.status === 'completed') {
+                statusComplete();
                 statusComplete();
                 return;
             }
@@ -387,6 +423,7 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
     
 
     p1Btn.addEventListener('click', () => {
+    p1Btn.addEventListener('click', () => {
         const target = p1Btn;
         const pidStr = target.getAttribute('data-player');
         const pid = pidStr ? Number(pidStr) : NaN;
@@ -413,6 +450,9 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
     startBtn.addEventListener('click', async () => {
         if (!t || !t.curM)
             return console.debug('No current match to start');
+    startBtn.addEventListener('click', async () => {
+        if (!t || !t.curM)
+            return console.debug('No current match to start');
         // Disable button to prevent multiple clicks
         startBtn.disabled = true;
         try {
@@ -425,6 +465,9 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
                 alert(data?.message || `Failed to start (HTTP ${resp.status})`);
                 return;
             }
+            t.curM = data.data as TournamentMatch;
+			if (!t.curM)
+				return;
             t.curM = data.data as TournamentMatch;
 			if (!t.curM)
 				return;
@@ -479,7 +522,13 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
     }
     if (opts.startBtn || start) {
         let startBtn: HTMLButtonElement = opts.startBtn ? opts.startBtn : start;
+    if (opts.startBtn || start) {
+        let startBtn: HTMLButtonElement = opts.startBtn ? opts.startBtn : start;
         const bothReady = (t.curM.p1.tpt === 'ai' || t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || t.curM.p2.isReady);
+        if (bothReady && t.curM.status !== 'active' && t.curM.status !== 'completed') {
+            startBtn.disabled = false;
+            if (ws)
+                ws.sendReady(true);
         if (bothReady && t.curM.status !== 'active' && t.curM.status !== 'completed') {
             startBtn.disabled = false;
             if (ws)
@@ -492,10 +541,17 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
             //     ws.sendReady(false);
             // t.curM.status = 'pending';
         }
+        else {
+            startBtn.disabled = true;
+            // if (ws)
+            //     ws.sendReady(false);
+            // t.curM.status = 'pending';
+        }
     }
     updateMatchInTournament(t.curM);
 }
 
+async function togglePlayerReady(t: Tournament | null, playerId: number, button: HTMLButtonElement | null): Promise<void> {
 async function togglePlayerReady(t: Tournament | null, playerId: number, button: HTMLButtonElement | null): Promise<void> {
     if (!button) return;
     if (!t || !t.curM) return;
@@ -510,15 +566,20 @@ async function togglePlayerReady(t: Tournament | null, playerId: number, button:
         }
         const data = await resp.json();
         t = data.data as Tournament;
+        t = data.data as Tournament;
         if (!t || !t.id)
             return;
         t = await setEffectiveTournament(t.id);
         if (!t || !t.id || !t.curM || !t.curM.p1 || !t.curM.p2) return;
 
         if (t.curM.p1 && t.curM.p1.id === playerId)
+        if (t.curM.p1 && t.curM.p1.id === playerId)
             updateReadyUI(t, {p1Btn: button});
         else if (t.curM.p2 && t.curM.p2.id === playerId)
+        else if (t.curM.p2 && t.curM.p2.id === playerId)
             updateReadyUI(t, {p2Btn: button});
+		if (!ws)
+            initws(t);
 		if (!ws)
             initws(t);
         if (ws && ws.isConnected()) {
@@ -577,6 +638,9 @@ async function initws(t: Tournament): Promise<void> {
 
         onMatchState: (match) => {
             if (match) {
+                let t = getCurrentTournament();
+                if (!t) return;
+                t.curM = match;
                 let t = getCurrentTournament();
                 if (!t) return;
                 t.curM = match;
@@ -719,7 +783,6 @@ async function initws(t: Tournament): Promise<void> {
                 }
             } finally {
                 isProcessingMatchEnd = false;
-                presenceService.setOnline();
             }
         },
 
@@ -743,8 +806,9 @@ async function initws(t: Tournament): Promise<void> {
             console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
-                showTournamentEndScreen(t.championId); //TODO: Here
-            //await resetTournament();
+				statusComplete();
+                // showTournamentEndScreen(t.championId); //TODO: Here
+            // await resetTournament();
         },
 
         onError: (err) => {
@@ -799,12 +863,9 @@ export async function renderTournamentPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
-            <div class="grid-anim"></div>
-            <div style="width:100%; display:flex; flex-direction:column; align-items:center; gap:1em; padding:0.75em 1.5em 0.5em 1.5em; justify-content: center; min-height: 80vh;">
-                <h2 class="title-neon" style="font-size:2.5rem; margin-bottom:0.5em;">Tournament Mode</h2>
-                <div id="tournamentContent" class="glass-card" style="width:100%; max-width:1000px; padding:2em;">Loading...</div>
-            </div>
+        <div class="t-section">
+            <h2>Tournament Mode</h2>
+            <div id="tournamentContent" class="t-content">Loading...</div>
         </div>
     `;
     let t = getCurrentTournament();
