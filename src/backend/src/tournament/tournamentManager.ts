@@ -1,784 +1,203 @@
-import { database, TournamentArchiveEntry } from "../database/index";
-import { Tournament, TournamentMatch, TournamentPlayer, TPT } from "../types/index";
-import { BaseGameEngine, createGameEngine } from "../game/gameEngine";
-// import { Player } from "../../../shared/gameTypes";
-import { activeGames, CreateGameInput } from "../routes/game";
-import { gameRoomManager } from "../game/gameRoom";
 import {
-	broadcastToTournament,
-	broadcastCountdownToMatch,
-	broadcastGameStartToMatch,
-	broadcastMatchEndToTournament,
-	broadcastTournamentState,
-	broadcastTournamentEnd
-} from '../websocket/tournamentHandler';
+	TournamentPlayer,
+	TournamentMatchInternal as TournamentMatch,
+	TournamentState,
+	TournamentMatchRecord
+} from '../../../shared/tournamentTypes';
+import { GameState, Player, RGBColor } from '../database';
 
-const db = database.tournaments;
-
-class TournamentManager {
-	private minPlayers: number = 3;
-	private maxPlayers: number = 10;
-	private matchRooms: Map<number, string> = new Map(); // Map<matchId, roomId> -> room = GameRoom
-
-	constructor() {}
-
-	/* ================================================== */
-	/* Tournament Setup                                    */
-	/* ================================================== */
-
-	async createTournament(name: string, userId: number): Promise<Tournament> {
-		try {
-			let t: Tournament | null;
-			t = db.createTournament({});
-			if (!t) throw new Error('Failed to create tournament in database');
-			if (!this.addPlayerToTournament(t.id, name, 'host', userId))
-				throw new Error('Failed to add host player to tournament');
-			t = db.getTournamentById(t.id);
-			if (!t)
-				throw new Error('Failed to retrieve tournament after creation');
-			console.log(`Tournament ${t.id} created by ${name}`);
-			return t;
-		} catch (error) {
-			console.error('Failed to create tournament:', error);
-			throw error;
-		}
-	}
-
-	async addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer> {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) {
-				console.error('Tournament not found:', tournamentId);
-				return null as any;
-			}
-			if (t.status !== 'setup') {
-				console.error('Cannot join: tournament already started');
-				return null as any;
-			}
-			if (t.players.length >= this.maxPlayers) {
-				console.error('Cannot join: max players reached');
-				return null as any;
-			}
-			if (t.players.find(p => p.name === name)) {
-				console.error('Cannot join: duplicate name');
-				return null as any;
-			}
-			const player = db.createPlayer({
-				tournamentId,
-				tpt,
-				name,
-				isReady: tpt === 'ai',
-				userId: userId || null as any
-			});
-			if (!player)
-				throw new Error('Failed to create player');
-			t = db.getTournamentById(tournamentId);
-			if (!t)
-				throw new Error('Failed to get tournament');
-			const alreadyPresent = t.players.some(p => p.id === player.id);
-			if (!alreadyPresent) {
-				t.players.push(player);
-				db.updateTournament(t.id, { players: t.players });
-			}
-			console.log(`${name} joined tournament ${tournamentId}`);
-			broadcastTournamentState(tournamentId);
-			return player;
-		} catch (error) {
-			console.error('Failed to add player:', error);
-			throw error;
-		}
-	}
-
-	leaveTournament(tournamentId: number, playerId: number): boolean {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) return false;
-			if (t.status === 'completed' || t.status === 'archived')
-				return false;
-			if (t.status === 'setup') {
-				if (!db.deletePlayer(playerId))
-					return false;
-			} else {
-				db.updatePlayer({ id: playerId, eliminated: true });
-				console.log(`Player ${playerId} eliminated from tournament ${tournamentId}`);
-				if (t.curM)
-					this.computeWinnerIfPossible(t.curM.id);
-			}
-			broadcastTournamentState(tournamentId);
-			return true;
-		} catch (error) {
-			console.error('leaveTournament error:', error);
-			return false;
-		}
-	}
-
-	/* ================================================== */
-	/* Bracket & Match Management                          */
-	/* ================================================== */
-
-	async createMatch(tournamentId: number, roundIdx: number, round: number, isBye: boolean = false): Promise<TournamentMatch> {
-		try {
-			const match = db.createMatch({
-				tournamentId,
-				round,
-				roundIdx,
-				isBye,
-				status: 'setup'
-			});
-			if (!match) return null as any;
-			console.log(`Created match ${match.id} (round ${round}${isBye ? ', bye' : ''})`);
-			return match;
-		} catch (error) {
-			console.error('Failed to create match:', error);
-			return null as any;
-		}
-	}
-
-	async createMatchRoom(match: TournamentMatch): Promise<boolean> {
-		try {
-			if (!match.p1 || !match.p1.name) {
-				console.error('Cannot create room: match has no player 1');
-				return false;
-			}
-
-			let id = match.p1.userId?.toString() || match.p1.id.toString();
-
-			match.room = gameRoomManager.createRoom(
-				id,
-				match.p1.name,
-				2,
-				match.p1.tpt
-			);
-			if (!match.room) {
-				console.error('Failed to create game room for match:', match.id);
-				return false;
-			}
-			if (match.p2 && !match.isBye) {
-				const joinResult = gameRoomManager.joinRoom(
-					match.room.roomId,
-					match.p2.id.toString(),
-					match.p2.name!,
-					match.p2.tpt === 'ai',
-					match.p2.isReady,
-					match.p2.tpt === 'local',
-					'normal'
-				);
-				if (!joinResult.success) {
-					console.error('Failed to join player 2 to room:', joinResult.message);
-					return false;
-				}
-			}
-			this.matchRooms.set(match.id, match.room.roomId);
-			let m = db.updateMatch({ id: match.id, room: match.room });
-			if (!m) return false;
-			let t = this.getTournament(m.tournamentId);
-			if (!t) return false;
-			let all = db.getAllMatches(t.id);
-			db.updateTournament(m.tournamentId, { allMatches: all, curM: m });
-			console.log(`Created room ${m.room!.roomId} for match ${m.id}`);
-			return true;
-		} catch (error) {
-			console.error('Failed to create match room:', error);
-			return false;
-		}
-	}
-
-	async setupMatches(tournamentId: number): Promise<boolean> {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) throw new Error('Tournament not found');
-			let playerCount = t.players.length;
-			console.log(`Setting up bracket for ${playerCount} players`);
-			if (playerCount < this.minPlayers) {
-				console.warn('Not enough players to setup matches');
-				return false;
-			}
-			let round = 1;
-			let matchCount = Math.floor(playerCount / 2);
-			let hasBye = playerCount % 2 === 1;
-			while (matchCount > 0) {
-				let roundMatches: TournamentMatch[] = [];
-				for (let i = 0; i < matchCount; i++) {
-					const match = await this.createMatch(tournamentId, i, round, false);
-					if (!match) throw new Error('Failed to create match');
-					roundMatches.push(match);
-				}
-				if (hasBye) {
-					const byeMatch = await this.createMatch(tournamentId, matchCount, round, true);
-					if (!byeMatch) throw new Error('Failed to create bye match');
-					roundMatches.push(byeMatch);
-				}
-				t.allMatches.push(...roundMatches);
-				console.log(`Round ${round}: ${matchCount} matches${hasBye ? ' + 1 bye' : ''}`);
-				playerCount = matchCount + (hasBye ? 1 : 0);
-				matchCount = Math.floor(playerCount / 2);
-				hasBye = playerCount % 2 === 1 && playerCount > 1;
-				round++;
-			}
-			t.round = 0;
-			db.updateTournament(tournamentId, t);
-			console.log(`Bracket setup complete: ${t.allMatches.length} total matches`);
-			if (!(await this.insertPlayersIntoNextRound(tournamentId)))
-				return false;
-			if (!t.curM || (t.curM && t.curM.status === 'completed')) {
-				if (t.matchQueue.length > 0) {
-					t.curM = t.matchQueue.shift() || null;
-					while (t.curM && t.curM.status === 'completed')
-						t.curM = t.matchQueue.shift() || null;
-				}
-			}
-			if (!t || !t.curM) return false;
-			return true;
-		} catch (error) {
-			console.error('setupMatches error:', error);
-			return false;
-		}
-	}
-
-	async insertPlayersIntoNextRound(tournamentId: number): Promise<boolean> {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) throw new Error('Tournament not found');
-			if ((!t.curM || t.curM && t.curM.status === 'completed') && t.matchQueue.length > 0) {
-				t.curM = t.matchQueue.shift() || null;
-				while (t.curM && t.curM.status === 'completed') {
-					t.curM = t.matchQueue.shift() || null;
-				}
-				if (!t.curM)
-					t.matchQueue = [];
-				t = db.updateTournament(t.id, {curM: t.curM, matchQueue: t.matchQueue});
-				if (t && t.curM) {
-					console.log('Match queue not empty, cannot advance round');
-					return true;
-				}
-			}
-			let players = db.getAllPlayers(tournamentId).filter((p: TournamentPlayer) => !p.eliminated).slice();
-			if (players.length === 0) {
-				console.log('No remaining players');
-				return false;
-			}
-			if (players.length === 1) {
-				console.log('Only one player remaining, ending tournament');
-				return this.endTournament(tournamentId);
-			}
-			if (!t) return false;
-			t.round++;
-			console.log(`Advancing to round ${t.round}`);
-			t = db.updateTournament(t.id, {round: t.round});
-			if (!t) return false;
-			let matches = db.getAllMatches(tournamentId).filter((m: TournamentMatch) => m.round === t!.round);
-			if (matches.length === 0) {
-				console.error('No matches found for round', t.round);
-				return false;
-			}
-			this.shuffle(players);
-			for (let m of matches) {
-				let p1 = players.shift();
-				if (p1) p1.isReady = p1.tpt === 'ai' ? true : false;
-				let p2 = players.shift();
-				if (p2) p2.isReady = p2.tpt === 'ai' ? true : false;
-				if (!p1) throw new Error('Not enough players for assignment');
-				if (p1 && p2 && p2.tpt === 'host')
-					[p1, p2] = [p2, p1];
-				m.p1 = p1;
-				if (!m.isBye && p2)
-					m.p2 = p2;
-				else if (m.isBye) {
-					m.winnerId = p1.id;
-					m.status = 'completed';
-				}
-
-				if (!m.isBye && m.p1 && m.p2 && m.p1.tpt === 'ai' && m.p2.tpt === 'ai') {
-					const randomSeed = Math.random();
-					const winner = randomSeed < 0.5 ? m.p1 : m.p2;
-					const loser = winner.id === m.p1.id ? m.p2 : m.p1;
-					m.winnerId = winner.id;
-					m.status = 'completed';
-					m.endedAt = new Date().toISOString();
-					if (m.p1.id === loser.id)
-						m.p1 = db.updatePlayer({ id: loser.id, eliminated: true }) || undefined;
-					else
-						m.p2 = db.updatePlayer({ id: loser.id, eliminated: true }) || undefined;
-				}
-
-				db.updateMatch({
-					id: m.id,
-					p1: m.p1,
-					p2: m.p2,
-					status: m.status,
-					winnerId: m.winnerId,
-					endedAt: m.endedAt
-				});
-			}
-			if (players.length > 0)
-				throw new Error(`${players.length} players left unassigned`);
-			t.matchQueue = matches.filter(m => m.status === 'pending');
-			t.matchQueue.sort((a, b) => a.roundIdx - b.roundIdx);
-			t.curM = t.matchQueue.shift() || null;
-			while (t.curM && t.curM.status === 'completed' && t.matchQueue.length > 0) {
-				t.curM = t.matchQueue.shift() || null;
-			}
-			t = db.updateTournament(tournamentId, {
-				round: t.round,
-				matchQueue: t.matchQueue,
-				curM: t.curM
-			});
-			if (t)
-				console.log(`Round ${t.round} ready: ${t.matchQueue.length} matches`);
-			broadcastTournamentState(tournamentId);
-			return true;
-		} catch (error) {
-			console.error('insertPlayersIntoNextRound error:', error);
-			return false;
-		}
-	}
-
-	private shuffle<T>(array: T[]): void {
-		for (let i = array.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[array[i], array[j]] = [array[j], array[i]];
-		}
-	}
-
-	/* ================================================== */
-	/* Tournament Lifecycle                                */
-	/* ================================================== */
-
-	async isSetupComplete(tournamentId: number): Promise<boolean> {
-		try {
-			const t = db.getTournamentById(tournamentId);
-			if (!t) return false;
-			const playerAmountOk = t.players.length >= this.minPlayers;
-			const matchesOk = t.allMatches.length > 0;
-			const curMatchOk = t.curM !== null;
-			return playerAmountOk && matchesOk && curMatchOk;
-		} catch (error) {
-			console.error('isSetupComplete error:', error);
-			return false;
-		}
-	}
-
-	async startTournament(tournamentId: number): Promise<boolean> {
-		try {
-			console.log(`Starting tournament ${tournamentId}`);
-			let t = db.getTournamentById(tournamentId);
-			if (!t) return false;
-			if (t.allMatches.length === 0) {
-				console.log('Setting up bracket...');
-				if (!this.setupMatches(tournamentId)) {
-					console.error('Failed to setup bracket');
-					return false;
-				}
-			}
-			if (!this.isSetupComplete(tournamentId)) {
-				console.error('Setup incomplete');
-				return false;
-			}
-			t = db.updateTournament(tournamentId, {
-				status: 'active',
-				startedAt: new Date().toISOString()
-			});
-			if (!t) throw new Error('Failed to update tournament');
-			console.log(`Tournament ${tournamentId} started`);
-			broadcastToTournament(tournamentId, {
-				type: 'tournamentStart',
-				tournamentId
-			});
-			broadcastTournamentState(tournamentId);
-			return true;
-		} catch (error) {
-			console.error('startTournament error:', error);
-			return false;
-		}
-	}
-
-	async endTournament(tournamentId: number): Promise<boolean> {
-		try {
-			console.log(`Ending tournament ${tournamentId}`);
-			this.computeChampionIfPossible(tournamentId);
-			const t = db.updateTournament(tournamentId, {
-				status: 'archived',
-				endedAt: new Date().toISOString()
-			});
-			if (!t) throw new Error('Failed to update tournament');
-			console.log(`Tournament ${tournamentId} completed`);
-			broadcastTournamentEnd(tournamentId);
-			broadcastTournamentState(tournamentId);
-			return true;
-		} catch (error) {
-			console.error('endTournament error:', error);
-			return false;
-		}
-	}
-
-	async computeChampionIfPossible(tournamentId: number): Promise<void> {
-		try {
-			const remaining = db.getAllPlayers(tournamentId).filter((p: TournamentPlayer) => !p.eliminated);
-			if (remaining.length === 1) {
-				db.updateTournament(tournamentId, { championId: remaining[0].id });
-				console.log(`Champion: ${remaining[0].name}`);
-			}
-		} catch (error) {
-			console.error('Error computing champion:', error);
-		}
-	}
-
-	/* ================================================== */
-	/* Match Operations                                    */
-	/* ================================================== */
-
-	async getCurrentMatch(tournamentId: number): Promise<TournamentMatch | null> {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) return null;
-			if (!t.curM || t.curM.status === 'completed')
-				t.curM = null;
-
-			if (!t.curM && t.matchQueue.length > 0) {
-				t.curM = t.matchQueue.shift() || null;
-				while (t.curM && t.curM.status === 'completed') {
-					t.curM = t.matchQueue.shift() || null;
-				}
-			}
-			if (!t.curM && (!t.matchQueue || t.matchQueue.length === 0) && t.round > 0) {
-				console.log('Attempting to advance to next round...');
-				if (await this.insertPlayersIntoNextRound(tournamentId)) {
-					t = db.getTournamentById(tournamentId);
-					if (t && !t.curM && t.matchQueue && t.matchQueue.length > 0) {
-						t.curM = t.matchQueue.shift() || null;
-						while (t.curM && t.curM.status === 'completed') {
-							t.curM = t.matchQueue.shift() || null;
-						}
-					}
-				} else throw new Error('insertPlayersIntoNextRound failed');
-			}
-			if (t && t.curM && t.curM.id) {
-				t.curM = db.updateMatch(t.curM);
-				t = db.updateTournament(tournamentId, {
-					curM: t.curM,
-					matchQueue: t.matchQueue
-				});
-				if (!t || !t.curM) throw new Error('Failed to update tournament');
-				console.log(`Loaded next match from queue: ${t.curM?.id}`);
-			}
-			if (!t || !t.curM) return null;
-			return t.curM;
-		} catch (error) {
-			console.error('getCurrentMatch error:', error);
-			return null;
-		}
-	}
-
-	async createGameState(mId: number): Promise<TournamentMatch> {
-		try {
-			let gameInput: CreateGameInput = { mode: '2P', difficulty: 'normal' };
-			const game = database.games.createGame(gameInput);
-			if (!game || !game.id) throw new Error('Failed to create new game for Tournament');
-			let m = db.getMatchById(mId);
-			if (!m) throw new Error('Failed to get match by id');
-			m.room!.gameId = game.id;
-			m.gameId = game.id;
-			m = db.updateMatch({ id: m.id, gameId: m.gameId, room: m.room });
-			if (!m) throw new Error('Failed to update match');
-			return m;
-		} catch (err) {
-			console.error('createGameState for Tournament failed:', err);
-			return null as any;
-		}
-	}
-
-	async prepareMatch(tournamentId: number, matchId: number): Promise<TournamentMatch | null> {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t) return null;
-			if (!t.curM || t.curM.id !== matchId) {
-				let match = db.getMatchById(matchId);
-				if (!match) return null;
-				if (match.status === 'completed')
-					match = await this.getCurrentMatch(t.id);
-				t = db.updateTournament(tournamentId, { curM: match });
-				if (!t) throw new Error('Failed to update tournament');
-			}
-			if (!t.curM) return null;
-			if (t.curM.isBye) {
-				console.log(`Bye match ${matchId}, auto-completing`);
-				await this.endMatch(matchId);
-				return null;
-			}
-			if (!this.allPlayersReadyForMatch(tournamentId)) {
-				console.log('Waiting for players to be ready...');
-				return null;
-			}
-			t.curM.status = 'ready';
-			t = db.updateTournament(t.id, {curM: t.curM});
-			if (!t || !t.curM) return null;
-			if (!(await this.createMatchRoom(t.curM))) return null;
-			t.curM = db.getMatchById(matchId);
-			if (!t || !t.curM || !t.curM.room|| !t.curM.room.roomId) {
-				console.error('Failed to create match room');
-				return null;
-			}
-			t.curM = await this.createGameState(t.curM.id);
-			if (!t.curM) return null;
-			t = db.updateTournament(t.id, { curM: t.curM });
-			if (!t) return null;
-			return t.curM;
-		} catch (error) {
-			console.error('startMatch error:', error);
-			return null;
-		}
-	}
-
-	async endMatch(matchId: number): Promise<boolean> {
-		try {
-			let match = db.getMatchById(matchId);
-			if (!match) throw new Error('Match not found');
-
-			let t = db.getTournamentById(match.tournamentId);
-			if (!t) throw new Error('Tournament not found');
-
-			t.curM = match;
-
-			this.computeWinnerIfPossible(t.curM.id);
-			if (!t.curM.winnerId) {
-				console.error('Cannot end match: no winner determined');
-				return false;
-			}
-			if (t.curM.p1 && t.curM.p1.id !== t.curM.winnerId)// && t.curM.p2 && t.curM.p2.id === t.curM.winnerId)
-				t.curM.p1 = db.updatePlayer({ id: t.curM.p1.id, eliminated: true }) || undefined;
-			else if (t.curM.p2 && t.curM.p2.id !== t.curM.winnerId)// && t.curM.p1 && t.curM.p1.id === t.curM.winnerId)
-				t.curM.p2 = db.updatePlayer({ id: t.curM.p2.id, eliminated: true }) || undefined;
-
-			t.curM.status = 'completed';
-			t.curM.endedAt = new Date().toISOString();
-			t = db.updateTournament(t.id, { curM: t.curM });
-			if (!t || !t.curM)
-				throw new Error('Failed to update tournament');
-			console.log(`Match ${t.curM.id} completed. Winner: ${t.curM.winnerId}`);
-			
-			const roomId = this.matchRooms.get(matchId);
-			if (roomId)
-				this.matchRooms.delete(matchId);
-			if (!match.winnerId) throw new Error('Winner not set after computation');
-			
-			if (t) {
-				db.updateTournament(t.id, { curM: null });
-				console.log(`Cleared curM for tournament ${match.tournamentId}, ready for next match`);
-			}
-			
-			broadcastMatchEndToTournament(match.tournamentId, matchId, match.winnerId);
-			return true;
-		} catch (error) {
-			console.error('endMatch error:', error);
-			return false;
-		}
-	}
-
-	async computeWinnerIfPossible(matchId: number): Promise<void> {
-		try {
-			let match = db.getMatchById(matchId);
-			if (!match) return;
-			if (match.isBye && match.p1) {
-				match.winnerId = match.p1.id;
-				db.updateMatch(match);
-				return;
-			}
-			if (match.p1 && match.p2) {
-				if (match.p1.eliminated && match.p2.eliminated) return;
-				if (match.p1.eliminated || match.p2.eliminated)
-					match.winnerId = match.p1.eliminated ? match.p2.id : match.p1.id;
-				else if (match.p1.score !== undefined && match.p2.score !== undefined
-					&& (match.p1.score >= 3 || match.p2.score >= 3))
-					match.winnerId = match.p1.score > match.p2.score ? match.p1.id : match.p2.id;
-			} else if (match.p1 || match.p2) {
-				match.winnerId = match.p1 ? match.p1.id : match.p2!.id;
-			}
-			match.status = 'completed';
-			match = db.updateMatch(match);
-		} catch (error) {
-			console.error('Error computing winner:', error);
-		}
-	}
-
-	allPlayersReadyForMatch(tournamentId: number): boolean {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t || !t.curM) return false;
-			const p1 = t.curM.p1;
-			if (!p1 || !p1.isReady) return false;
-			const p2 = t.curM.p2;
-			if (!p2 || !p2.isReady) return false;
-			t.curM.status = 'ready';
-			t = db.updateTournament(t.id, {curM: t.curM});
-			return true;
-		} catch (error) {
-			console.error('allPlayersReadyForMatch error:', error);
-			return false;
-		}
-	}
-
-	toggleMatchPlayerReady(tournamentId: number, matchId: number, playerId: number): boolean {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (!t || !t.curM || t.curM.id !== matchId) return false;
-			if (!t.curM.p1 || !t.curM.p2 || (playerId !== t.curM.p1.id && playerId !== t.curM.p2.id)) return false;
-			
-			let p = t.curM.p1.id === playerId ? t.curM.p1 : t.curM.p2;
-
-			let player = db.updatePlayer({ id: playerId, isReady: !p.isReady});
-			if (!player) {
-				console.error('updatePlayer failed');
-				return false;
-			}
-			if (player.id === t.curM.p1.id) t.curM.p1 = player;
-			else t.curM.p2 = player;
-
-			if (!t.curM.isBye && this.allPlayersReadyForMatch(tournamentId)) {
-				console.debug('Both players are ready for match', matchId);
-				t.curM.status = 'ready';
-			}
-
-			t.curM = db.updateMatch({id: t.curM.id, status: t.curM.status, p1: t.curM.p1, p2: t.curM.p2});
-			if (!t.curM) throw new Error('Failed to update match');
-
-			t = db.updateTournament(t.id, { curM: t.curM });
-			if (!t) throw new Error('Failed to update tournament');
-
-			broadcastTournamentState(tournamentId);
-			return true;
-		} catch (error) {
-			console.error('toggleMatchPlayerReady error:', error);
-			return false;
-		}
-	}
-
-	hydrateAllMatches(matches: TournamentMatch[]): TournamentMatch[] {
-		try {
-			let m: TournamentMatch | null;
-			for (m of matches) {
-				m = this.hydrateMatch(m);
-				if (!m) throw new Error('updateMatch failed');
-			}
-			return matches;
-		} catch (err) {
-			console.error('hydrateAllMatches failed');
-			return null as any;
-		}
-	}
-
-	hydrateMatch(match: TournamentMatch | null): TournamentMatch | null {
-        if (!match) return null;
-        try {
-            if (typeof match.p1 === 'string')
-                match.p1 = match.p1 ? JSON.parse(match.p1) : undefined;
-            if (typeof match.p2 === 'string')
-                match.p2 = match.p2 ? JSON.parse(match.p2) : undefined;
-            if (typeof match.room === 'string')
-                match.room = match.room ? JSON.parse(match.room) : null;
-            return match;
-        } catch (error) {
-            console.error('Error hydrating match:', error);
-            return match;
-        }
-    }
-
-	hydrateTournament(t: any): Tournament | null {
-    if (!t) return null;
-    
-    try {
-        if (typeof t.players === 'string')
-            t.players = JSON.parse(t.players);
-        if (typeof t.allMatches === 'string')
-            t.allMatches = JSON.parse(t.allMatches);
-        if (typeof t.matchQueue === 'string')
-            t.matchQueue = JSON.parse(t.matchQueue);
-        if (typeof t.curM === 'string')
-            t.curM = JSON.parse(t.curM);
-        const players = db.getAllPlayers(t.id);
-        if (players.length > 0)
-            t.players = players;
-        const matches = db.getAllMatches(t.id);
-        if (matches.length > 0)
-            t.allMatches = matches;
-        
-        const mqueue = t.allMatches.filter((m: TournamentMatch) => 
-            m.round === t.round && m.status !== 'completed' && m.status !== 'active'
-        );
-        if (mqueue.length > 0)
-            t.matchQueue = mqueue;
-        else
-            t.matchQueue = [];
-            
-        t.curM = this.hydrateMatch(t.curM);
-        return t as Tournament;
-    } catch (error) {
-        console.error('Error hydrating tournament:', error);
-        return t;
-    }
+function nowISO(): string {
+	return new Date().toISOString();
 }
 
-	async deleteTournament(tId: number): Promise<void> {
-		try {
-			if (!db.deleteTournament(tId))
-				throw new Error('Failed to delete tournament');
-		} catch (err) {
-			console.error('deleteTournament failed:', err);
-		}
+class TournamentManager {
+	private tournaments: TournamentState[] = [];
+	private activeId: number | null = null;
+	private nextTournamentId = 1;
+	private nextPlayerIdGlobal = 1;
+	private nextMatchIdGlobal = 1;
+
+	list(): TournamentState[] {
+		return this.tournaments.map(t => this.cloneState(t));
 	}
 
-	/* ================================================== */
-	/* Utility Methods                                     */
-	/* ================================================== */
-
-	setPlayerSocket(playerId: number, socketId: string): boolean {
-		try {
-			db.updatePlayer({ id: playerId, socketId });
-			return true;
-		} catch (error) {
-			console.error('setPlayerSocket error:', error);
-			return false;
-		}
+	getActive(): TournamentState | null {
+		if (this.activeId == null) return null;
+		const t = this.tournaments.find(x => x.id === this.activeId) || null;
+		return t ? this.cloneState(t) : null;
 	}
 
-	getMatch(matchId: number): TournamentMatch | null {
-		try {
-			return db.getMatchById(matchId);
-		} catch (error) {
-			console.error('getMatch error:', error);
-			return null;
-		}
+	getById(id: number): TournamentState | null {
+		const t = this.tournaments.find(x => x.id === id);
+		return t ? this.cloneState(t) : null;
 	}
 
-	getTournament(tournamentId: number): Tournament | null {
-		try {
-			let t = db.getTournamentById(tournamentId);
-			if (t)
-				return this.hydrateTournament(t);
-			else
-				return null;
-		} catch (error) {
-			console.error('getTournament error:', error);
-			return null;
-		}
+	newTournament(): TournamentState {
+		const createdAt = nowISO();
+		const t: TournamentState = {
+			id: this.nextTournamentId++,
+			status: 'idle',
+			gameStates: [],//TODO: maybe good to have for live tracking?
+			createdAt,
+			updatedAt: createdAt,
+			players: [],
+			queue: [],
+			currentMatch: null,
+			matchHistory: [],
+			championId: undefined
+		};
+		this.tournaments.push(t);
+		this.activeId = t.id;
+		return this.cloneState(t);
 	}
 
-	getAllTournaments(): Tournament[] {
-		try {
-			let tt = db.getAllTournaments() || [];
-			let t: Tournament | null;
-			for (t of tt) {
-				t = this.hydrateTournament(t);
-				if (!t) throw new Error('[Tournaments] hydrateTournament failed');
-			}
-			return tt;
-		} catch (error) {
-			console.error('getAllTournaments error:', error);
-			return [];
+	startTournament(aliases: string[]): TournamentState {
+		const cleaned = aliases.map(a => a.trim()).filter(Boolean);
+		if (cleaned.length < 2) throw new Error('At least two players required.');
+		const seen = new Set<string>();
+		cleaned.forEach(a => {
+			const k = a.toLowerCase();
+			if (seen.has(k)) throw new Error(`Duplicate alias: ${a}`);
+			seen.add(k);
+		});
+
+		const t = this.newTournamentInternal();
+		t.players = cleaned.map(alias => ({
+			id: this.nextPlayerIdGlobal++,
+			alias: alias,
+			eliminated: false,
+			wins: 0,
+			losses: 0,
+			profile: {
+				gameId: 0,
+				id: 0,
+				name: alias,
+				avatar: '',
+				createdAt: nowISO(),
+				updatedAt: nowISO(),
+				pos: 0,
+				material: '',
+				color: { r: 0, g: 0, b: 0 },
+				score: 0,
+				connectionStatus: '',
+				lastActivity: nowISO()
+			} as Player
+		}));
+		t.queue = t.players.map((p: TournamentPlayer) => p.id);
+		t.currentMatch = this.createNextMatch(t.queue);
+		t.status = t.currentMatch ? 'in_progress' : 'completed';
+
+		if (!t.currentMatch) {
+			t.status = 'completed';
+			t.championId = t.players[0]?.id;
+			if (t.championId) t.queue = [t.championId];
 		}
+		t.updatedAt = nowISO();
+		return this.cloneState(t);
 	}
 
-	getMatchRoom(matchId: number): string | undefined {
-		return this.matchRooms.get(matchId);
+	recordResult(winner: { alias?: string; playerId?: number }): TournamentState {
+		const t = this.getActiveOrThrow();
+		if (!t.currentMatch) throw new Error('No active match.');
+		const { player1Id, player2Id, matchId } = t.currentMatch;
+		const p1 = t.players.find((p: TournamentPlayer) => p.id === player1Id)!;
+		const p2 = t.players.find((p: TournamentPlayer) => p.id === player2Id)!;
+		const winP = this.resolveWinner(winner, [p1, p2]);
+		const loseP = winP.id === p1.id ? p2 : p1;
+
+		winP.wins++;
+		loseP.losses++;
+		loseP.eliminated = true;
+
+		t.matchHistory.push({
+			id: matchId,
+			player1Id,
+			player2Id,
+			winnerId: winP.id,
+			loserId: loseP.id,
+			finishedAt: nowISO()
+		});
+
+		t.currentMatch = null;
+		const alive = t.players.filter((p: TournamentPlayer) => !p.eliminated).map((p: TournamentPlayer) => p.id);
+		if (alive.length === 1) {
+			t.status = 'completed';
+			t.championId = alive[0];
+		} else {
+			t.queue.push(winP.id);
+			t.currentMatch = this.createNextMatch(t.queue);
+			if (!t.currentMatch) {
+				t.status = 'completed';
+				t.championId = winP.id;
+			} else t.status = 'in_progress';
+		}
+		t.updatedAt = nowISO();
+		return this.cloneState(t);
+	}
+
+	resetActive(): void {
+		this.activeId = null;
+	}
+
+	private getActiveOrThrow(): TournamentState {
+		const t = this.tournaments.find(x => x.id === this.activeId!);
+		if (!t) throw new Error('No active tournament.');
+		return t;
+	}
+
+	private createNextMatch(queue: number[]): TournamentMatch | null {
+		if (queue.length < 2) return null;
+		const p1 = queue.shift();
+		const p2 = queue.shift();
+		if (p1 == null || p2 == null) return null;
+		return {
+			matchId: this.nextMatchIdGlobal++,
+			player1Id: p1,
+			player2Id: p2,
+			startedAt: nowISO()
+		};
+	}
+
+	private resolveWinner(w: { alias?: string; playerId?: number }, players: TournamentPlayer[]): TournamentPlayer {
+		if (w.playerId != null) {
+			const p = players.find(pl => pl.id === w.playerId);
+			if (p) return p;
+		}
+		if (w.alias) {
+			const low = w.alias.toLowerCase();
+			const p = players.find(pl => pl.alias.toLowerCase() === low);
+			if (p) return p;
+		}
+		throw new Error('Winner not in current match.');
+	}
+
+	private newTournamentInternal(): TournamentState {
+		const createdAt = nowISO();
+		const t: TournamentState = {
+			id: this.nextTournamentId++,
+			status: 'idle',
+			gameStates: [],
+			createdAt,
+			updatedAt: createdAt,
+			players: [],
+			queue: [],
+			currentMatch: null,
+			matchHistory: [],
+			championId: undefined
+		};
+		this.tournaments.push(t);
+		this.activeId = t.id;
+		return t;
+	}
+
+	private cloneState(state: TournamentState): TournamentState {
+		return {
+			...state,
+			players: state.players.map((p: TournamentPlayer) => ({ ...p })),
+			queue: [...state.queue],
+			currentMatch: state.currentMatch ? { ...state.currentMatch } : null,
+			matchHistory: state.matchHistory.map((m: TournamentMatchRecord) => ({ ...m }))
+		};
 	}
 }
 

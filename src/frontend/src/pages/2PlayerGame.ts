@@ -114,7 +114,7 @@ export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     }
 }
 
-async function setupGameButtons(pongGame: PongGame): Promise<void> {
+export async function setupGameButtons(pongGame: PongGame): Promise<void> {
     
     let effectiveRoom = await setEffectiveRoom();
 
@@ -277,7 +277,6 @@ export function setupKeyboardControls(ws: any, playerId: string, pongInstance?: 
     
     const room = getCurrentRoom();
     
-    // Verify this player is in the room
     if (room) {
         const playerInRoom = room.players.find((p: any) => p.id === playerId);
         if (!playerInRoom) {
