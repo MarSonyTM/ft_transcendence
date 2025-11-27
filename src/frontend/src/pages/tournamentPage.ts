@@ -11,7 +11,7 @@ import {
     createTournament,
     setEffectiveTournament,
     postTournamentMatchWinner,
-    showTournamentEndScreen,
+    // showTournamentEndScreen,
     deleteTournament
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
@@ -88,42 +88,54 @@ async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
     return false;
 }
 
-function statusComplete(content: HTMLElement): void {
-    const t = getCurrentTournament();
+function statusComplete(): void {
+	const t = getCurrentTournament();
     if (!t || !t.id) return;
     const champPlayer = t.championId ? findPlayer(t.championId) : undefined;
     const champ = champPlayer?.name || '—';
 
-    content.innerHTML = `
-        <p class="t-info-text"><strong>Tournament #${t.id || '?'}</strong></p>
-        <h3 class="t-info-text">Tournament Complete</h3>
-        <p class="t-info-text">Champion: <strong>${champ}</strong></p>
-        <div class="t-footer">
-            <span class="t-footer-spacer">
-                <button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
-                <button id="resetBtn" class="btn btn-submit t-flex-1">New Tournament</button>
-                <button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
-            </span>
+    const existingOverlay = document.getElementById('tournamentEndOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'tournamentEndOverlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+        display: flex; align-items: center; justify-content: center; z-index: 1000;
+    `;
+    const name = champ || (t?.players.find(p => p.id === t.championId)?.name) || `Player ${t.championId}`;
+    overlay.innerHTML = `
+        <div style="background: rgb(55 65 81); padding: 3em; border-radius: 12px; text-align: center; max-width: 560px;">
+            <div style="font-size: 4em; margin-bottom: 0.2em;">🏆</div>
+            <h2 style="color: rgb(52 211 153); font-size: 2.4em; margin: 0 0 0.3em 0;">Tournament Finished</h2>
+            <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
+            <div class="t-actions">
+				<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
+				<button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
+				<button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
+			</div>
         </div>
     `;
+    document.body.appendChild(overlay);
+    setTimeout(() => {
     
-    document.getElementById('archiveBtn')?.addEventListener('click', () => openTournamentArchive());
+		document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
-    document.getElementById('resetBtn')?.addEventListener('click', async () => {
-        await resetTournament();
-        let t = getCurrentTournament();
-        if (!t || !t.id) {
-            console.debug('[Tournament] No tournament found after reset, creating new one');
-            return;
-        }
-        await renderTournamentContent(t);
-    });
-    
-    document.getElementById('backBtn')?.addEventListener('click', () => {
-        history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
-        setCurrentPage('gameSelect');
-        renderApp();
-    });
+		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+			await resetTournament();
+			let t = getCurrentTournament();
+			if (!t || !t.id) {
+				console.debug('[Tournament] No tournament found after reset, creating new one');
+				return;
+			}
+			await renderTournamentContent(t);
+		});
+		
+		document.getElementById('backBtn')?.addEventListener('click', () => {
+			history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+			setCurrentPage('gameSelect');
+			renderApp();
+		});
+	}, 0);
 }
 
 export async function renderTournamentContent(t: Tournament): Promise<void> {
@@ -139,7 +151,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         return;
     }
     if (t.status === 'completed') {
-        statusComplete(content);//TODO switch to showTournamentEndScreen
+        statusComplete();//TODO switch to showTournamentEndScreen
         return;
     }
     if (!t.curM || t.curM.status === 'completed') {
@@ -285,7 +297,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         } else if (!nextMatch) {
             const refreshedT = await setEffectiveTournament(t.id!);
             if (refreshedT && refreshedT.status === 'completed') {
-                statusComplete(document.getElementById('tournamentContent')!);
+                statusComplete();
                 return;
             }
             box.innerHTML = '<p>Waiting for next round to be scheduled...</p>';
@@ -729,8 +741,9 @@ async function initws(t: Tournament): Promise<void> {
             console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
-                showTournamentEndScreen(t.championId); //TODO: Here
-            await resetTournament();
+				statusComplete();
+                // showTournamentEndScreen(t.championId); //TODO: Here
+            // await resetTournament();
         },
 
         onError: (err) => {

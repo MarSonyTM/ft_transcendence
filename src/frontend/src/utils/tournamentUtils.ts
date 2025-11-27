@@ -57,6 +57,8 @@ export async function resetTournament(): Promise<void> {
     let t = getCurrentTournament();
     if (t && t.id)
         deleteTournament(t.id);
+	setCurrentTournament(null);
+    setCurrentMatch(null);
     const host = authService.getCurrentUser();
     if (!host) {
         console.error('Cannot create new tournament: no user logged in');
@@ -227,41 +229,6 @@ export function finalizeTournament(championId: number | null): void {
     t.status = 'completed';
     t.championId = championId;
     setCurrentTournament(t);
-}
-
-export function showTournamentEndScreen(championId: number, championName?: string): void {//TODO
-    const existingOverlay = document.getElementById('tournamentEndOverlay');
-    if (existingOverlay) existingOverlay.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'tournamentEndOverlay';
-    overlay.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.9);
-        display: flex; align-items: center; justify-content: center; z-index: 1000;
-    `;
-    const t = getCurrentTournament();
-    const name = championName || (t?.players.find(p => p.id === championId)?.name) || `Player ${championId}`;
-    overlay.innerHTML = `
-        <div style="background: rgb(55 65 81); padding: 3em; border-radius: 12px; text-align: center; max-width: 560px;">
-            <div style="font-size: 4em; margin-bottom: 0.2em;">🏆</div>
-            <h2 style="color: rgb(52 211 153); font-size: 2.4em; margin: 0 0 0.3em 0;">Tournament Finished</h2>
-            <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
-            <div style="display: flex; gap: 1em; justify-content: center;">
-                <button id="backToHomeBtn" style="background: rgb(99 102 241); color: white; border: none; padding: 1em 2em; border-radius: 8px; font-size: 1.1em; cursor: pointer; font-weight: 600; transition: background 0.2s;">Back to Home</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-    setTimeout(() => {
-        const backBtn = document.getElementById('backToHomeBtn');
-        if (backBtn) {
-            backBtn.addEventListener('click', () => {
-                overlay.remove();
-                history.pushState({ page: 'landing' }, '', '/');
-                setCurrentPage('landing');
-                renderApp();
-            });
-        }
-    }, 0);
 }
 
 export function showTournamentPlayerDisconnectedMessage(playerName: string): void {
