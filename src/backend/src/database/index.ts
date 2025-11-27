@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { Tournament, TournamentMatch, TournamentPlayer } from '../types/index';
 
-const DATABASE_PATH = process.env.DATABASE_PATH || "/app/database/database.db";
+const DATABASE_PATH = process.env.DATABASE_PATH || "./app/database/database.db";
 const DATABASE_DIR = path.dirname(DATABASE_PATH);
 
 export interface User {
