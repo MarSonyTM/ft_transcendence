@@ -1,13 +1,12 @@
-import { Player, GameState, WebSocketMessage } from '../types';
+import { GameState, WebSocketMessage, Player } from '../types';
 import { getCurrentGameMode } from '../utils/globalState';
 import { getCurrentRoom } from '../utils/roomState';
-import { RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from '../utils/auth';
 import { baby3D } from './game3D';
+import { RoomWebSocketManager } from '../utils/roomWebSocket';
 
 export class PongGame {
     gameId?: number = 0;
-    // viewIndexMap: number[] = [0, 1, 2, 3];
     canvas: HTMLCanvasElement | null = null;
     ctx: CanvasRenderingContext2D | null = null;
     babylonGame?: baby3D;
@@ -19,12 +18,12 @@ export class PongGame {
     players: Player[] = [];
 
     gameState: GameState = {
-        gameId: this.gameId,
+        gameId: this.gameId!,
         players: [],
 		ballPosX: 200,
         ballPosY: getCurrentGameMode() === '4P' ? 200 : 100,
         mode: getCurrentGameMode(),
-        lastContact: 0
+        lastContact: 0,
     };
     heartbeatInterval: any = null;
     keys: { [key: string]: boolean } = {};
@@ -119,12 +118,11 @@ export class PongGame {
         this.stateListeners.push(cb);
     }
 
-    /** Remove a previously registered callback */
     removeStateListener(cb: (state: GameState, game: PongGame) => void): void {
         this.stateListeners = this.stateListeners.filter(l => l !== cb);
     }
 
-    private notifyStateListeners(): void {
+    public notifyStateListeners(): void {
         for (const l of this.stateListeners) {
             try { l(this.gameState, this); } catch (e) { /* swallow listener errors */ }
         }
@@ -152,7 +150,7 @@ export class PongGame {
                 console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
             }
             // If there's a room with a gameId, use it
-            else if (room && room.gameId) {
+            if (room && room.gameId) {
                 this.gameId = room.gameId;
                 console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
             }
@@ -169,15 +167,13 @@ export class PongGame {
                 return; // Don't initialize yet
             }
             
-            // Connect to WebSocket only after gameId is confirmed
             if (this.gameId) {
                 await this.connectWebSocket();
                 this.updateStatus("Connected - Click Start to begin");
                 
-                // Initialize 3D AFTER WebSocket is connected
                 await this.init3DGame();
                 
-                this.startRenderLoop(); // Start the game loop for input/state updates
+                this.startRenderLoop();
             } else {
                 throw new Error("Failed to establish game ID");
             }
@@ -314,7 +310,7 @@ export class PongGame {
                 if (message.state) {
                     const s = message.state as any;
 
-                    this.gameState.ballPosX = s.ballPosX === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosX;
+                    this.gameState.ballPosX = s.ballPosX === undefined ? 200 : s.ballPosX;
                     this.gameState.ballPosY = s.ballPosY === undefined ? this.gameState.mode === '4P' ? 200 : 100 : s.ballPosY;
                     this.gameState.lastContact = s.lastContact === undefined ? 0 : s.lastContact;
 
@@ -403,6 +399,8 @@ export class PongGame {
             case 'ping':
                 console.log("pong");
                 break;
+            case 'pong':
+                break;
                 
             default:
                 console.log("Unknown WebSocket message:", message);
@@ -480,7 +478,7 @@ export class PongGame {
     sendPlayerMove(position: number): void {
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            if (this.playerId === undefined) this.playerId = 0;// TODO: why default to 1? -> this.playerId = 1; // Default to player 1 if unset
+            if (this.playerId === undefined) this.playerId = 1;// TODO: why default to 1? // Default to player 1 if unset
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: this.playerId,
@@ -547,6 +545,7 @@ export class PongGame {
         const element = document.getElementById('wsStatus');
         if (element) {
             element.className = connected ? 'connected' : 'disconnected';
+            element.textContent = status;
         }
     }
 

@@ -5,16 +5,19 @@ import { PongGame } from '../game/PongGame';
 import { getLobbyPlayers,  getCurrentRoom } from '../utils/roomState';
 import { initRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { setGameScreen, endGame,cleanupGame, setEffectiveRoom, showGameEndScreen } from '../utils/gameUtils'
-import { toggleTournaments } from '../tournament';
 import { presenceService } from '../utils/presenceService';
+import { TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 
 export let pongGame: PongGame | null = null;
 let keyboardCleanup: (() => void) | null = null;
 
-export async function render2PlayerGame(): Promise<void> {
+export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     const room = getCurrentRoom();
 
-    pongGame = new PongGame();
+	if (!pong)
+    	pongGame = new PongGame();
+	else
+		pongGame = pong;
 
     if (room)
         pongGame.hasLocal = room.players.some(p => p.id === 'local');
@@ -25,8 +28,8 @@ export async function render2PlayerGame(): Promise<void> {
     // Get players from lobby
     const lobbyPlayers = getLobbyPlayers();
     const players = [
-        lobbyPlayers[0] || { username: 'Player 1', isAI: false },
-        lobbyPlayers[1] || { username: 'Player 2', isAI: false },
+        lobbyPlayers[0] || { name: 'Player 1', isAI: false },
+        lobbyPlayers[1] || { name: 'Player 2', isAI: false },
     ];
     
     // Get authenticated user info for fallback
@@ -83,7 +86,7 @@ export async function render2PlayerGame(): Promise<void> {
             </div>
         </div>
     `;
-    
+
     await setupGameButtons(pongGame);
 
     const backBtn = document.getElementById('backToLandingBtn');
@@ -129,7 +132,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const tournamentsBtn = document.getElementById('tournamentsBtn');
 
     window.addEventListener('popstate', async () => {
         if (pongGame) {
@@ -188,10 +190,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
             }
         });
     }
-
-    if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', toggleTournaments);
-    }
 }
 
 // Initialize room-based multiplayer game
@@ -209,9 +207,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
         return;
     }
 
-    const playerId = user?.id?.toString() || `guest-${Date.now()}`;
-    const gameMode = getCurrentGameMode();
-
+    const playerId = user?.id?.toString() || room.players[0].id.toString() || `guest-${Date.now()}`;
 
     pongGame.roomWS = initRoomWebSocket({
         roomId: room.roomId,
@@ -267,20 +263,19 @@ async function initRoomBasedGame(room: any): Promise<void> {
 }
 
 // Setup keyboard controls
-function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
-    // Clean up any existing handlers first!
+export function setupKeyboardControls(ws: any, playerId: string, pongInstance?: PongGame): void {
     if (keyboardCleanup) {
         console.log('🧹 Cleaning up old keyboard handlers');
         keyboardCleanup();
     }
 
     const keys: { [key: string]: boolean } = {};
-    const hasLocal = pongGame && pongGame.hasLocal;
+    // Use provided pong instance (for tournaments) or fall back to global pongGame
+    const activePong = pongInstance || pongGame;
+    const hasLocal = activePong && activePong.hasLocal;
     const gameMode = getCurrentGameMode();
     
-    // DEBUG: Check what's in the room
     const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
     
     // Verify this player is in the room
     if (room) {
@@ -292,7 +287,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
             });
         }
     }
-    
+
     const movementKeys = new Set(['w','s','o','l','arrowup','arrowdown']);
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -341,7 +336,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
 
 
 // Sync game state from room WebSocket
-function syncGameStateFromRoom(state: any): void {
+export function syncGameStateFromRoom(state: any): void {
     if (!pongGame || !pongGame.gameState) return;
 
     // Merge delta updates - only update fields that are present

@@ -1,18 +1,11 @@
-export interface RGBColor {
-  r: number;
-  g: number;
-  b: number;
-}
-
-// Core player data structure
 export interface Player {
   id: number;
-  name?: string; // Optional player name
-  gameId?: number;
-  pos: number; // Paddle position
+  name: string;
+  gameId: number;
+  pos: number;
   score: number;
-  connectionStatus?: string;
-  lastActivity?: string;
+  connectionStatus: string;
+  lastActivity: string;
 }
 
 // Core game state structure

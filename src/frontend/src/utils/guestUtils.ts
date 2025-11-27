@@ -1,6 +1,4 @@
-import { authService } from "./auth";   
-
-
+import { authService } from "./auth";  
 
 export async function getGuestUsername(): Promise<string | null> {
 
@@ -101,7 +99,7 @@ export function isGuestSessionExpired(): boolean {
     if (!user) return true;
   
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(token.split('.')[1]));//TODO MERGE -> no token?
         const exp = payload.exp * 1000; // Convert to milliseconds
         return Date.now() > exp;
     } catch {

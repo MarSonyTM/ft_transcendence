@@ -1,4 +1,4 @@
-import { getCurrentUser, setCurrentPage } from '../utils/globalState';
+import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 import { authService } from '../utils/auth';
@@ -35,7 +35,6 @@ function getApiEndpoint(): string {
 
 async function fetchAllGames(): Promise<GameResult[]> {
     try {
-        //TODO: check if the api needs authentication for this endpoint
         const response = await fetch(`${getApiEndpoint()}/api/game`);
         if (!response.ok) {
             console.error('Failed to fetch games:', response.status);
@@ -43,7 +42,6 @@ async function fetchAllGames(): Promise<GameResult[]> {
         }
         const result = await response.json();
         
-        // Extract the data array from the API response
         return result.data || [];
     } catch (error) {
         console.error('Error fetching games:', error);
@@ -53,8 +51,6 @@ async function fetchAllGames(): Promise<GameResult[]> {
 
 async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
     try {
-        // Fetch all users with their stats
-        //TODO: check if the api needs authentication for this endpoint
         const response = await fetch(`${getApiEndpoint()}/api/users/stats`);
         if (!response.ok) {
             console.error('Failed to fetch leaderboard:', response.status);

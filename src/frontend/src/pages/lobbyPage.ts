@@ -3,11 +3,11 @@ import { renderApp } from '../main';
 import { initRoomWebSocket } from '../utils/roomWebSocket';
 import { authService } from '../utils/auth';
 import { 
-	Player, 
-  	GameRoom, 
-  	getCurrentRoom,
-  	setCurrentRoom,
-  	clearRoomState
+  getCurrentRoom,
+  setCurrentRoom,
+  clearRoomState,
+  GameRoom,
+  Player
 } from '../utils/roomState';
 
 let currentUserId: string | null = null;
@@ -201,41 +201,17 @@ async function startGame(): Promise<void> {
 }
 
 async function showGameStartCountdown(): Promise<void> {
-	return new Promise((resolve) => {
-    	const overlay = document.createElement('div');
-    	overlay.id = 'countdown-overlay';
-    	overlay.style.cssText = `
-			position: fixed;
-			top: 0;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			background: rgba(0, 0, 0, 0.95);
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			z-index: 10000;
-			animation: fadeIn 0.3s ease-out;
-    	`;
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'countdown-overlay';
+    overlay.className = 'countdown-overlay animate-fade-in';
 
-		const countdownText = document.createElement('div');
-		countdownText.style.cssText = `
-			font-size: 10em;
-			font-weight: bold;
-			color: rgb(52 211 153);
-			text-shadow: 0 0 30px rgba(52, 211, 153, 0.5);
-			animation: pulse 1s ease-in-out;
-		`;
+    const countdownText = document.createElement('div');
+    countdownText.className = 'countdown-text animate-pulse';
 
-    	const messageText = document.createElement('div');
-    	messageText.style.cssText = `
-      		font-size: 2em;
-			color: rgb(209 213 219);
-			margin-top: 1em;
-			opacity: 0.8;
-		`;
-   		messageText.textContent = 'Get Ready!';
+    const messageText = document.createElement('div');
+    messageText.className = 'countdown-message';
+    messageText.textContent = 'Get Ready!';
 
     	overlay.appendChild(countdownText);
     	overlay.appendChild(messageText);
@@ -247,30 +223,30 @@ async function showGameStartCountdown(): Promise<void> {
     	const countdownInterval = setInterval(() => {
       		count--;
       
-      		if (count > 0) {
-        		countdownText.textContent = count.toString();
-        		// Reset animation
-        		countdownText.style.animation = 'none';
-        		setTimeout(() => {
-          			countdownText.style.animation = 'pulse 1s ease-in-out';
-        		}, 10);
-      		} else {
-        		countdownText.textContent = 'GO!';
-        		countdownText.style.color = 'rgb(251 191 36)';
-        		messageText.textContent = 'Game Starting...';
+      if (count > 0) {
+        countdownText.textContent = count.toString();
+        // Retrigger pulse animation by toggling the class
+        countdownText.classList.remove('animate-pulse');
+        void (countdownText as HTMLElement).offsetWidth; // force reflow
+        countdownText.classList.add('animate-pulse');
+      } else {
+        countdownText.textContent = 'GO!';
+        countdownText.style.color = 'rgb(251 191 36)';
+        messageText.textContent = 'Game Starting...';
         
         		clearInterval(countdownInterval);
         
-        		setTimeout(() => {
-          			overlay.style.animation = 'fadeOut 0.3s ease-in';
-          			setTimeout(() => {
-            			overlay.remove();
-            			resolve();
-          			}, 300);
-        		}, 800);
-      		}
-    	}, 1000);
-  	});
+        setTimeout(() => {
+          overlay.classList.remove('animate-fade-in');
+          overlay.classList.add('animate-fade-out');
+          setTimeout(() => {
+            overlay.remove();
+            resolve();
+          }, 300);
+        }, 800);
+      }
+    }, 1000);
+  });
 }
 
 function initLobbyWebSocket(roomId: string, playerId: string): void {
@@ -713,21 +689,21 @@ async function addLocalPlayer(): Promise<void> {
     	return; 
   	}
   
-  	try {
-    	const joinResponse = await fetch(`/api/room/${roomId}/join`, {
-      		method: 'POST',
-      		credentials: 'include',
-      		headers: { 
-        		'Content-Type': 'application/json',
-      		},
-      		body: JSON.stringify({
-				playerId: localId,
-				username: username,
-				isAI: false,
-				isReady: true,
-				isLocal: true
-			})
-    	});
+  try {
+    const joinResponse = await fetch(`/api/room/${roomId}/join`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        playerId: localId,
+        username: username,
+        isAI: false,
+        isReady: false,
+        isLocal: true
+      })
+    });
 
     	const joinData = await joinResponse.json();
     

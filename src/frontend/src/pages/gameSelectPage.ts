@@ -1,5 +1,6 @@
 import { setCurrentPage, setCurrentUser, setCurrentGameMode, getCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
+import { renderSetup } from './tournamentLobbyPage';
 import { authService } from '../utils/auth';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 
@@ -17,6 +18,7 @@ export async function renderGameSelectPage(): Promise<Promise<void>> {
                 <div class="game-mode-options" style="align-items:center;">
                     <button id="2PBtn" class="btn-neon primary" style="font-size: 1.2em;">1 vs 1 Match</button>
                     <button id="4PBtn" class="btn-neon primary" style="font-size: 1.2em;">4 Player Match</button>
+                    <button id="tournamentBtn" class="btn-neon primary" style="font-size: 1.2em;">Tournament</button>
                 </div>
             </div>
             <div style="display: flex; gap: 1.2em; justify-content: center; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
@@ -61,7 +63,20 @@ export async function renderGameSelectPage(): Promise<Promise<void>> {
             renderApp();
         });
     }
-
+    
+    const tournamentBtn = document.getElementById('tournamentBtn');
+    if (tournamentBtn) {
+        tournamentBtn.addEventListener('click', () => {
+            if (!getCurrentUser()) {
+                setCurrentUser('Player 1');
+            }
+            setCurrentGameMode('2P');
+            history.pushState({ page: 'tournament' }, '', '/tournament');
+            setCurrentPage('tournament');
+            renderApp();
+        });
+    }
+    
     const leaderboardBtn = document.getElementById('leaderboardBtn');
     if (leaderboardBtn) {
         leaderboardBtn.addEventListener('click', () => {

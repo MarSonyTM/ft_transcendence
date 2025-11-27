@@ -1,0 +1,137 @@
+/* LAYOUT AND BASE STYLES */
+html, body { height: 100%; }
+body { overflow-x: hidden; }
+
+body {
+  /* Sleek glassmorphism background */
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.22), transparent 40%),
+    radial-gradient(900px 500px at 120% 20%, rgba(236,72,153,0.16), transparent 40%),
+    radial-gradient(900px 500px at -20% 60%, rgba(16,185,129,0.16), transparent 40%),
+    linear-gradient(180deg, #0d1226, #0b1020);
+  color: rgb(255 255 255); /* text-white */
+  font-family: ui-sans-serif, system-ui, sans-serif; /* font-sans */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 1.25rem; /* p-5 */
+}
+
+/* Neon grid background overlay */
+/* Neon grid (enabled) */
+.neon-grid {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  min-height: 100vh; /* make grid span full screen height */
+  overflow: visible; /* allow border to extend beyond all sides */
+}
+
+.neon-grid::before {
+  content: '';
+  position: absolute;
+  inset: -12px -24px; /* bring top/bottom closer; keep sides extended */
+  background:
+    linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06)) padding-box,
+    conic-gradient(from 180deg at 50% 50%, #60a5fa, #ec4899, #22c55e, #60a5fa) border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 1; /* above grid anim, below content */
+  box-shadow: 0 0 24px rgba(99,102,241,0.18), 0 0 36px rgba(236,72,153,0.14);
+}
+
+/* Landing page: tighten bottom a bit more to match visual top spacing */
+.neon-grid.landing-tight::before {
+  inset: -12px -24px -12px -24px; /* top right bottom left - symmetric top/bottom */
+}
+
+.neon-grid .grid-anim {
+  position: fixed; /* stretch across the entire viewport */
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99,102,241,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,102,241,0.18) 1px, transparent 1px);
+  background-size: 36px 36px, 36px 36px;
+  transform: perspective(700px) rotateX(60deg) translateY(-20%);
+  transform-origin: top center;
+  filter: drop-shadow(0 0 12px rgba(99,102,241,0.25));
+  animation: scrollGrid 12s linear infinite;
+  opacity: .55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes scrollGrid {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 0 36px, 36px 0; }
+}
+
+/* Futuristic glowing title */
+.title-neon {
+  position: relative;
+  letter-spacing: 0.04em;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa, #ec4899);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  text-shadow:
+    0 0 15px rgba(96,165,250,0.35),
+    0 0 30px rgba(167,139,250,0.25),
+    0 0 45px rgba(236,72,153,0.2);
+  animation: titlePulse 5s ease-in-out infinite;
+}
+
+@keyframes titlePulse {
+  0%, 100% {
+    text-shadow:
+      0 0 12px rgba(96,165,250,0.28),
+      0 0 26px rgba(167,139,250,0.2),
+      0 0 36px rgba(236,72,153,0.18);
+  }
+  50% {
+    text-shadow:
+      0 0 20px rgba(96,165,250,0.5),
+      0 0 40px rgba(167,139,250,0.35),
+      0 0 60px rgba(236,72,153,0.3);
+  }
+}
+
+h2 {
+  font-size: 2em; 
+  margin-bottom: 1em;
+}
+
+h3 {
+  color: rgb(156 163 175); 
+  font-size: 0.9em; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  margin-bottom: 0.5em;
+}
+
+.main-title {
+  text-align: center;
+  font-size: 4rem;
+  font-weight: 700; /* font-bold */
+  margin-bottom: 1rem; /* mb-4 */
+  color: rgb(255 255 255); /* text-white */
+}
+
+.landing-container,
+.login-container,
+.game-select-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+}
