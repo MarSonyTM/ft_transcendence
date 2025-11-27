@@ -1,6 +1,16 @@
 /* LAYOUT AND BASE STYLES */
-html, body { height: 100%; }
-body { overflow-x: hidden; }
+html, body { 
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling */
+  margin: 0;
+  padding: 0;
+}
+
+#app-root {
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling on main container */
+  width: 100%;
+}
 
 body {
   /* Sleek glassmorphism background */
@@ -14,7 +24,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100vh;
+  height: 100vh; /* Fixed height */
   padding: 1.25rem; /* p-5 */
 }
 
@@ -26,8 +36,8 @@ body {
   max-width: 1100px;
   margin: 0 auto;
   padding: 2rem 1rem;
-  min-height: 100vh; /* make grid span full screen height */
-  overflow: visible; /* allow border to extend beyond all sides */
+  height: calc(100vh - 2.5rem); /* Fixed height minus body padding */
+  overflow: auto; /* Allow internal scrolling if content exceeds */
 }
 
 .neon-grid::before {
