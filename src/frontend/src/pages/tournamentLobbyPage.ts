@@ -103,8 +103,8 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const alias = prompt('Local player alias', `Local_${x}`)?.trim();
 		if (!alias) return;
 		console.log('[Tournament] Add local player:', alias);
-		addPlayerToTournament(activeT.id!, alias, 'local');
-		rerender();
+		await addPlayerToTournament(activeT.id!, alias, 'local');
+		await rerender();
 	});
 
 	document.getElementById('addAIBtn')?.addEventListener('click', async () => {
@@ -113,18 +113,8 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const alias = `AI_${x}`;
 		if (!alias) return;
 		console.log('[Tournament] Add AI player:', alias);
-		addPlayerToTournament(activeT.id!, alias, 'ai');
-		rerender();
-	});
-
-	document.getElementById('addRemoteBtn')?.addEventListener('click', async () => {
-		if (!activeT) return;
-		let x = getNextId(internalRemoteIds);
-		const alias = prompt('Remote player alias', `Remote_${x}`)?.trim();
-		if (!alias) return;
-		console.log('[Tournament] Add remote player:', alias);
-		addPlayerToTournament(activeT.id!, alias, 'remote');
-		rerender();
+		await addPlayerToTournament(activeT.id!, alias, 'ai');
+		await rerender();
 	});
 
 	listEl.addEventListener('click', async (e) => {
