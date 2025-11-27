@@ -1,3 +1,5 @@
+DB_FILE ?= ./src/database/database.db
+
 all: up
 
 setup:
@@ -82,7 +84,11 @@ logs:
 logs-f:
 	@docker compose -f docker-compose.yml logs -f
 
+dev-dbreset: dev-down
+	@rm -f $(DB_FILE) $(DB_FILE)-wal $(DB_FILE)-shm || true
+	@echo "Database removed: $(DB_FILE)*"
+
 nuke:
 	@docker stop $(docker ps -qa); docker rm $(docker ps -qa); docker rmi -f $(docker images -qa); docker volume rm $(docker volume ls -q); docker network rm $(docker network ls -q) 2>/dev/null
 
-.PHONY: all setup up up-d down stop start restart clean rebuild rebuild-up dev dev-d dev-down dev-stop dev-start dev-restart dev-clean dev-rebuild dev-rebuild-up dev-logs dev-logs-f status logs logs-f nuke
+.PHONY: all setup up up-d down stop start restart clean rebuild rebuild-up dev dev-d dev-down dev-stop dev-start dev-restart dev-clean dev-rebuild dev-rebuild-up dev-logs dev-logs-f status logs logs-f dev-dbreset nuke

@@ -3,8 +3,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   root: './src',
   optimizeDeps: {
-    include: ['@babylonjs/core', '@babylonjs/loaders'],
-    force: true,
+    include: ['@babylonjs/core'],
     esbuildOptions: {
       target: 'es2020'
     }
@@ -14,7 +13,7 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: 'assets',
     sourcemap: false,
-    minify: 'terser',
+    minify: 'terser'
   },
   server: {
     host: '0.0.0.0',

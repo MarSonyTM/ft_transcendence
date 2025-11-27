@@ -9,7 +9,7 @@ interface FriendParams {
     id: string;
 }
 
-// Extend FastifyRequest to include user
+// // Extend FastifyRequest to include user
 async function friendRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
   
     // Get all friends

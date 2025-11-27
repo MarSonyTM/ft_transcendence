@@ -1,23 +1,27 @@
 import { FastifyInstance } from 'fastify';
 import { activeGames } from '../routes/game';
+import { broadcastGameStateToMatch, broadcastScoreToMatch, broadcastGameEndToMatch } from './tournamentHandler';
 
-const DEBUG = false;
-
-// Store active WebSocket connections per game
 const gameConnections = new Map<number, Set<any>>();
+const gameToMatchMap = new Map<number, number>();
+
+export function registerTournamentGame(gameId: number, matchId: number): void {
+    console.log(`📝 Registered tournament game ${gameId} -> match ${matchId}`);
+    gameToMatchMap.set(gameId, matchId);
+}
+export function unregisterTournamentGame(gameId: number): void {
+    console.log(`🗑️ Unregistered tournament game ${gameId}`);
+    gameToMatchMap.delete(gameId);
+}
 
 // Register WebSocket routes
 async function webSocketRoutes(fastify: FastifyInstance) {
-    //TODO: Add authentication to WebSocket connections
-
-  // WebSocket endpoint for game connections
     (fastify as any).register(async function (fastify: any) {
         fastify.get('/game/:gameId/ws', { websocket: true }, (connection: any, req: any) => {
             const { gameId } = req.params;
             const gameIdNum = parseInt(gameId);
             
             if (isNaN(gameIdNum)) {
-                // Try different ways to close the connection
                 if (connection.socket) {
                     connection.socket.close(1008, 'Invalid game ID');
                 } else if (connection.close) {
@@ -28,23 +32,14 @@ async function webSocketRoutes(fastify: FastifyInstance) {
                 return;
             }
 
-            // Try to find the actual WebSocket object
-            let socket = null;
-            if (connection) {
-                socket = connection;
-            }
+            let socket = connection;
+            if (!socket) return;
             
-            if (!socket) {
-                return;
-            }
-            
-            // Add socket to game connections
             if (!gameConnections.has(gameIdNum)) {
                 gameConnections.set(gameIdNum, new Set());
             }
             gameConnections.get(gameIdNum)!.add(socket);
 
-            // Handle incoming messages
             if (typeof socket.on === 'function') {
                 socket.on('message', (data: any) => {
                     try {
@@ -55,14 +50,14 @@ async function webSocketRoutes(fastify: FastifyInstance) {
                                 if (typeof socket.send === 'function') {
                                     socket.send(JSON.stringify({ type: 'pong' }));
                                 }
-                            break;
+                                break;
                       
                             case 'move':
                                 if (typeof message.position === 'number') {
                                     const playerId = typeof message.playerId === 'number' ? message.playerId : 1;
                                     handlePlayerMove(gameIdNum, playerId, message.position);
                                 }
-                            break;
+                                break;
                     
                             case 'score':
                                 const gameEngine = activeGames.get(gameIdNum);
@@ -79,20 +74,15 @@ async function webSocketRoutes(fastify: FastifyInstance) {
                     } catch {} 
                 });
 
-                // Handle connection close
                 socket.on('close', () => {
                     removeSocketFromGame(gameIdNum, socket);
                 });
 
-                // Handle errors
                 socket.on('error', (error: any) => {
                     removeSocketFromGame(gameIdNum, socket);
                 });
-            } else {
-                return;
             }
 
-            // Send initial connection confirmation
             if (typeof socket.send === 'function') {
                 socket.send(JSON.stringify({
                     type: 'connected',
@@ -104,7 +94,6 @@ async function webSocketRoutes(fastify: FastifyInstance) {
     });
 }
 
-// Helper function to remove socket from game connections
 function removeSocketFromGame(gameId: number, socket: any) {
     const connections = gameConnections.get(gameId);
     if (connections) {
@@ -115,7 +104,6 @@ function removeSocketFromGame(gameId: number, socket: any) {
     }
 }
 
-// Handle player movement
 function handlePlayerMove(gameId: number, playerId: number, position: number) {
     const gameEngine = activeGames.get(gameId);
     if (gameEngine) {
@@ -123,48 +111,52 @@ function handlePlayerMove(gameId: number, playerId: number, position: number) {
     }
 }
 
-// Broadcast message to all connections in a game
 export function broadcastToGame(gameId: number, message: any) {
     const connections = gameConnections.get(gameId);
-    if (!connections || connections.size === 0) {
-        return;
-    }
-  
-    const messageStr = JSON.stringify(message);
-    const deadConnections: any[] = [];
-  
-    connections.forEach(socket => {
-        if (socket && typeof socket.send === 'function') {
-            try {
-                if (typeof socket.readyState !== 'undefined' && socket.readyState === 1) {
-                    socket.send(messageStr);
-                } else {
+    if (connections && connections.size > 0) {
+        const messageStr = JSON.stringify(message);
+        const deadConnections: any[] = [];
+      
+        connections.forEach(socket => {
+            if (socket && typeof socket.send === 'function') {
+                try {
+                    if (typeof socket.readyState !== 'undefined' && socket.readyState === 1) {
+                        socket.send(messageStr);
+                    } else {
+                        deadConnections.push(socket);
+                    }
+                } catch (error) {
                     deadConnections.push(socket);
                 }
-            } catch (error) {
+            } else {
                 deadConnections.push(socket);
             }
-        } else {
-            deadConnections.push(socket);
+        });
+
+        deadConnections.forEach(socket => connections.delete(socket));
+        if (connections.size === 0) {
+            gameConnections.delete(gameId);
         }
-    });
+    }
 
-    // Clean up dead connections
-    deadConnections.forEach(socket => {
-        connections.delete(socket);
-    });
-
-    if (connections.size === 0) {
-        gameConnections.delete(gameId);
+    const matchId = gameToMatchMap.get(gameId);
+    if (matchId) {
+        if (message.type === 'gameState') {
+            broadcastGameStateToMatch(matchId, message.state);
+        } else if (message.type === 'score') {
+            broadcastScoreToMatch(matchId, message);
+        } else if (message.type === 'gameEnd') {
+            broadcastGameEndToMatch(matchId, message.winner);
+        } else if (message.type === 'ballReset') {
+            // Also forward ball reset messages to tournament
+            broadcastGameStateToMatch(matchId, { ballReset: true, ...message });
+        }
     }
 }
 
-// Get connection count for a game
 export function getGameConnectionCount(gameId: number): number {
     const connections = gameConnections.get(gameId);
-    if (connections)
-        return connections.size
-    return 0;
+    return connections ? connections.size : 0;
 }
 
 export default webSocketRoutes;

@@ -1,6 +1,6 @@
 import { PongGame } from "../game/PongGame";
 import { GameRoom, getCurrentRoom } from "./roomState";
-import { disconnectRoomWebSocket } from '../utils/roomWebSocket';
+import { disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
 import { authService } from "./auth";
 import { baby3D } from "../game/game3D";
 

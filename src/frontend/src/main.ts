@@ -1,4 +1,4 @@
-import './styles.css';
+import './styles/styles.css';
 import { AppPage } from './types';
 import { getCurrentPage, setCurrentPage, setCurrentUser } from './utils/globalState';
 import { renderLandingPage } from './pages/landingPage';
@@ -18,6 +18,7 @@ import { renderChangeUsernamePage } from './pages/changeUsernamePage';
 import { renderChangeEmailPage } from './pages/changeEmailPage';
 import { renderVerifyEmailPage } from './pages/verifyEmail';
 import { renderLeaderboardPage } from './pages/leaderboardPage';
+import { renderTournamentPage, cleanupTournamentPage } from './pages/tournamentPage';
 import { renderStatsPage } from './pages/statsPage';
 import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
@@ -28,7 +29,6 @@ import { renderTwoFactorAuthPage } from './pages/twoAuth';
 let currentRoomId: string | null = null;
 
 export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
-
 
 // Centralized routing handler
 async function handleRouting(): Promise<void> {
@@ -119,6 +119,9 @@ async function handleRouting(): Promise<void> {
     case '/leaderboard':
       setCurrentPage('leaderboard');
       break;
+    case '/tournament':
+      setCurrentPage('tournament');
+      break;
     case '/stats':
       setCurrentPage('stats');
       break; 
@@ -137,8 +140,11 @@ async function handleRouting(): Promise<void> {
 export async function renderApp(): Promise<void> {
   const page = getCurrentPage();
 
-  if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame') {
+  if (page !== 'lobby' && page !== '2PGame' && page !== '4PGame' && page !== 'tournament') {
     cleanupLobby();
+  }
+  if (page !== 'tournament') {
+    cleanupTournamentPage();
   }
 
   switch (page) {
@@ -205,6 +211,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'leaderboard':
       renderLeaderboardPage();
+      break;
+    case 'tournament':
+      renderTournamentPage();
       break;
     case 'stats':
       renderStatsPage();

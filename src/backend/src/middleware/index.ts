@@ -58,8 +58,9 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     // Check prefix matches for public route patterns
     const publicPrefixes = [
         '/assets/',
-        '/api/room',     
-        '/api/game',        
+        '/api/room',
+        '/api/game',
+        '/api/tournament',
         '/game/',
         '/room/',
         '/join/',

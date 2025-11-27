@@ -26,10 +26,10 @@ export async function render4PlayerGame(): Promise<void> {
     // Get players from lobby
     const lobbyPlayers = getLobbyPlayers();
     const players = [
-        lobbyPlayers[0] || { username: 'Player 1', isAI: false },
-        lobbyPlayers[1] || { username: 'Player 2', isAI: false },
-        lobbyPlayers[2] || { username: 'Player 3', isAI: false },
-        lobbyPlayers[3] || { username: 'Player 4', isAI: false }
+        lobbyPlayers[0] || { name: 'Player 1', isAI: false },
+        lobbyPlayers[1] || { name: 'Player 2', isAI: false },
+        lobbyPlayers[2] || { name: 'Player 3', isAI: false },
+        lobbyPlayers[3] || { name: 'Player 4', isAI: false }
     ];
 
     // Get authenticated user info for fallback
@@ -94,8 +94,7 @@ export async function render4PlayerGame(): Promise<void> {
             </div>
         </div>
     `;
-    
-     
+
     await setupGameButtons(pongGame);
 
     const backBtn = document.getElementById('backToLandingBtn');
@@ -140,7 +139,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
     const pauseBtn = document.getElementById('pauseBtn');
     const endBtn = document.getElementById('endBtn');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const tournamentsBtn = document.getElementById('tournamentsBtn');
 
     if (startBtn) {
         startBtn.addEventListener('click', async () => {
@@ -184,10 +182,6 @@ async function setupGameButtons(pongGame: PongGame): Promise<void> {
                 }
             }
         });
-    }
-
-    if (tournamentsBtn) {
-        tournamentsBtn.addEventListener('click', toggleTournaments);
     }
 }
 

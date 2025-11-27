@@ -23,7 +23,7 @@ export class BaseGameEngine {
     private yDir: number = 1;
 
     // Paddles
-    private readonly paddleHeight: number;
+    private readonly paddleLength: number;
     private readonly paddleWidth: number;
     private readonly defaultPaddlePos: number;
     private readonly paddleSpeed: number;
@@ -52,9 +52,9 @@ export class BaseGameEngine {
         this.min = 0;
         this.maxX = 400;
         this.maxY = is2P? 200 : 400;
-        this.ballRadius = 10;
+        this.ballRadius = 10;//TODO check -> balldiameter is 10
         this.ballSpeed = 4;
-        this.paddleHeight = is2P ? 60 : 80;
+        this.paddleLength = is2P ? 60 : 80;
         this.paddleWidth = 10;
         this.defaultPaddlePos = is2P ? 70 : 160;
         this.paddleSpeed = is2P ? 4 : 8;
@@ -69,7 +69,7 @@ export class BaseGameEngine {
             maxY: this.maxY,
             ballRadius: this.ballRadius,
             ballSpeed: this.ballSpeed,
-            paddleHeight: this.paddleHeight,
+            paddleHeight: this.paddleLength,
             paddleWidth: this.paddleWidth,
             defaultPaddlePos: this.defaultPaddlePos,
             paddleSpeed: this.paddleSpeed
@@ -104,7 +104,7 @@ export class BaseGameEngine {
             this.gameTimer = null;
         }
         
-        broadcastToGame(this.gameState.gameId, {
+        broadcastToGame(this.gameState.gameId!, {
             type: 'gamePause',
             gameId: this.gameState.gameId
         });
@@ -285,7 +285,7 @@ export class BaseGameEngine {
         };
 
         this.updateDatabaseState();
-        broadcastToGame(this.gameState.gameId, gameEndMessage);
+        broadcastToGame(this.gameState.gameId!, gameEndMessage);
         this.updateDatabaseState();
     }
 
@@ -357,28 +357,28 @@ export class BaseGameEngine {
                 lastUpdate: Date.now(),
                 maxX: this.maxX,
                 maxY: this.maxY,
-                paddleLength: this.paddleHeight
+                paddleLength: this.paddleLength
             };
 
             aiPlayer.updateAIView(gameView);
             const keys = aiPlayer.getKeyStates();
 
             const playerIndex = playerId - 1;
-            const currentPos = this.gameState.players[playerIndex]?.pos;
+            const currentPos = this.gameState.players[playerIndex].pos;
             if (currentPos === undefined || currentPos === null) continue;
 
             if (is2P || playerId === 1 || playerId === 3) {
                 if (keys.up || keys.down) {
                     let newY = currentPos;
                     if (keys.up) newY = Math.max(this.min, currentPos - this.paddleSpeed);
-                    if (keys.down) newY = Math.min(this.maxY - this.paddleHeight, currentPos + this.paddleSpeed);
+                    if (keys.down) newY = Math.min(this.maxY - this.paddleLength, currentPos + this.paddleSpeed);
                     if (newY !== currentPos) this.updatePlayerPosition(playerId, newY);
                 }
             } else {
                 if (keys.up || keys.down) {
                     let newX = currentPos;
                     if (keys.up) newX = Math.max(this.min, currentPos - this.paddleSpeed);
-                    if (keys.down) newX = Math.min(this.maxX - this.paddleHeight, currentPos + this.paddleSpeed);
+                    if (keys.down) newX = Math.min(this.maxX - this.paddleLength, currentPos + this.paddleSpeed);
                     if (newX !== currentPos) this.updatePlayerPosition(playerId, newX);
                 }
             }
@@ -389,18 +389,26 @@ export class BaseGameEngine {
         if (!this.playerKeyStates.has(playerId)) {
             this.playerKeyStates.set(playerId, {});
         }
-        
         const playerKeys = this.playerKeyStates.get(playerId)!;
         playerKeys[key] = pressed;
     }
 
     // Process player inputs based on key states
-    private processPlayerInputs(): void {
+    protected processPlayerInputs(): void {
         this.playerKeyStates.forEach((keys, playerId) => {
+            // if (this.isPlayerAI(playerId)) return;//TODO try
+            // let curPos = this.gameState.players[playerId - 1].pos;
+            // if (curPos === undefined || curPos === null) return;
+            // let newPos = curPos;
+            // let max = (!is2P && playerId % 2 === 0) ? this.maxX - this.paddleLength : this.maxY - this.paddleLength;
+
+            // if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+            // if (keys['s'] || keys['l']) newPos = Math.min(max, newPos + this.paddleSpeed);
+            // if (newPos != curPos) this.updatePlayerPosition(playerId, newPos);
             const is2P = this.gameState.mode === '2P';
             if ((playerId === 1 || (!is2P && playerId === 3)) && this.gameState.players[playerId - 1].pos !== undefined) {
                 let newPos = this.gameState.players[playerId - 1].pos;
-                const maxYPos = this.maxY - this.paddleHeight;
+                const maxYPos = this.maxY - this.paddleLength;
                 if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
                 if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
                 if (newPos !== this.gameState.players[playerId - 1].pos) {
@@ -412,7 +420,7 @@ export class BaseGameEngine {
                 if (is2P && playerId === 2) {
                     // 2-Player Mode: Player 2 (right side, vertical movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxYPos = this.maxY - this.paddleHeight;
+                    const maxYPos = this.maxY - this.paddleLength;
                     // Accept both w/s (remote player) and o/l (local player) keys
                     if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
                     if (keys['s'] || keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
@@ -422,7 +430,7 @@ export class BaseGameEngine {
                 } else if (!is2P && (playerId === 2 || playerId === 4)) {
                     // 4-Player Mode: Players 2 & 4 (top & bottom sides, horizontal movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxXPos = this.maxX - this.paddleHeight;
+                    const maxXPos = this.maxX - this.paddleLength;
                     // Accept both w/s (remote player) and o/l (local player) keys
                     if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
                     if (keys['s'] || keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
@@ -432,7 +440,7 @@ export class BaseGameEngine {
                 } else if (!is2P && playerId === 3) {
                     // 4-Player Mode: Player 3 (right side, vertical movement)
                     let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxYPos = this.maxY - this.paddleHeight;
+                    const maxYPos = this.maxY - this.paddleLength;
                     if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
                     if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
                     if (newPos !== this.gameState.players[playerId - 1].pos) {
@@ -448,7 +456,7 @@ export class BaseGameEngine {
     }
 
     public getGameId(): number {
-        return this.gameState.gameId;
+        return this.gameState.gameId!;
     }
 
     public isRunning(): boolean {
@@ -467,7 +475,7 @@ export class BaseGameEngine {
 
         const maxPlayers = is2P ? 2 : 4;
         for (let i = 0; i < maxPlayers; i++) {
-            this.gameState.players[i].pos = (this.maxY + this.min) / 2 - (this.paddleHeight / 2);
+            this.gameState.players[i].pos = (this.maxY + this.min) / 2 - (this.paddleLength / 2);
             this.gameState.players[i].score = 0;
         }
         
@@ -490,16 +498,16 @@ export class BaseGameEngine {
         let paddleEnd: number;
 
         // Left collision
-        if (this.xDir < 0 && this.gameState.ballPosX <= (this.paddleWidth + this.ballRadius)) {
+        if (this.xDir < 0 && this.gameState.ballPosX <= this.paddleWidth) {
             paddleStart = this.gameState.players[0].pos || 0;
-            paddleEnd = paddleStart + this.paddleHeight;
+            paddleEnd = paddleStart + this.paddleLength;
 
             if (this.gameState.ballPosY + this.ballRadius >= paddleStart && this.gameState.ballPosY - this.ballRadius <= paddleEnd) {
                 
                 this.lastContact = 1;
                 this.xDir = Math.abs(this.xDir);
 
-                const hitPosition = (this.gameState.ballPosY - paddleStart) / this.paddleHeight;
+                const hitPosition = (this.gameState.ballPosY - paddleStart) / this.paddleLength;
                 const relativeHit = (hitPosition - 0.5) * 2;
                 this.yDir = (this.yDir + relativeHit * 0.8);
                 this.yDir += (Math.random() - 0.5) * 0.15;
@@ -511,29 +519,27 @@ export class BaseGameEngine {
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
 
                 this.gameState.ballPosX = this.paddleWidth + this.ballRadius;
-            } else if (is2P) {
-                this.updateScoreBoard(2);
-                return 1;
             } else {
+                if (is2P && this.lastContact === 0) this.lastContact = 2;
                 return this.handleGoal();
             }
         }
 
-        // Top collision
-        if (is2P && this.gameState.ballPosY <= this.min) {
+        // Bottom collision
+        if (is2P && this.gameState.ballPosY <= this.ballRadius) {
             this.yDir = Math.abs(this.yDir);
-            this.gameState.ballPosY = this.min;
+            this.gameState.ballPosY = this.ballRadius;
         }
         else if (!is2P && this.yDir < 0 && this.gameState.ballPosY <= (this.paddleWidth + this.ballRadius)) {
             paddleStart = this.gameState.players[1].pos || 0;
-            paddleEnd = paddleStart + this.paddleHeight;
+            paddleEnd = paddleStart + this.paddleLength;
 
             if (this.gameState.ballPosX + this.ballRadius >= paddleStart && this.gameState.ballPosX - this.ballRadius <= paddleEnd) {
                 
                 this.lastContact = 2;
                 this.yDir = Math.abs(this.yDir);
 
-                const hitPosition = (this.gameState.ballPosX - paddleStart) / this.paddleHeight;
+                const hitPosition = (this.gameState.ballPosX - paddleStart) / this.paddleLength;
                 const relativeHit = (hitPosition - 0.5) * 2;
                 this.xDir = (this.xDir + relativeHit * 0.8);
                 this.xDir += (Math.random() - 0.5) * 0.15;
@@ -553,14 +559,14 @@ export class BaseGameEngine {
         // Right collision
         if (this.xDir > 0 && this.gameState.ballPosX >= (this.maxX - this.ballRadius - this.paddleWidth)) {
             paddleStart = is2P ? this.gameState.players[1].pos || 0 : this.gameState.players[2].pos || 0;
-            paddleEnd = paddleStart + this.paddleHeight;
+            paddleEnd = paddleStart + this.paddleLength;
             
             if (this.gameState.ballPosY + this.ballRadius >= paddleStart && this.gameState.ballPosY - this.ballRadius <= paddleEnd) {
 
                 this.lastContact = is2P ? 2 : 3;
                 this.xDir = -Math.abs(this.xDir);
 
-                const hitPosition = (this.gameState.ballPosY - paddleStart) / this.paddleHeight;
+                const hitPosition = (this.gameState.ballPosY - paddleStart) / this.paddleLength;
                 const relativeHit = (hitPosition - 0.5) * 2;
                 this.yDir = (this.yDir + relativeHit * 0.8);
                 this.yDir += (Math.random() - 0.5) * 0.15;
@@ -572,29 +578,27 @@ export class BaseGameEngine {
                 if (Math.abs(this.yDir) > this.ballSpeed) this.yDir = Math.sign(this.yDir) * this.ballSpeed;
 
                 this.gameState.ballPosX = this.maxX - this.paddleWidth - this.ballRadius;
-            } else if (is2P) {
-                this.updateScoreBoard(1);
-                return 1;
             } else {
+                if (is2P && this.lastContact === 0) this.lastContact = 1;
                 return this.handleGoal();
             }
         }
 
-        // Bottom collision
-        if (is2P && this.gameState.ballPosY >= this.maxY) {
+        // Top collision
+        if (is2P && this.gameState.ballPosY >= this.maxY - this.ballRadius) {
             this.yDir = -Math.abs(this.yDir);
-            this.gameState.ballPosY = this.maxY;
+            this.gameState.ballPosY = this.maxY - this.ballRadius;
         }
         else if (!is2P && this.yDir > 0 && this.gameState.ballPosY >= (this.maxY - this.ballRadius - this.paddleWidth)) {
             paddleStart = this.gameState.players[3].pos || 0;
-            paddleEnd = paddleStart + this.paddleHeight;
+            paddleEnd = paddleStart + this.paddleLength;
             
             if (this.gameState.ballPosX + this.ballRadius >= paddleStart && this.gameState.ballPosX - this.ballRadius <= paddleEnd) {
 
                 this.lastContact = 4;
                 this.yDir = -Math.abs(this.yDir);
 
-                const hitPosition = (this.gameState.ballPosX - paddleStart) / this.paddleHeight;
+                const hitPosition = (this.gameState.ballPosX - paddleStart) / this.paddleLength;
                 const relativeHit = (hitPosition - 0.5) * 2;
                 this.xDir = (this.xDir + relativeHit * 0.8);
                 this.xDir += (Math.random() - 0.5) * 0.15;
@@ -616,9 +620,9 @@ export class BaseGameEngine {
 
     private addSpinToBall(ballPos: number, paddleStart: number, paddleEnd: number, isHorizontal: boolean): void {
         // Add some variation to ball direction based on where it hits the paddle
-        const paddleCenter = (paddleStart + paddleEnd) / 2;
+        const paddleCenter = (paddleStart + paddleEnd) / 2;//
         const hitOffset = ballPos - paddleCenter;
-        const maxOffset = this.paddleHeight / 2;
+        const maxOffset = this.paddleLength / 2;
         const spinFactor = (hitOffset / maxOffset) * 0.5; // Max 0.5 units of spin
         
         if (isHorizontal) {
@@ -639,8 +643,11 @@ export class BaseGameEngine {
     }
 
     private handleGoal(): number {
-        if (this.lastContact > 0 && this.lastContact <= 4)
-            this.gameState.players[this.lastContact - 1].score += 1;
+        if (this.lastContact > 0 && this.lastContact <= 4 && this.gameState.players[this.lastContact - 1]) {
+            if (this.gameState.players[this.lastContact - 1].score === undefined)
+                this.gameState.players[this.lastContact - 1].score = 0;
+            this.gameState.players[this.lastContact - 1].score! += 1;            
+        }
         this.lastContact = 0;
         this.broadcastScoreUpdate();
         this.updateDatabaseState();
@@ -665,7 +672,7 @@ export class BaseGameEngine {
             timestamp: Date.now()
         };
 
-        broadcastToGame(this.gameState.gameId, scoreUpdate);
+        broadcastToGame(this.gameState.gameId!, scoreUpdate);
     }
 
     broadcastGameState(): void {
@@ -733,7 +740,7 @@ export class BaseGameEngine {
                 state: delta  // Only changed values!
             };
             
-            broadcastToGame(this.gameState.gameId, message);
+            broadcastToGame(this.gameState.gameId!, message);
         }
     }
 
@@ -741,25 +748,22 @@ export class BaseGameEngine {
         const is2P = this.gameState.mode === '2P';
         let clampedPos: number;
         if (playerId >= 1 && playerId <= (is2P ? 2 : 4) && this.gameState.players[playerId - 1]) {
+            // if (is2P || playerId === 1 || playerId === 3)//TODO try
+            //     clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
+            // else
+            //     clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
             if (is2P) {
-                clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleHeight));
+                clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
             } else {
                 if (playerId === 1 || playerId === 3)
-                    clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleHeight));
+                    clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
                 else
-                    clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleHeight));
+                    clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
             }
             const isAI = this.isPlayerAI(playerId);
 
             this.gameState.players[playerId - 1].pos = clampedPos;
         }
-    }
-
-    private updateScoreBoard(player: number): void {
-        this.gameState.players[player - 1].score += 1;
-        console.log(`⚽ GOAL! Player ${player} scored! Score: ${this.gameState.players[0].score} - ${this.gameState.players[1].score}`);
-        this.broadcastScoreUpdate();
-        this.updateDatabaseState();
     }
 
     resetBall(): void {
@@ -785,7 +789,7 @@ export class BaseGameEngine {
             gameId: this.gameState.gameId,
             message: 'Ball reset - get ready!',
         };
-        broadcastToGame(this.gameState.gameId, resetMessage);
+        broadcastToGame(this.gameState.gameId!, resetMessage);
         
         // Brief pause before resuming
         setTimeout(() => {
