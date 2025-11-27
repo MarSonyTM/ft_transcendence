@@ -58,7 +58,7 @@ body {
   margin: 0 auto;
   padding: 2rem 1rem;
   height: calc(100vh - 2.5rem); /* Fixed height minus body padding */
-  overflow: auto; /* Allow internal scrolling if content exceeds */
+  overflow: hidden; /* No scrolling at all */
 }
 
 .neon-grid::before {
