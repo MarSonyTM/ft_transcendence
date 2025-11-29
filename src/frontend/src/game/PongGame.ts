@@ -478,7 +478,7 @@ export class PongGame {
     sendPlayerMove(position: number): void {
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            if (this.playerId === undefined) this.playerId = 1;// TODO: why default to 1? // Default to player 1 if unset
+            if (this.playerId === undefined) this.playerId = 1;
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: this.playerId,

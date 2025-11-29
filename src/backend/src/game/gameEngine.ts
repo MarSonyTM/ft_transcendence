@@ -52,7 +52,7 @@ export class BaseGameEngine {
         this.min = 0;
         this.maxX = 400;
         this.maxY = is2P? 200 : 400;
-        this.ballRadius = 10;//TODO check -> balldiameter is 10
+        this.ballRadius = 5;
         this.ballSpeed = 4;
         this.paddleLength = is2P ? 60 : 80;
         this.paddleWidth = 10;
@@ -396,58 +396,16 @@ export class BaseGameEngine {
     // Process player inputs based on key states
     protected processPlayerInputs(): void {
         this.playerKeyStates.forEach((keys, playerId) => {
-            // if (this.isPlayerAI(playerId)) return;//TODO try
-            // let curPos = this.gameState.players[playerId - 1].pos;
-            // if (curPos === undefined || curPos === null) return;
-            // let newPos = curPos;
-            // let max = (!is2P && playerId % 2 === 0) ? this.maxX - this.paddleLength : this.maxY - this.paddleLength;
-
-            // if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-            // if (keys['s'] || keys['l']) newPos = Math.min(max, newPos + this.paddleSpeed);
-            // if (newPos != curPos) this.updatePlayerPosition(playerId, newPos);
+            if (this.isPlayerAI(playerId)) return;
             const is2P = this.gameState.mode === '2P';
-            if ((playerId === 1 || (!is2P && playerId === 3)) && this.gameState.players[playerId - 1].pos !== undefined) {
-                let newPos = this.gameState.players[playerId - 1].pos;
-                const maxYPos = this.maxY - this.paddleLength;
-                if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-                if (newPos !== this.gameState.players[playerId - 1].pos) {
-                    this.gameState.players[playerId - 1].pos = newPos;
-                }
-            }
+            let curPos = this.gameState.players[playerId - 1].pos;
+            if (curPos === undefined || curPos === null) return;
+            let newPos = curPos;
+            let max = (!is2P && playerId % 2 === 0) ? this.maxX - this.paddleLength : this.maxY - this.paddleLength;
 
-            if (this.gameState.players[playerId - 1].pos !== undefined) {
-                if (is2P && playerId === 2) {
-                    // 2-Player Mode: Player 2 (right side, vertical movement)
-                    let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxYPos = this.maxY - this.paddleLength;
-                    // Accept both w/s (remote player) and o/l (local player) keys
-                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['s'] || keys['l']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-                    if (newPos !== this.gameState.players[playerId - 1].pos) {
-                        this.gameState.players[playerId - 1].pos = newPos;
-                    }
-                } else if (!is2P && (playerId === 2 || playerId === 4)) {
-                    // 4-Player Mode: Players 2 & 4 (top & bottom sides, horizontal movement)
-                    let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxXPos = this.maxX - this.paddleLength;
-                    // Accept both w/s (remote player) and o/l (local player) keys
-                    if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['s'] || keys['l']) newPos = Math.min(maxXPos, newPos + this.paddleSpeed);
-                    if (newPos !== this.gameState.players[playerId - 1].pos) {
-                        this.gameState.players[playerId - 1].pos = newPos;
-                    }
-                } else if (!is2P && playerId === 3) {
-                    // 4-Player Mode: Player 3 (right side, vertical movement)
-                    let newPos = this.gameState.players[playerId - 1].pos;
-                    const maxYPos = this.maxY - this.paddleLength;
-                    if (keys['w']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
-                    if (keys['s']) newPos = Math.min(maxYPos, newPos + this.paddleSpeed);
-                    if (newPos !== this.gameState.players[playerId - 1].pos) {
-                        this.gameState.players[playerId - 1].pos = newPos;
-                    }
-                }
-            }
+            if (keys['w'] || keys['o']) newPos = Math.max(this.min, newPos - this.paddleSpeed);
+            if (keys['s'] || keys['l']) newPos = Math.min(max, newPos + this.paddleSpeed);
+            if (newPos != curPos) this.updatePlayerPosition(playerId, newPos);
         });
     }
 
@@ -485,8 +443,6 @@ export class BaseGameEngine {
 
     private updateBallPosition(): number {
         const is2P = this.gameState.mode === '2P';
-        // const prevX = this.gameState.ballPosX;
-        // const prevY = this.gameState.ballPosY;
         
         this.gameState.ballPosX += this.xDir * 2;
         this.gameState.ballPosY += this.yDir * 2;
@@ -748,20 +704,10 @@ export class BaseGameEngine {
         const is2P = this.gameState.mode === '2P';
         let clampedPos: number;
         if (playerId >= 1 && playerId <= (is2P ? 2 : 4) && this.gameState.players[playerId - 1]) {
-            // if (is2P || playerId === 1 || playerId === 3)//TODO try
-            //     clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
-            // else
-            //     clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
-            if (is2P) {
+            if (is2P || playerId === 1 || playerId === 3)
                 clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
-            } else {
-                if (playerId === 1 || playerId === 3)
-                    clampedPos = Math.max(0, Math.min(position, this.maxY - this.paddleLength));
-                else
-                    clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
-            }
-            const isAI = this.isPlayerAI(playerId);
-
+            else
+                clampedPos = Math.max(0, Math.min(position, this.maxX - this.paddleLength));
             this.gameState.players[playerId - 1].pos = clampedPos;
         }
     }
