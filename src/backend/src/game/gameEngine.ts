@@ -348,11 +348,14 @@ export class BaseGameEngine {
 
             let paddlePosAxis: number = this.gameState.players[playerId - 1]?.pos ?? this.defaultPaddlePos;
 
+            // Convert velocity from pixels/frame to pixels/second
+            // Game runs at ~60fps (16ms per frame), so multiply by 60
+            const FRAMES_PER_SECOND = 60;
             const gameView = {
                 ballPosX: this.gameState.ballPosX,
                 ballPosY: this.gameState.ballPosY,
-                ballVelX: this.xDir * 2,
-                ballVelY: this.yDir * 2,
+                ballVelX: (this.xDir * 2) * FRAMES_PER_SECOND,  // Convert to pixels/second
+                ballVelY: (this.yDir * 2) * FRAMES_PER_SECOND,  // Convert to pixels/second
                 paddlePos: paddlePosAxis,
                 lastUpdate: Date.now(),
                 maxX: this.maxX,
