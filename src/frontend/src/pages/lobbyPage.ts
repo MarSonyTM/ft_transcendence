@@ -637,6 +637,11 @@ async function addAIOpponent(): Promise<void> {
     	return;
   	}
 
+  	// Get selected difficulty from the dropdown
+  	const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
+  	const selectedDifficulty = difficultySelect?.value || 'normal';
+  	console.log(`🤖 Adding AI with difficulty: ${selectedDifficulty}`);
+
   	const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
   	const aiId = `ai-${Date.now()}`;
   	const roomId = currentRoom.roomId;
@@ -653,7 +658,8 @@ async function addAIOpponent(): Promise<void> {
 				username: `AI Bot ${aiNumber}`,
 				isAI: true,
 				isReady: true,
-				isLocal: true
+				isLocal: true,
+				difficulty: selectedDifficulty  // Include the selected difficulty
 			})
    		});
 

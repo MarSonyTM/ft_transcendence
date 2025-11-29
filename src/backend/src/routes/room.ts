@@ -406,7 +406,7 @@ async function roomRoutes(fastify: FastifyInstance) {
                         const playerId = index + 1;
                         if (player.isAI) {
                             const difficulty = (player.difficulty as any) || 'normal';
-                            console.warn(playerId);
+                            console.log(`🎮 Setting AI Player ${playerId} with difficulty: ${difficulty}`);
                             gameEngine.setPlayerAI(playerId, true, difficulty);
                         }
                     });
