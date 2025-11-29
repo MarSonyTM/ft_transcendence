@@ -1,1 +1,2 @@
-export const API_BASE = 'http://localhost:3000';
+const isHttps = window.location.href. includes("https") ? true : false;
+export const API_BASE = (isHttps ? "https://" : "http://") + window.location.hostname + ":8443"

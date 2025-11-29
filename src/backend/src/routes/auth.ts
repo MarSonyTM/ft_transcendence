@@ -389,8 +389,7 @@ async function userRoutes(
       reply.setCookie('token', token, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
         maxAge: 604800,
       });
@@ -582,8 +581,7 @@ async function userRoutes(
       reply.setCookie('token', token, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
         maxAge: 604800,
       });
@@ -751,8 +749,7 @@ async function userRoutes(
       reply.setCookie("token", token, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
         maxAge: 7 * 24 * 60 * 60, // 1 week
       });
@@ -872,8 +869,7 @@ async function userRoutes(
       reply.setCookie("token", jwtToken, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
         maxAge: 7 * 24 * 60 * 60, // 1 week
       });
@@ -914,8 +910,8 @@ async function userRoutes(
         reply.setCookie("token", token, {
           httpOnly: true,
           secure: true,
-          sameSite: "none",
-          partitioned: true,
+          sameSite: "lax",
+
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 1 week
         });
@@ -988,8 +984,7 @@ async function userRoutes(
       reply.setCookie("token", token, {
         httpOnly: true,
         secure: true,
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
         maxAge: 24 * 60 * 60, // 24 hours
       });
