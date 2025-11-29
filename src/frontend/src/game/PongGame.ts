@@ -253,9 +253,8 @@ export class PongGame {
 
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const protocol = window.location.protocol === 'http:' ? 'wss:' : 'ws:';
-            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
-            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/game/${this.gameId}/ws`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
@@ -381,7 +380,6 @@ export class PongGame {
             
             if (message.mode === '4P') {
                 this.updateStatus(`Game Over! ${message.winnerName ?? 'Player ?'} wins!`);
-                console.log(`4-Player Game Over! Winner: ${message.winnerName}`);
                 
                 // Trigger callback for 4-player mode
                 if (this.onGameEnd) {
@@ -390,7 +388,6 @@ export class PongGame {
                 }
             } else {
                 this.updateStatus(`Game Over! ${message.winner} wins!`);
-                console.log(`Game Over! Winner: ${message.winner}`);
                 
                 if (this.onGameEnd && message.winner !== undefined) {
                     this.onGameEnd(message.winner);
