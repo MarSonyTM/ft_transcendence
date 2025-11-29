@@ -1,4 +1,4 @@
-import { TPT, TPTmap, Tournament, getApiEndpoint } from '../types';
+import { TPT, TPTmap, Tournament } from '../types';
 import { setCurrentPage } from '../utils/globalState';
 import { getCurrentTournament, setCurrentMatch, setCurrentTournament } from '../utils/tournamentState';
 import {
@@ -14,7 +14,6 @@ import {
 import { renderTournamentPage } from './tournamentPage';
 import { openTournamentArchive } from '../utils/tournamentArchive'
 import { renderApp } from '../main';
-import { PongGame } from '../game/PongGame';
 
 let activeT: Tournament | null = null;
 
@@ -82,7 +81,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		if (!activeT) return;
 		if (activeT.players.length === 0) {
 			listEl.innerHTML = `<li class="empty">No players yet</li>`;
-		} else if (activeT.players.length >= 10) {
+		} else if (activeT.players.length > 10) {
 			alert('Maximum of 10 players reached');
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
@@ -184,7 +183,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	document.getElementById('backBtn')?.addEventListener('click', async () => {
 		if (activeT && activeT.id)
 			await deleteTournament(activeT.id);
-		history.pushState({ page: 'gameSelect' }, '', '/gameSelect');
+		history.pushState({ page: 'gameSelect' }, '', '/game-select');
 		setCurrentPage('gameSelect');
 		renderApp();
 	});

@@ -43,3 +43,5 @@ src/frontend/node_modules/
 *.db-wal
 *.db
 src/database/database.db
+
+.git_rescue_new_20251106

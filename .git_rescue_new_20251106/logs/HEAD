@@ -1,0 +1,3 @@
+0000000000000000000000000000000000000000 b9eb76c10fdf4bdd9b42ee47de95d65f4cb4642f Rescue Bot <rescue@example.com> 1762438613 +0100	commit (initial): rescue: reinit repo after .git corruption (backup in .rescue-20251106)
+b9eb76c10fdf4bdd9b42ee47de95d65f4cb4642f 0000000000000000000000000000000000000000 Lilly Baumeister <lbaumeis@student.42vienna.com> 1762438613 +0100	Branch: renamed refs/heads/master to refs/heads/rescue-2025-11-06
+0000000000000000000000000000000000000000 b9eb76c10fdf4bdd9b42ee47de95d65f4cb4642f Lilly Baumeister <lbaumeis@student.42vienna.com> 1762438613 +0100	Branch: renamed refs/heads/master to refs/heads/rescue-2025-11-06

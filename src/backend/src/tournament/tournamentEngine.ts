@@ -1,5 +1,5 @@
 import { TournamentState } from './tournamentState';
-import { tournamentManager as TManager } from './tournamentManager';
+import { tournamentManager } from './tournamentManager';
 import { broadcastToTournament } from '../websocket/tournamentHandler';
 
 export class TournamentEngine {
@@ -29,7 +29,7 @@ export class TournamentEngine {
 	}
 
 	private loop = async () => {
-		const next = await TManager.getCurrentMatch(this.state.tournamentId);
+		const next = await tournamentManager.getCurrentMatch(this.state.tournamentId);
 		if (next) {
 			broadcastToTournament(this.state.tournamentId, {
 				type: 'nextMatch',
