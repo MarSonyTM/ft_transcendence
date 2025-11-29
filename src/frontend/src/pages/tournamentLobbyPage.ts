@@ -55,19 +55,11 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	content.innerHTML = `
 	<p class="t-msg">Create a new tournament</p>
 		<div class="t-setup">
-		<div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; flex-direction: column; align-items: center;">
 			<span class="t-actions t-flex">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
-				<div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; width: 100%; max-width: 300px;">
-					<label style="color: rgb(156 163 175); font-size: 0.85em; font-weight: 500;">AI Difficulty</label>
-					<select id="tournamentAIDifficulty" 
-						style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-size: 0.9em; cursor: pointer;">
-						<option value="easy">Easy - Good for beginners</option>
-						<option value="normal" selected>Normal - Balanced challenge</option>
-						<option value="hard">Hard - Extremely challenging</option>
-					</select>
+
 				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
-				</div>
+
 				<div id="alias-modal" class="modal hidden">
 					<div class="modal-content">
 						<input id="alias-input" />
@@ -75,6 +67,14 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 					</div>
 				</div>
 			</span>
+			<div id="ai-select" style="display: none">
+				<select id="tournamentAIDifficulty">
+					<label>AI Difficulty</label>
+					<option value="easy">Easy - Good for beginners</option>
+					<option value="normal" selected>Normal - Balanced challenge</option>
+					<option value="hard">Hard - Extremely challenging</option>
+				</select>
+			</div>
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove-alias" style="display: none">x</button></ul>
 			<div class="t-footer">
 				<div class="t-actions">
@@ -163,12 +163,21 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const alias = `AI_${x}`;
 		// const alias = await askAlias(x, 'ai');
 		if (!alias) return;
-		// Get selected difficulty from dropdown
-		const difficultySelect = document.getElementById('tournamentAIDifficulty') as HTMLSelectElement;
-		const selectedDifficulty = difficultySelect?.value || 'normal';
-		
+		const aiSelect = document.getElementById('ai-select') as HTMLElement;
+		const selected = document.getElementById('tournamentAIDifficulty') as HTMLSelectElement;
+		if (!aiSelect || !selected) return;
+		let selectedDifficulty;
+		aiSelect.style = "display: ''";
+		selected.onclick = () => {
+			selected.style = "display: ''";
+			selected.onclick = () => {
+				let retSelected = selected.value ?? `normal`;
+				selectedDifficulty = retSelected;
+				aiSelect.style = "display: none";
+			}
+		}
 		console.log('[Tournament] Add AI player:', alias, 'with difficulty:', selectedDifficulty);
-		await addPlayerToTournament(activeT.id!, alias, 'ai', undefined, selectedDifficulty);
+		await addPlayerToTournament(activeT!.id!, alias, 'ai', undefined, selectedDifficulty);
 		await rerender();
 	});
 
