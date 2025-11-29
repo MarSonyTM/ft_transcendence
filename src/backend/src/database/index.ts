@@ -119,16 +119,6 @@ export interface GameInvitation {
     expiresAt: string;
 }
 
-export interface TournamentArchiveEntry {
-	tournamentId: number;
-	players: TournamentPlayer[];//maybe simplify?
-	matches: any[];//maybe simplify?
-	champion: TournamentPlayer | null;
-	createdAt: string;
-	startedAt?: string;
-	endedAt?: string;
-}
-
 // Base database manager class
 abstract class BaseDatabaseManager {
     protected db: Database.Database;
@@ -1697,22 +1687,6 @@ export class DatabaseManager extends BaseDatabaseManager {
         `;
         this.db.exec(createTMatchT);
 
-        const createTArchiveT = `
-            CREATE TABLE IF NOT EXISTS t_archive (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tournamentId INTEGER NOT NULL,
-                players JSON DEFAULT '[]',
-                matches JSON DEFAULT '[]',
-                championId INTEGER,
-                createdAt DATETIME,
-                startedAt DATETIME,
-                endedAt DATETIME,
-                FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
-                FOREIGN KEY (championId) REFERENCES t_players(id) ON DELETE SET NULL
-            )
-        `;
-        this.db.exec(createTArchiveT);
-
         this.createTriggers();
     }
     
@@ -1823,52 +1797,6 @@ export class DatabaseManager extends BaseDatabaseManager {
             END;
         `);
 
-        // TMatchArchive on tournament completion
-        const TMatchArchive = `
-            SELECT COALESCE(json_group_array(
-                json_object(
-                    'id', id,
-                    'player1Id', json_extract(p1,'$.playerId'),
-                    'player2Id', json_extract(p2,'$.playerId'),
-                    'winnerId', winnerId,
-                    'loserId',
-                        CASE
-                            WHEN winnerId IS NULL THEN NULL
-                            WHEN winnerId = json_extract(p1,'$.playerId') THEN json_extract(p2,'$.playerId')
-                            ELSE json_extract(p1,'$.playerId')
-                        END,
-                    'createdAt', createdAt,
-                    'startedAt', startedAt,
-                    'endedAt', endedAt
-                )
-            ), '[]')
-            FROM t_matches
-            WHERE id = NEW.id AND status = 'completed'
-        `;
-
-        //tournaments_after_update_completed
-        this.db.exec(`
-            CREATE TRIGGER IF NOT EXISTS tournaments_after_update_completed
-            AFTER UPDATE ON tournaments
-            WHEN NEW.status = 'completed'
-              AND (OLD.status IS NULL OR OLD.status != 'completed')
-              AND NEW.endedAt IS NOT NULL
-              AND NEW.championId IS NOT NULL
-            BEGIN
-                INSERT INTO t_archive (
-                    id, createdAt, startedAt, endedAt, players, matches, championId
-                ) VALUES (
-                    NEW.id,
-                    NEW.createdAt,
-                    NEW.startedAt,
-                    NEW.endedAt,
-                    NEW.players,
-                    (${TMatchArchive}),
-                    NEW.championId
-                );
-            END;
-        `);
-
         //tournaments_after_delete
         this.db.exec(`
             CREATE TRIGGER IF NOT EXISTS tournaments_after_delete
@@ -1876,7 +1804,6 @@ export class DatabaseManager extends BaseDatabaseManager {
             BEGIN
                 DELETE FROM t_players WHERE tournamentId = OLD.id;
                 DELETE FROM t_matches WHERE tournamentId = OLD.id;
-                DELETE FROM t_archive WHERE tournamentId = OLD.id;
             END;
         `);
     }

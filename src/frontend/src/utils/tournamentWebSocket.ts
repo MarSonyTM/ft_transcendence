@@ -211,7 +211,6 @@ export class TournamentWebSocketManager {
     }
 
     sendPlayerReady(playerId: number, isReady: boolean): void {
-        console.debug('SEND PLAYER READY:', playerId, isReady);
         this.send({ type: 'playerReady', playerId, isReady });
     }
 
@@ -225,7 +224,6 @@ export class TournamentWebSocketManager {
 
     private send(message: any): void {
     if (!this.opt.ws || this.opt.ws.readyState !== WebSocket.OPEN) {
-        console.warn('Tournament ws not open, dropping message:', message);
         return;
     }
     try {
@@ -286,15 +284,4 @@ export function initTournamentWebSocket(tconfig: TournamentWebSocketConfig): Tou
         globalTws.disconnect();
     globalTws = new TournamentWebSocketManager(tconfig);
     return globalTws;
-}
-
-export function getTournamentWebSocket(): TournamentWebSocketManager | null {
-    return globalTws;
-}
-
-export function disconnectTournamentWebSocket(): void {
-    if (globalTws) {
-        globalTws.disconnect();
-        globalTws = null;
-    }
 }

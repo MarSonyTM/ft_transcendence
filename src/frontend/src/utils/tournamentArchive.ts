@@ -1,16 +1,6 @@
-import { getApiEndpoint, Tournament, TournamentPlayer } from "../types/index";
+import { getApiEndpoint, Tournament } from "../types/index";
 
 let list: Partial<Tournament>[];
-
-export interface TournamentArchiveEntry {
-	tournamentId: number;
-	players: TournamentPlayer[];//maybe simplify?
-	matches: any[];//maybe simplify?
-	champion: TournamentPlayer | null;
-	createdAt: string;
-	startedAt?: string;
-	endedAt?: string;
-}
 
 async function fetchTournamentList(): Promise<any[]> {
 	try {
@@ -226,28 +216,6 @@ function showMatchDetail(match: any, allMatches: any[], players: any[], tourname
     const bracketHtml = generateBracketVisualization(allMatches, players);
     
     detailPanel.innerHTML = bracketHtml;
-        // <div class="t-match-detail-content">          
-        //     <!-- Player Grid (1x2) -->
-        //     <div class="t-players-grid">
-        //         <div class="t-player-card ${match.winnerId === match.p1?.id ? 'winner' : 'loser'}">
-        //             <div class="t-player-name">${p1Name}</div>
-        //             <div class="t-player-stats">${p1Stats}</div>
-        //             ${match.winnerId === match.p1?.id ? '<div class="t-winner-badge">🏆 Winner</div>' : '<div class="t-loser-badge">Loser</div>'}
-        //         </div>
-                
-        //         <div class="t-player-card ${match.winnerId === match.p2?.id ? 'winner' : 'loser'}">
-        //             <div class="t-player-name">${p2Name}</div>
-        //             <div class="t-player-stats">${p2Stats}</div>
-        //             ${match.winnerId === match.p2?.id ? '<div class="t-winner-badge">🏆 Winner</div>' : '<div class="t-loser-badge">Loser</div>'}
-        //         </div>
-        //     </div>
-            
-        //     <!-- Bracket Visualization -->
-        //     <div class="t-bracket-section">
-        //         <h6>Tournament Bracket</h6>
-        //         ${bracketHtml}
-        //     </div>
-        // </div>`;
 }
 
 function generateBracketVisualization(matches: any[], players: any[]): string {
@@ -310,15 +278,4 @@ function getRoundLabel(roundIdx: number, totalRounds: number): string {
     if (roundsFromEnd === 1) return 'Semi-Final';
     if (roundsFromEnd === 2) return 'Quarter-Final';
     return `Round ${roundIdx + 1}`;
-}
-
-function formatDate(dateString: string): string {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
 }

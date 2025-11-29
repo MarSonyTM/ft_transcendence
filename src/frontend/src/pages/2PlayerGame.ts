@@ -41,35 +41,20 @@ export async function render2PlayerGame(pong?: PongGame): Promise<void> {
         <!-- Fixed Debug Panel - Top Left -->
         
 
-        <div class="neon-grid" style="padding-top: 0;">
+        <div class="neon-grid" style="padding: 0; ">
             <div class="grid-anim"></div>
             <div class="glass-card" style="max-width: 1200px; width: 100%;">
 
-                <div style="text-align: center; position: relative; padding-top: 20px;">
-                    <button id="backToLandingBtn" class="btn btn-neon danger" style="position: absolute; left: 0; top: 20px;">← Back to Home</button>
-                    
-                    <!-- Elegant Player & Score Display -->
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 20px;">
-                        <!-- Player 1 -->
-                        <div style="flex: 1; max-width: 250px; text-align: right;">
-                            <div id="player1Name" style="color: #0ff; font-size: 1.3rem; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);">
-                                ${players[0].username}
-                            </div>
-                        </div>
-                        
-                        <!-- Score Display -->
-                        <div style="display: flex; align-items: center; gap: 20px;">
-                            <span id="player1score" style="font-size: 4rem; font-weight: 700; color: #0ff; text-shadow: 0 0 20px rgba(0, 255, 255, 0.8), 0 0 40px rgba(0, 255, 255, 0.4); min-width: 70px; text-align: center;">0</span>
-                            <span style="font-size: 2rem; color: rgba(255, 255, 255, 0.4); font-weight: 300;">:</span>
-                            <span id="player2score" style="font-size: 4rem; font-weight: 700; color: #ff0; text-shadow: 0 0 20px rgba(255, 255, 0, 0.8), 0 0 40px rgba(255, 255, 0, 0.4); min-width: 70px; text-align: center;">0</span>
-                        </div>
-                        
-                        <!-- Player 2 -->
-                        <div style="flex: 1; max-width: 250px; text-align: left;">
-                            <div id="player2Name" style="color: #ff0; font-size: 1.3rem; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);">
-                                ${players[1].username}
-                            </div>
-                        </div>
+                <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
+                    <div class="player-names" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span id="player1Name" class="player1-name" style="font-weight: bold;">${players[0].username}</span>
+                        <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
+                        <span id="player2Name" class="player2-name" style="font-weight: bold;">${players[1].username}</span>
+                    </div>
+                    <div class="score-container" style="font-size: 2.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
+                        <span id="player1score" class="player1-score">0</span>
+                        <span class="score-separator" style="margin: 0 15px;">-</span>
+                        <span id="player2score" class="player2-score">0</span>
                     </div>
                 </div>
 

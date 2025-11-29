@@ -7,7 +7,7 @@ export function getApiEndpoint(): string {
 }
 
 /* TOURNAMENT TYPES */
-export type TournamentStatus = 'setup' | 'active' | 'completed' | 'archived';
+export type TournamentStatus = 'setup' | 'active' | 'completed' | 'archived' | 'suspended';
 export const TSmap: Map<TournamentStatus, string> = new Map<TournamentStatus, string>([
 	['setup', '⚙️'],
 	['active', '🎮'],
@@ -36,9 +36,9 @@ export interface TournamentPlayer {
     id?: number;
     tournamentId: number;
     tpt: TPT;
-    name?: string;
+    name: string;
     user?: any;
-    isReady?: boolean;
+    isReady: boolean;
     score?: number;
     eliminated: boolean;
     createdAt?: string;

@@ -64,7 +64,7 @@ async function handleRouting(): Promise<void> {
     currentRoomId = joinMatch[1];
     console.log('Joining room:', currentRoomId);
     setCurrentPage('join');
-    renderApp();
+    await renderApp();
     return;
   }
 
@@ -144,18 +144,18 @@ export async function renderApp(): Promise<void> {
     cleanupLobby();
   }
   if (page !== 'tournament') {
-    cleanupTournamentPage();
+    await cleanupTournamentPage();
   }
 
   switch (page) {
     case 'landing':
-      renderLandingPage();
+      await renderLandingPage();
       break;
     case 'login':
       renderLoginPage();
       break;
     case 'gameSelect':
-      renderGameSelectPage();
+      await renderGameSelectPage();
       break;
     case 'register':
       renderRegisterPage();
@@ -168,7 +168,7 @@ export async function renderApp(): Promise<void> {
         await renderJoinPage(currentRoomId);
       } else {
         setCurrentPage('landing');
-        renderLandingPage();
+        await renderLandingPage();
       }
       break;
     case 'lobby':
@@ -181,24 +181,24 @@ export async function renderApp(): Promise<void> {
       }
       break;
     case 'profile':
-      renderProfilePage();
+      await renderProfilePage();
       break;
     case 'editProfile':
-      renderEditProfilePage();
+      await renderEditProfilePage();
       break;
     case 'changeUsername':
-      renderChangeUsernamePage();
+      await renderChangeUsernamePage();
       break;
     case 'changeEmail':
-      renderChangeEmailPage();
+      await renderChangeEmailPage();
       break;
     case '2PGame':
       removePingPongBalls(); // Remove balls on game pages
-      render2PlayerGame();
+      await render2PlayerGame();
       break;
     case '4PGame':
       removePingPongBalls(); // Remove balls on game pages
-      render4PlayerGame();
+      await render4PlayerGame();
       break;
     case 'friends':
       renderFriendsPage();
@@ -207,25 +207,25 @@ export async function renderApp(): Promise<void> {
       renderTempLoginPage();
       break;
     case 'verifyEmail':
-      renderVerifyEmailPage();
+      await renderVerifyEmailPage();
       break;
     case 'leaderboard':
-      renderLeaderboardPage();
+      await renderLeaderboardPage();
       break;
     case 'tournament':
-      renderTournamentPage();
+      await renderTournamentPage();
       break;
     case 'stats':
-      renderStatsPage();
+      await renderStatsPage();
       break; 
     case 'pingPong':
-      renderStartPage();
+      await renderStartPage();
       break;
     case 'twoFactorAuth':
       await renderTwoFactorAuthPage();
       break;
     default:
-      renderLandingPage();
+      await renderLandingPage();
   }
 }
 
@@ -236,7 +236,7 @@ window.addEventListener('popstate', async () => {
   currentRoomId = null;
   
   // Use centralized routing
-  handleRouting();
+  await handleRouting();
 });
 
 // Entry point with SSR support
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.__INITIAL_STATE__) {
     setCurrentUser(window.__USERNAME__ || '');
   }
-  handleRouting();
+  await handleRouting();
 });
 
 // Add types for SSR support

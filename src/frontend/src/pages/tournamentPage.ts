@@ -10,12 +10,11 @@ import {
     loadCurrentMatch,
     createTournament,
     setEffectiveTournament,
-    postTournamentMatchWinner,
-    deleteTournament
+    postTournamentMatchWinner
 } from '../utils/tournamentUtils';
 import { renderSetup } from './tournamentLobbyPage';
 import { MSmap, TournamentMatch, getApiEndpoint, Tournament } from '../types';
-import { getCurrentTournament, setCurrentMatch, updateMatchInTournament } from '../utils/tournamentState';
+import { getCurrentTournament, setCurrentMatch } from '../utils/tournamentState';
 import { initTournamentWebSocket, TournamentWebSocketManager } from '../utils/tournamentWebSocket';
 import { setupKeyboardControls } from './2PlayerGame';
 import { removePingPongBalls } from '../utils/pingPongBalls';
@@ -46,6 +45,7 @@ function matchBracketHTML(t: Tournament): string {
     const sortedRounds = Array.from(rounds.keys()).sort((a, b) => a - b);
     
     for (const r of sortedRounds) {
+        const curRound = r === t.round ? true : false;
         const matches = rounds.get(r) || [];
         const cards = matches.map(m => {
             const p1 = m.p1?.name || '—';
@@ -63,7 +63,10 @@ function matchBracketHTML(t: Tournament): string {
                 <div class="t-match-status">${status}</div>
             </div>`;
         }).join('');
-        roundHtml += `<div class="t-bracket-round"><h4>Round ${r}</h4><div class="t-bracket-grid">${cards}</div></div>`;
+        if (!curRound)
+            roundHtml += `<details closed class="t-bracket-round"><summary>Round ${r}</summary><div class="t-bracket-grid">${cards}</div></details>`;
+        else
+            roundHtml += `<details open class="t-bracket-round"><summary>Round ${r}</summary><div class="t-bracket-grid">${cards}</div></details>`;
     }
     
     return `<div class="t-bracket">${roundHtml}</div>`; 
@@ -72,7 +75,7 @@ function matchBracketHTML(t: Tournament): string {
 async function waitForNextMatch(attempts = 8, delayMs = 500): Promise<boolean> {
     let t = getCurrentTournament();
     if (!t) return false;
-	if (t.curM && t.curM.status === 'completed') {
+	if (t.curM && ['completed', 'archived'].includes(t.curM.status)) {
         t.curM = null;
     }
     for (let i = 0; i < attempts; i++) {
@@ -110,7 +113,7 @@ function statusComplete(): void {
             <p style="color: rgb(209 213 219); font-size: 1.6em; margin-bottom: 1.5em; font-weight: bold;">${name} is the Champion!</p>
             <div class="t-actions">
 				<button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
-				<button id="resetBtn" class="btn btn-reset t-flex-1">Start New Tournament</button>
+				<button id="startBtn" class="btn btn-start t-flex-1">New Tournament</button>
 				<button id="backBtn" class="btn btn-t-back t-flex-1">Back Home</button>
 			</div>
         </div>
@@ -120,12 +123,11 @@ function statusComplete(): void {
     
     	document.getElementById('archiveBtn')?.addEventListener('click', async () => await openTournamentArchive());
 
-		document.getElementById('resetBtn')?.addEventListener('click', async () => {
+		document.getElementById('startBtn')?.addEventListener('click', async () => {
 			overlay.remove();
 			await resetTournament();
 			let t = getCurrentTournament();
 			if (!t || !t.id) {
-				console.debug('[Tournament] No tournament found after reset, creating new one');
 				return;
 			}
 			await renderTournamentContent(t);
@@ -133,6 +135,7 @@ function statusComplete(): void {
 		
 		document.getElementById('backBtn')?.addEventListener('click', async () => {
 			overlay.remove();
+            await resetTournament(false);
 			history.pushState({ page: 'landing' }, '', '/landing');
 			setCurrentPage('landing');
 			await renderApp();
@@ -143,20 +146,21 @@ function statusComplete(): void {
 export async function renderTournamentContent(t: Tournament): Promise<void> {
     const content = document.getElementById('tournamentContent');
     if (!content) {
-        console.error('[Tournament] No tournament content element found');
         return;
     }
     if (!t)
         return;
     if (t.status === 'setup') {
-        await renderSetup(content);
-        return;
+        return await renderSetup(content);
     }
-    if (t.status === 'completed') {
+    if (['completed', 'archived'].includes(t.status)) {
         statusComplete();
         return;
     }
-    if (!t.curM || t.curM.status === 'completed') {
+    if (t.status === 'suspended') {
+        return await resetTournament();
+    }
+    if (!t.curM ||  t.curM.status === 'completed') {
         content.innerHTML = '<p>Loading match data...</p>';
         try {
             t.curM = await loadCurrentMatch();
@@ -171,9 +175,10 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
 			}
         } catch (e) {
             console.error('[Tournament] Error loading match:', e);
+            return;
         }
     }
-    if (!t || !t.curM) {
+    if (!t.curM) {
         content.innerHTML = '<p>No current match available</p>';
         return;
     }
@@ -183,12 +188,10 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     });
 
     if (!resp.ok) {
-        console.error('[Tournament] Failed to fetch tournament players:', resp.status);
         return;
     }
     const data = await resp.json();
     if (!data || !data.data) {
-        console.error('[Tournament] Invalid player data received:', data);
         return;
     }
     t = data.data as Tournament;
@@ -205,6 +208,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     content.innerHTML = `
         <p class="t-info-text"><strong>Tournament #${t.id || '?'}</strong></p>
         <p class="t-info-text"><strong>Status:</strong> <span id="tStatusText">${t.status}</span></p>
+        <p class="t-info-text"><strong>Round:</strong> ${t.round}</p>
         <p class="t-info-text"><strong>Current Match:</strong> ${curLabel}</p>
         
         <div id="currentMatchBox" class="t-match-controls"></div>
@@ -239,11 +243,11 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         </details>
         
         <div class="t-footer">
-            <span class="t-footer-spacer">
+            <div class="t-actions">
                 <button id="archiveBtn" class="btn btn-archive t-flex-1">History</button>
                 <button id="resetBtn" class="btn btn-reset t-flex-1">Reset</button>
                 <button id="backBtn" class="btn btn-t-back t-flex-1">Back</button>
-            </span>
+            </div>
         </div>
     `;
 
@@ -252,7 +256,6 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         const btn = document.getElementById('toggleGameBtn') as HTMLButtonElement;
         if (!pure || !btn) return;
         if (!isGameActive) {
-            console.log('[Tournament] No active game to show/hide');
             return;
         }
         const isVisible = pure.style.display !== 'none';
@@ -263,7 +266,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     document.getElementById('backBtn')?.addEventListener('click', async () => {
         if (confirm('Leave tournament page? Any active matches will be ended.')) {
             cleanupActiveGame();
-            await deleteTournament(getCurrentTournament()?.id!);
+            await resetTournament(false);
             history.pushState({ page: 'gameSelect' }, '', '/game-select');
             setCurrentPage('gameSelect');
             await renderApp();
@@ -298,7 +301,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
             return;
         } else if (!nextMatch) {
             const refreshedT = await setEffectiveTournament(t.id!);
-            if (refreshedT && refreshedT.status === 'completed') {
+            if (refreshedT && ['completed', 'archived'].includes(refreshedT.status)) {
                 statusComplete();
                 return;
             }
@@ -322,7 +325,6 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
     
     // Create a basic PongGame instance but DON'T initialize 3D yet (canvas is hidden)
     if (!t.curM.pong) {
-        console.log('🎮 Creating PongGame instance (3D will initialize when game starts)');
         t.curM.pong = new PongGame();
         t.curM.pong.gameState.mode = '2P';
         t.curM.pong.gameId = t.curM.gameId;
@@ -331,7 +333,6 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         const hasLocalP1 = t.curM.p1?.tpt === 'local';
         const hasLocalP2 = t.curM.p2?.tpt === 'local';
         t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
-        console.log(`🎮 Tournament match has local players: ${t.curM.pong.hasLocal} (P1: ${t.curM.p1?.tpt}, P2: ${t.curM.p2?.tpt})`);
         
         // Initialize players array
         t.curM.pong.gameState.players = [
@@ -345,7 +346,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
         t.curM.pong.gameState.ballVelX = 0;
         t.curM.pong.gameState.ballVelY = 0;
         
-        setGameScreen(t.curM.pong);
+        await setGameScreen(t.curM.pong);
     }
 
     if (!ws || !ws.isConnected())
@@ -359,7 +360,7 @@ export async function renderTournamentContent(t: Tournament): Promise<void> {
 
 function renderMatchControls(box: HTMLElement, t: Tournament): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2 || !t.curM.p1.id || !t.curM.p2.id)
-        return console.debug('No current match or players to render controls for');
+        return;
 
     box.innerHTML = `
         <p class="t-info-bold">Next Match:</p>
@@ -388,25 +389,25 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
     updateReadyUI(t, {p1Btn, p2Btn, startBtn});
     
 
-    p1Btn.addEventListener('click', () => {
+    p1Btn.addEventListener('click', async () => {
         const target = p1Btn;
         const pidStr = target.getAttribute('data-player');
         const pid = pidStr ? Number(pidStr) : NaN;
         updateReadyUI(t, {p1Btn: target});
         if (!isNaN(pid)) {
-            togglePlayerReady(t, pid, target);
+            await togglePlayerReady(t, pid, target);
         } else {
             console.warn('Missing playerId on ready button');
         }
     });
 
-    p2Btn.addEventListener('click', () => {
+    p2Btn.addEventListener('click', async () => {
         const target = p2Btn;
         const pidStr = target.getAttribute('data-player');
         const pid = pidStr ? Number(pidStr) : NaN;
         updateReadyUI(t, {p2Btn: target});
         if (!isNaN(pid)) {
-            togglePlayerReady(t, pid, target);
+            await togglePlayerReady(t, pid, target);
         } else {
             console.warn('Missing playerId on ready button');
         }
@@ -414,8 +415,7 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
 
     startBtn.addEventListener('click', async () => {
         if (!t || !t.curM)
-            return console.debug('No current match to start');
-        // Disable button to prevent multiple clicks
+            return;
         startBtn.disabled = true;
         try {
             const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/match/${t.curM.id}/start`, {
@@ -424,7 +424,6 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
             });
             const data = await resp.json();
             if (!resp.ok) {
-                alert(data?.message || `Failed to start (HTTP ${resp.status})`);
                 return;
             }
             t.curM = data.data as TournamentMatch;
@@ -438,7 +437,6 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
             if (ws?.isConnected())
                 ws.requestMatchState();
             await showMatch(t);
-            console.log('[Tournament] Match start initiated');
         } catch (e) {
             console.error('[Tournament] Failed to start match:', e);
         }
@@ -448,16 +446,14 @@ function renderMatchControls(box: HTMLElement, t: Tournament): void {
 function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?: HTMLButtonElement, startBtn?: HTMLButtonElement }): void {
     if (!t || !t.curM || !t.curM.p1 || !t.curM.p2) return;
     const start = document.getElementById('readyAndStartBtn') as HTMLButtonElement;
-    if (!start) return console.error('Error: startBtn');
+    if (!start)
+        return;
     if (opts.p1Btn) {
-        if (t.curM.p1.tpt === 'ai') {
+        if (t.curM.p1.isReady || t.curM.p1.tpt === 'ai') {
             opts.p1Btn.setAttribute("aria-pressed", "true");
             opts.p1Btn.textContent = 'Ready ✓';
-            opts.p1Btn.disabled = true;
-        }
-        else if (t.curM.p1.isReady) {
-            opts.p1Btn.setAttribute("aria-pressed", "true");
-            opts.p1Btn.textContent = 'Ready ✓';
+            if (t.curM.p1.tpt === 'ai')
+                opts.p1Btn.disabled = true;
         }
         else {
             opts.p1Btn.setAttribute("aria-pressed", "false");
@@ -465,14 +461,11 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
         }
     }
     if (opts.p2Btn) {
-        if (t.curM.p2.tpt === 'ai') {
+        if (t.curM.p2.isReady || t.curM.p2.tpt === 'ai') {
             opts.p2Btn.setAttribute("aria-pressed", "true");
             opts.p2Btn.textContent = 'Ready ✓';
-            opts.p2Btn.disabled = true;
-        }
-        else if (t.curM.p2.isReady) {
-            opts.p2Btn.setAttribute("aria-pressed", "true");
-            opts.p2Btn.textContent = 'Ready ✓';
+            if (t.curM.p2.tpt === 'ai')
+                opts.p2Btn.disabled = true;
         }
         else {
             opts.p2Btn.setAttribute("aria-pressed", "false");
@@ -482,7 +475,7 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
     if (opts.startBtn || start) {
         let startBtn: HTMLButtonElement = opts.startBtn ? opts.startBtn : start;
         const bothReady = (t.curM.p1.tpt === 'ai' || t.curM.p1.isReady) && (t.curM.p2.tpt === 'ai' || t.curM.p2.isReady);
-        if (bothReady && t.curM.status !== 'active' && t.curM.status !== 'completed') {
+        if (bothReady && ['ready', 'setup', 'pending'].includes(t.curM.status)) {
             startBtn.disabled = false;
             if (ws)
                 ws.sendReady(true);
@@ -490,12 +483,12 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
         }
         else {
             startBtn.disabled = true;
-            // if (ws)
-            //     ws.sendReady(false);
-            // t.curM.status = 'pending';
+            if (ws)
+                ws.sendReady(false);
+            t.curM.status = 'pending';
         }
     }
-    updateMatchInTournament(t.curM);
+    setCurrentMatch(t.curM);
 }
 
 async function togglePlayerReady(t: Tournament | null, playerId: number, button: HTMLButtonElement | null): Promise<void> {
@@ -522,7 +515,7 @@ async function togglePlayerReady(t: Tournament | null, playerId: number, button:
         else if (t.curM.p2 && t.curM.p2.id === playerId)
             updateReadyUI(t, {p2Btn: button});
 		if (!ws)
-            initws(t);
+            await initws(t);
         if (ws && ws.isConnected()) {
             ws.requestMatchState();
         } else {
@@ -535,12 +528,10 @@ async function togglePlayerReady(t: Tournament | null, playerId: number, button:
 
 async function initws(t: Tournament): Promise<void> {
     if (ws && ws.isConnected()) {
-        console.log('WebSocket already connected, skipping init');
         return;
     }
     if (!t || !t.id) return;
     if (!t.curM!.pong) {
-        console.error('No t.curM.pong instance');
         return;
     }
 
@@ -560,12 +551,11 @@ async function initws(t: Tournament): Promise<void> {
         playerId: wsPlayerId!.toString(),
         
         onConnect: () => {
-            console.log('✅ Tournament WebSocket connected');
             ws?.requestState();
             setupKeyboardControls(ws, wsPlayerId!.toString(), t.curM?.pong);
         },
 
-        onTournamentState: (tournament) => {
+        onTournamentState: async (tournament) => {
             const st = document.getElementById('tStatusText');
             if (st) st.textContent = tournament.status;
             const br = document.getElementById('bracketSection');
@@ -573,11 +563,11 @@ async function initws(t: Tournament): Promise<void> {
             const cmId = tournament.curM?.id;
             if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
                 lastRenderedCurrentMatchId = cmId;
-                renderTournamentContent(tournament);
+                await renderTournamentContent(tournament);
             }
         },
 
-        onMatchState: (match) => {
+        onMatchState: async (match) => {
             if (match) {
                 let t = getCurrentTournament();
                 if (!t) return;
@@ -589,7 +579,7 @@ async function initws(t: Tournament): Promise<void> {
                 const cmId = t.curM?.id;
                 if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
                     lastRenderedCurrentMatchId = cmId;
-                    renderTournamentContent(t);
+                    await renderTournamentContent(t);
                 }
             }
         },
@@ -651,7 +641,6 @@ async function initws(t: Tournament): Promise<void> {
                 const hasLocalP1 = t.curM.p1?.tpt === 'local';
                 const hasLocalP2 = t.curM.p2?.tpt === 'local';
                 t.curM.pong.hasLocal = hasLocalP1 || hasLocalP2;
-                console.log(`🎮 hasLocal flag set to ${t.curM.pong.hasLocal} for keyboard controls`);
             }
             
             // Show the game container FIRST
@@ -665,7 +654,6 @@ async function initws(t: Tournament): Promise<void> {
             
             // NOW initialize the 3D scene (canvas is visible)
             if (t.curM.pong && !t.curM.pong.babylonGame) {
-                console.log('🎮 Initializing 3D scene now that container is visible...');
                 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
                 if (canvas) {
                     t.curM.pong.canvas = canvas;
@@ -675,12 +663,10 @@ async function initws(t: Tournament): Promise<void> {
                         const baby = new baby3D(t.curM.pong);
                         await baby.createScene();
                         t.curM.pong.babylonGame = baby;
-                        console.log('✅ 3D renderer created for tournament');
                         
                         // Start render loop
                         if (t.curM.pong.startRenderLoop) {
                             t.curM.pong.startRenderLoop();
-                            console.log('✅ Render loop started');
                         }
                     } catch (e) {
                         console.error('❌ Failed to start 3D renderer:', e);
@@ -692,14 +678,12 @@ async function initws(t: Tournament): Promise<void> {
             if (t.curM.pong) {
                 t.curM.pong.isActive = true;
                 presenceService.setInGame();
-                console.log('✅ Game is now active and ready');
             } else {
                 console.error('❌ No pong instance found when game started!');
             }
         },
 
         onGameEnd: async (data) => {
-            console.log('🏁 Game ended:', data);
             if (!t || !data.matchId || isProcessingMatchEnd) return;
             
             isProcessingMatchEnd = true;
@@ -733,16 +717,11 @@ async function initws(t: Tournament): Promise<void> {
             const updatedT = await setEffectiveTournament(t.id);
             if (updatedT) {
                 t = updatedT;
-                if (t.curM) {
-                    await renderTournamentContent(t);
-                } else if (t.status === 'completed') {
-                    await renderTournamentContent(t);
-                }
+                await renderTournamentContent(t);
             }
         },
 
         onTournamentEnd: async (tournamentId) => {
-            console.log('Tournament ended:', tournamentId);
             if (!t || t.id !== Number(tournamentId)) return;
             if (t.championId)
 				statusComplete();
@@ -761,13 +740,9 @@ async function initws(t: Tournament): Promise<void> {
 
 async function showMatch(t: Tournament): Promise<void> {
     if (!t || !t.curM) {
-        console.error('❌ No tournament or current match found');
         return;
     }
     
-    console.log('🎮 showMatch called - but 3D initialization happens in onGameStart now');
-    
-    // Just ensure the container is visible
     const gameContainer = document.getElementById('tournamentGameContainer');
     if (gameContainer) {
         gameContainer.style.display = 'block';
@@ -778,33 +753,29 @@ async function showMatch(t: Tournament): Promise<void> {
     }
     
     isGameActive = true;
-    console.log('✅ Match display ready');
 }
 
 function cleanupActiveGame(): void {
-    console.log('🧹 Cleaning up tournament game...');
     const t = getCurrentTournament();
-    if (!t ||!t.curM)
+    if (!t || !t.curM)
         return;
 	t.curM.status = 'completed';
     if (t.curM.pong) {
         cleanupGame(t.curM.pong);
         t.curM.pong = undefined;
     }
-    
+    setCurrentMatch(null);
     isGameActive = false;
-    console.log('✅ Tournament game cleaned up');
 }
 
 export async function renderTournamentPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
     root.innerHTML = `
-        <div class="neon-grid profile-container" style="width:100%; max-width:1200px; margin: 0 auto;">
+        <div class="neon-grid profile-container t-section">
             <div class="grid-anim"></div>
-            <div style="width:100%; display:flex; flex-direction:column; align-items:center; gap:1em; padding:0.75em 1.5em 0.5em 1.5em; justify-content: center; min-height: 80vh;">
-                <h2 class="title-neon" style="font-size:2.5rem; margin-bottom:0.5em;">Tournament Mode</h2>
-                <div id="tournamentContent" class="glass-card" style="width:100%; max-width:1000px; padding:2em;">Loading...</div>
+                <h2 class="title-neon">Tournament Mode</h2>
+                <div id="tournamentContent" class="glass-card t-content">Loading...</div>
             </div>
         </div>
     `;
@@ -822,8 +793,14 @@ export async function renderTournamentPage(): Promise<void> {
         await renderTournamentContent(t);
 }
 
-export function cleanupTournamentPage(): void {
+export async function cleanupTournamentPage(): Promise<void> {
     cleanupActiveGame();
+    let t = getCurrentTournament();
+    if (t) {
+        if (!['completed', 'archived'].includes(t.status))
+            t.status = 'suspended';
+        await resetTournament(false);
+    }
     if (ws) {
         try {
             ws.disconnect();

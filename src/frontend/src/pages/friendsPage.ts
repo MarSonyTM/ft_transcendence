@@ -28,7 +28,7 @@ export function renderFriendsPage(): void {
   root.innerHTML = `
     <div class="neon-grid">
       <div class="grid-anim"></div>
-      <div class="glass-card" style="max-width: 1200px;">
+      <div class="glass-card" style="max-width: 1200px; padding: 20px">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <h1 class="title-neon" style="font-size: 2rem;">Friends</h1>
           <button id="backBtn" class="btn btn-neon accent">

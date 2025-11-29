@@ -58,13 +58,13 @@ export async function render4PlayerGame(): Promise<void> {
 
                 <div class="glass-card" style="margin-bottom: 20px; padding: 20px; text-align: center;">
                     <div class="player-names" style="margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span id="player1Name" class="player1-name" style="color: #0ff; font-weight: bold;">${players[0].username}</span>
+                        <span id="player1Name" class="player1-name" style="font-weight: bold;">${players[0].username}</span>
                         <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
-                        <span id="player2Name" class="player2-name" style="color: #ff0; font-weight: bold;">${players[1].username}</span>
+                        <span id="player2Name" class="player2-name" style="font-weight: bold;">${players[1].username}</span>
                         <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
-                        <span id="player3Name" class="player3-name" style="color: #f0f; font-weight: bold;">${players[2].username}</span>
+                        <span id="player3Name" class="player3-name" style="font-weight: bold;">${players[2].username}</span>
                         <span class="vs-text" style="color: #fff; font-weight: bold;">VS</span>
-                        <span id="player4Name" class="player4-name" style="color: #0f0; font-weight: bold;">${players[3].username}</span>
+                        <span id="player4Name" class="player4-name" style="font-weight: bold;">${players[3].username}</span>
                     </div>
                     <div class="score-container" style="font-size: 2.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
                         <span id="player1score" class="player1-score">0</span>
@@ -83,7 +83,7 @@ export async function render4PlayerGame(): Promise<void> {
 
                 <div class="controls-info" style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 15px; margin-top: 20px; text-align: center;">
                     <p style="color: #0ff; font-weight: bold; margin: 5px 0;">W / S keys</p>
-                    ${!pongGame.hasLocal ? '<p style="color: #0f0; font-weight: bold; margin: 5px 0;">Player 2: Up/Down arrows</p>' : ''}
+                    ${!pongGame.hasLocal ? '<p style="color: #0f0; font-weight: bold; margin: 5px 0;">Player 2: O / L keys</p>' : ''}
                     <p style="color: #ff6b00; font-style: italic; margin-top: 10px;">Last player to touch ball gets point when opponent misses!</p>
                 </div>
 

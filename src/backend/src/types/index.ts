@@ -2,13 +2,10 @@ import { GameRoom } from "../game/gameRoom";
 import { GameState } from '../database/index';
 
 export type TPT = 'host' | 'ai' | 'local' | 'remote';
-export const TPTMap: Array<TPT> = ['host', 'ai', 'local', 'remote'];
 
 export type MatchStatus = 'setup' | 'pending' | 'ready' | 'active' | 'completed';
-export const MSMap: Array<MatchStatus> = ['setup', 'pending', 'ready', 'active', 'completed'];
 
-export type TournamentStatus = 'setup' | 'active' | 'completed' | 'archived';
-export const TSMap: Array<TournamentStatus> = ['setup', 'active', 'completed', 'archived'];
+export type TournamentStatus = 'setup' | 'active' | 'completed' | 'archived' | 'suspended';
 
 export interface Tournament {
 	id: number;
@@ -30,7 +27,7 @@ export interface TournamentMatch {
 	tournamentId: number;
 	gameId?: number;
 	room?: GameRoom | null;
-	gameState?: GameState;//TODO add to table
+	gameState?: GameState;
 	status: MatchStatus;
 	isBye: boolean;
 	p1?: TournamentPlayer;

@@ -1,14 +1,15 @@
 import { Tournament, TournamentMatch, TournamentPlayer, TPT, getApiEndpoint } from '../types';
 import { getCurrentTournament, setCurrentTournament, setCurrentMatch } from './tournamentState';
 import { authService } from './auth';
-import { setCurrentPage } from './globalState';
-import { renderApp } from '../main';
+import { renderSetup } from '../pages/tournamentLobbyPage';
+import { renderTournamentContent } from '../pages/tournamentPage';
 
 export async function createTournament(): Promise<Tournament | null> {
     try {
         let ok: string = 'true';
         const host = await authService.getCurrentUser();
-        if (!host) ok = 'false';
+        if (!host)
+            ok = 'false';
         const response = await fetch(`${getApiEndpoint()}/api/tournament`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -21,7 +22,6 @@ export async function createTournament(): Promise<Tournament | null> {
 
         const data = await response.json();
         if (!response.ok) {
-            console.error('Failed to create tournament:', data);
             return null;
         }
         const t: Tournament = data.data as Tournament;
@@ -53,23 +53,41 @@ export async function deleteTournament(tId: number): Promise<void> {
     }
 }
 
-export async function resetTournament(): Promise<void> {
+export async function resetTournament(create: boolean = true): Promise<void> {
     let t = getCurrentTournament();
-    if (t && t.id && t.status === 'setup')
-        deleteTournament(t.id);
-	setCurrentTournament(null);
-    setCurrentMatch(null);
+    if (!t) return;
+    
     const host = authService.getCurrentUser();
     if (!host) {
-        console.error('Cannot create new tournament: no user logged in');
+        if (t && t.id)
+            await deleteTournament(t.id);
+        setCurrentTournament(null);
         return;
     }
-    t = await createTournament();
-    if (!t || !t.id) {
-        console.error('Failed to create new tournament during reset');
-        return;
+
+    if (t && t.id && (['active', 'suspended'].includes(t.status) || (t.status === 'setup' && !create))) {
+        t.status = 'suspended';
     }
+
+    let shouldCreate = create === true ? 'true' : 'false';
+    const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            shouldCreate,
+            status: t.status
+        })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok)
+        return;
+    t = data.data as Tournament;
+    if (!t && create)
+        t = await createTournament();
     setCurrentTournament(t);
+    if (t)
+        await renderTournamentContent(t);
 }
 
 export async function addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer | null> {
@@ -88,7 +106,6 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
 
         const data = await resp.json();
         if (!resp.ok) {
-            console.error('Failed to add player:', data);
             return null;
         }
         const t: Tournament = data.data as Tournament;
@@ -99,18 +116,16 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
     }
 }
 
-export async function removeTournamentPlayer(playerName: string): Promise<void> {
+export async function removeTournamentPlayer(playerName: string, clear: boolean = false): Promise<void> {
     const t = getCurrentTournament();
     if (!t) return;
 
     const player = t.players.find(p => p.name === playerName);
     if (!player || !player.id) {
-        console.error(`Player ${playerName} not found`, { player, allPlayers: t.players });
         return;
     }
 
     try {
-        console.log(`Removing player ${playerName} (id=${player.id}) from tournament ${t.id}`);
 
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${t.id}/leave`, {
             method: 'POST',
@@ -119,13 +134,11 @@ export async function removeTournamentPlayer(playerName: string): Promise<void> 
         });
 
         if (!resp.ok) {
-            const msg = await resp.text().catch(() => '');
-            console.error(`Failed to remove player ${player.id}`, msg);
             return;
         }
 
-        showTournamentPlayerDisconnectedMessage(playerName);
-        console.log(`Player ${player.id} removed from tournament ${t.id}`);
+        if (!clear)
+            showTournamentPlayerDisconnectedMessage(playerName);
         if (t.id)
             await setEffectiveTournament(t.id);
     } catch (e) {
@@ -146,14 +159,12 @@ export async function startTournament(): Promise<boolean> {
         });
         const data = await resp.json();
         if (!resp.ok) {
-            console.error('Failed to start tournament:', data?.message || `HTTP ${resp.status}`);
             return false;
         }
         t = data.data as Tournament;
         if (!t)
             return false;
         setCurrentTournament(t);
-        console.log(`Tournament ${t.id} started`);
         return true;
     } catch (e) {
         console.error('startTournament failed:', e);
@@ -195,7 +206,6 @@ export async function setEffectiveTournament(tournamentId: number): Promise<Tour
             return null as any;
         setCurrentTournament(t);
         t.curM = await loadCurrentMatch();
-        console.log(`Loaded tournament ${tournamentId} with ${t.players.length} players and ${t.allMatches.length} matches`);
         return t;
     } catch (error) {
         console.error('setEffectiveTournament error:', error);
@@ -211,7 +221,6 @@ export async function postTournamentMatchWinner(tournamentId: number, matchId: n
             body: JSON.stringify({ winnerId })
         });
         if (!resp.ok) {
-            console.error('Failed to post match winner:', resp.status);
             return false;
         }
 
@@ -221,14 +230,6 @@ export async function postTournamentMatchWinner(tournamentId: number, matchId: n
         console.error('Failed to post match winner:', e);
         return false;
     }
-}
-
-export function finalizeTournament(championId: number | null): void {
-    const t = getCurrentTournament();
-    if (!t) return;
-    t.status = 'completed';
-    t.championId = championId;
-    setCurrentTournament(t);
 }
 
 export function showTournamentPlayerDisconnectedMessage(playerName: string): void {
@@ -246,9 +247,19 @@ export function showTournamentPlayerDisconnectedMessage(playerName: string): voi
     }, 4000);
 }
 
-export function findMatch(matchId: number): TournamentMatch | undefined {
-    const t = getCurrentTournament();
-    return t?.allMatches.find(m => m.id === matchId);
+export function showTournamentMaxPlayerMessage(): void {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed; top: 20px; right: 20px; background: rgb(220 38 38);
+        color: white; padding: 1em 1.5em; border-radius: 8px; z-index: 999; font-weight: 600;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out;
+    `;
+    notification.innerHTML = `Maximum amount of players in tournament reached`;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+    }, 4000);
 }
 
 export function findPlayer(playerId: number): TournamentPlayer | undefined {

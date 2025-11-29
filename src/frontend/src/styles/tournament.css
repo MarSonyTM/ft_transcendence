@@ -1,32 +1,32 @@
 /* BASE STYLES */
 .t-section {
-	margin-top: 2rem;
-	margin-bottom: 3rem;
 	text-align: center;
 	align-content: center;
 	justify-content: center;
-	width: 95vw;
+	width: 100%;
+	margin: 0 auto;
 }
 
 .t-content {
   background-color: rgba(25, 35, 50, 0.6);
   backdrop-filter: blur(10px);
-  padding: 2.5rem 3rem;
+  padding: 1rem;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 1.1rem;
   color: rgb(229 231 235);
   width: 100%;
+  min-width: 600px;
   max-width: 1000px;
-  margin: 0 auto;
+  margin: 0 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .t-setup {
 	display: flex;
 	flex-direction: column;
-	gap: 2rem;
+	gap: 0.75rem;
 	align-items: center;
 }
 
@@ -42,36 +42,30 @@
 
 .t-alias-list {
 	list-style: none;
-	margin: 1rem auto;
+	margin: 0.3rem auto;
 	padding: 0;
 	display: flex;
 	flex-direction: column;
-	text-align: left;
-	gap: 0.75rem;
-	max-width: 700px;
+	text-align: center;
+	gap:0.35rem;
+	max-width: 500px;
 	width: 100%;
 }
 
 .t-alias-item {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
+	gap: 0.5rem;
 	background: rgba(2, 11, 24, 0.6);
-	padding: 1rem 1.5rem;
-	border-radius: 12px;
+	padding: 0.5rem;
+	padding-left: 43%;
+	border-radius: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.08);
-	transition: all 0.2s ease;
-}
-
-.t-alias-item:hover {
-	background: rgba(2, 11, 24, 0.8);
-	border-color: rgba(0, 255, 255, 0.3);
-	transform: translateX(4px);
+	max-height: 20px;
 }
 
 .t-alias-name {
-	flex: 1;
+	flex: content;
 	text-align: left;
 	font-size: 1.1rem;
 	font-weight: 500;
@@ -82,7 +76,6 @@
 	display: flex;
 	gap: 1rem;
 	flex-wrap: wrap;
-	justify-content: center;
 	margin-top: 2rem;
 	width: 100%;
 }
@@ -91,7 +84,7 @@
 	margin-top: 0;
 	margin-bottom: 1.5rem;
 	font-size: 1.3em;
-	font-weight: 600;
+	font-weight: 500;
 	color: rgb(229 231 235);
 	text-align: center;
 }
@@ -100,6 +93,24 @@
 	opacity: .6;
 	font-style: italic;
 }
+
+.modal {
+	position: fixed;
+	top: 0; left: 0;
+	right: 0; bottom: 0;
+	background: rgba(2, 7, 20, 0.58);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 15px;
+}
+
+.modal-content {
+	background: rgb(42, 58, 69);
+	padding: 10px;
+	border-radius: 5px;
+}
+.hidden { display: none; }
 
 /* LIVE GAME CONTAINER */
 .t-game-container {

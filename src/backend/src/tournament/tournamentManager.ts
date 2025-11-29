@@ -89,14 +89,13 @@ class TournamentManager {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) return false;
-			if (t.status === 'completed' || t.status === 'archived')
+			if (['completed', 'archived', 'suspended'].includes(t.status))
 				return false;
 			if (t.status === 'setup') {
 				if (!db.deletePlayer(playerId))
 					return false;
 			} else {
 				db.updatePlayer({ id: playerId, eliminated: true });
-				console.log(`Player ${playerId} eliminated from tournament ${tournamentId}`);
 				if (t.curM)
 					this.computeWinnerIfPossible(t.curM.id);
 			}
@@ -105,6 +104,31 @@ class TournamentManager {
 		} catch (error) {
 			console.error('leaveTournament error:', error);
 			return false;
+		}
+	}
+
+	async resetTournament(tId: number, create: boolean, status: string): Promise<Tournament | null> {
+		try {
+			let t = db.getTournamentById(tId);
+			if (status === 'suspended') {
+				t = db.updateTournament(tId, { status: 'suspended', endedAt: new Date().toISOString() });
+			}
+			else if (t && status === 'setup' && create) {
+				t = db.updateTournament(tId, {
+					allMatches: [],
+					championId: null,
+					curM: null,
+					matchQueue: [],
+					round: 0,
+					status: 'setup',
+					players: [t.players[0]]
+				});
+				return t;
+			}
+			return null;
+		} catch (err) {
+			console.error('Failed to reset tournament:', err);
+			return null;
 		}
 	}
 
@@ -215,7 +239,6 @@ class TournamentManager {
 			}
 			t.round = 0;
 			db.updateTournament(tournamentId, t);
-			console.log(`Bracket setup complete: ${t.allMatches.length} total matches`);
 			if (!(await this.insertPlayersIntoNextRound(tournamentId)))
 				return false;
 			if (!t.curM || (t.curM && t.curM.status === 'completed')) {
@@ -225,7 +248,8 @@ class TournamentManager {
 						t.curM = t.matchQueue.shift() || null;
 				}
 			}
-			if (!t || !t.curM) return false;
+			if (!t || !t.curM)
+				return false;
 			return true;
 		} catch (error) {
 			console.error('setupMatches error:', error);
@@ -279,7 +303,7 @@ class TournamentManager {
 				if (p2)
 					p2.isReady = p2.tpt === 'ai' ? true : false;
 				if (!p1)
-					throw new Error('Not enough players for assignment');
+					return false;//throw new Error('Not enough players for assignment');
 				if (p1 && p2 && p2.tpt === 'host')
 					[p1, p2] = [p2, p1];
 				m.p1 = p1;
@@ -315,7 +339,7 @@ class TournamentManager {
 				});
 			}
 			if (players.length > 0)
-				throw new Error(`${players.length} players left unassigned`);
+				return false;
 			t.matchQueue = matches.filter(m => m.status === 'pending');
 			t.matchQueue.sort((a, b) => a.roundIdx - b.roundIdx);
 			t.curM = t.matchQueue.shift() || null;
@@ -401,7 +425,7 @@ class TournamentManager {
 	async endTournament(tournamentId: number): Promise<boolean> {
 		try {
 			this.computeChampionIfPossible(tournamentId);
-			const t = db.updateTournament(tournamentId, {//TODO check if is archived?
+			const t = db.updateTournament(tournamentId, {
 				status: 'archived',
 				endedAt: new Date().toISOString()
 			});
@@ -454,9 +478,7 @@ class TournamentManager {
 						while (t.curM && t.curM.status === 'completed')
 							t.curM = t.matchQueue.shift() || null;
 					}
-				} //else
-					// return null;
-					// throw new Error('insertPlayersIntoNextRound failed');
+				}
 			}
 			if (t && t.curM && t.curM.id) {
 				if (this.allPlayersReadyForMatch(t.curM.id) && t.curM.status !== 'completed')
@@ -481,15 +503,14 @@ class TournamentManager {
 			let gameInput: CreateGameInput = { mode: '2P', difficulty: 'normal' };
 			const game = database.games.createGame(gameInput);
 			if (!game || !game.id)
-				throw new Error('Failed to create new game for Tournament');
+				return null as any;
 			let m = db.getMatchById(mId);
 			if (!m)
-				throw new Error('Failed to get match by id');
+				return null as any;
 			m.room!.gameId = game.id;
 			m.gameId = game.id;
 			m = db.updateMatch({ id: m.id, gameId: m.gameId, room: m.room });
-			if (!m)
-				throw new Error('Failed to update match');
+			if (!m) return null as any;
 			return m;
 		} catch (err) {
 			console.error('createGameState for Tournament failed:', err);
@@ -519,7 +540,6 @@ class TournamentManager {
 				return null;
 			}
 			if (!this.allPlayersReadyForMatch(t.curM.id)) {
-				console.log('Waiting for players to be ready...');
 				return null;
 			}
 			t.curM.status = 'ready';
@@ -527,7 +547,7 @@ class TournamentManager {
 			t = db.updateTournament(t.id, {curM: t.curM});
 			if (!t || !t.curM) return null;
 			if (!(await this.createMatchRoom(t.curM)))
-				throw new Error('createMatchRoom failed');
+				return null;
 			t.curM = db.getMatchById(matchId);
 			if (!t || !t.curM || !t.curM.room|| !t.curM.room.roomId) {
 				console.error('Failed to create match room');
@@ -547,15 +567,14 @@ class TournamentManager {
 		try {
 			let match = db.getMatchById(matchId);
 			if (!match)
-				throw new Error('Match not found');
+				return false;
 			let t = db.getTournamentById(match.tournamentId);
 			if (!t)
-				throw new Error('Tournament not found');
+				return false;
 			t.curM = match;
 
 			await this.computeWinnerIfPossible(t.curM.id);
 			if (!t.curM.winnerId) {
-				console.error('Cannot end match: no winner determined');
 				return false;
 			}
 			if (t.curM.p1 && t.curM.p1.id !== t.curM.winnerId)
@@ -566,17 +585,15 @@ class TournamentManager {
 			t.curM.status = 'completed';
 			t.curM.endedAt = new Date().toISOString();
 			t = db.updateTournament(t.id, { curM: t.curM });
-			console.log(`Match ${t!.curM!.id} completed. Winner: ${t!.curM!.winnerId}`);
 			
 			const roomId = this.matchRooms.get(matchId);
 			if (roomId)
 				this.matchRooms.delete(matchId);
 			if (!match.winnerId)
-				throw new Error('Winner not set after computation');
+				return false;
 			
 			if (t) {
 				db.updateTournament(t.id, { curM: null });
-				console.log(`Cleared curM for tournament ${match.tournamentId}, ready for next match`);
 			}
 			
 			broadcastMatchEndToTournament(match.tournamentId, matchId, match.winnerId);
@@ -618,7 +635,7 @@ class TournamentManager {
 		try {
 			let m = db.getMatchById(matchId);
 			if (!m)
-				throw new Error('Match not found');
+				return false;
 			if (m.status === 'completed')
 				return false;
 			const p1 = m.p1;
@@ -656,18 +673,17 @@ class TournamentManager {
 
 			t.curM = db.updateMatch({ id: matchId, p1: t.curM.p1, p2: t.curM.p2 });
 			if (!t.curM)
-				throw new Error('updateMatch failed');
-
+				return false;
 			if (!t.curM.isBye && this.allPlayersReadyForMatch(matchId))
 				t.curM.status = 'ready';
 
 			t.curM = db.updateMatch({ id: matchId, status: t.curM.status });
 			if (!t.curM)
-				throw new Error('Failed to update match');
+				return false;
 
 			t = db.updateTournament(t.id, { curM: t.curM });
 			if (!t)
-				throw new Error('Failed to update tournament');
+				return false;
 
 			broadcastTournamentState(tournamentId);
 			return true;
@@ -743,7 +759,7 @@ class TournamentManager {
 	async deleteTournament(tId: number): Promise<void> {
 		try {
 			if (!db.deleteTournament(tId))
-				throw new Error('Failed to delete tournament');
+				return;
 		} catch (err) {
 			console.error('deleteTournament failed:', err);
 		}
@@ -792,7 +808,7 @@ class TournamentManager {
 			for (t of tt) {
 				t = this.hydrateTournament(t);
 				if (!t)
-					throw new Error('hydrateTournament failed');
+					return [];
 			}
 			return tt;
 		} catch (error) {
