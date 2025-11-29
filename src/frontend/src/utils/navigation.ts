@@ -65,6 +65,20 @@ export async function createUserNav(): Promise<string> {
                     ">
                         🏠 Home
                     </button>
+                    <button id="navHomeBtn" class="user-menu-item" style="
+                        width: 100%;
+                        text-align: left;
+                        padding: 0.8em 1.2em;
+                        background: transparent;
+                        border: none;
+                        color: #00ffff;
+                        cursor: pointer;
+                        font-size: 0.95em;
+                        transition: background 0.2s ease;
+                        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+                    ">
+                        🏠 Home
+                    </button>
                     <button id="navProfileBtn" class="user-menu-item" style="
                         width: 100%;
                         text-align: left;
@@ -172,8 +186,8 @@ export function attachUserNavListeners(): void {
     });
 
     // Home button
-    if (homeBtn) {
-        homeBtn.addEventListener('click', () => {
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
             dropdown.classList.remove('show');
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
