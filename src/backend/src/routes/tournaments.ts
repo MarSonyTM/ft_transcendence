@@ -4,6 +4,7 @@ import { TPT, TournamentPlayer } from '../types/index';
 import { activeGames } from './game';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
+import { AIDifficulty } from '../game/aiPlayer';
 import { registerTournamentGame } from '../websocket/websocketHandler';
 import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 import { sanitizeString, sanitizeAlias, sanitizeId } from '../utils/sanitization';
@@ -65,6 +66,10 @@ const addPlayerBodySchema = {
 			pattern: '^[0-9-]+$',
 			minLength: 1,
 			maxLength: 20
+		},
+		difficulty: {
+			type: 'string',
+			enum: ['easy', 'normal', 'hard']
 		}
 	},
 	required: ['name', 'tpt', 'id'],
@@ -387,11 +392,20 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			const { name, tpt, id } = request.body as { name: string; tpt: TPT, id: string };
+			const { name, tpt, id, difficulty } = request.body as { name: string; tpt: TPT, id: string, difficulty?: string };
 			
 			const sanitizedName = sanitizeAlias(name);
 			const sanitizedTpt = sanitizeString(tpt) as TPT;
 			const tId = sanitizeId(tournamentId);
+
+			// Sanitize and validate difficulty (only for AI players)
+			let sanitizedDifficulty: string | undefined = undefined;
+			if (difficulty && sanitizedTpt === 'ai') {
+				sanitizedDifficulty = sanitizeString(difficulty);
+				if (!['easy', 'normal', 'hard'].includes(sanitizedDifficulty)) {
+					sanitizedDifficulty = 'normal'; // Default to normal if invalid
+				}
+			}
 			
 			if (isNaN(tId) || tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -406,9 +420,9 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 
 			let success;
 			if (id === '-')
-				success = await tournamentManager.addPlayerToTournament(tId, sanitizedName, sanitizedTpt);
+				success = await tournamentManager.addPlayerToTournament(tId, sanitizedName, sanitizedTpt, undefined, sanitizedDifficulty);
 			else
-				success = await tournamentManager.addPlayerToTournament(tId, sanitizedName, sanitizedTpt, sanitizeId(id));
+				success = await tournamentManager.addPlayerToTournament(tId, sanitizedName, sanitizedTpt, sanitizeId(id), sanitizedDifficulty);
 			
 			if (!success)
 				return reply.status(400).send({ success: false, message: 'Failed to add player to tournament' });
@@ -647,11 +661,22 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				};
 
 				gameEngine = new BaseGameEngine(initialGameState);
-				if (m.p1?.tpt === 'ai')
-					gameEngine.setPlayerAI(1, true, 'normal');
-				if (m.p2?.tpt === 'ai')
-					gameEngine.setPlayerAI(2, true, 'normal');
-
+				// Set AI players with their stored difficulty (default to 'normal' if not set)
+				if (m.p1?.tpt === 'ai') {
+					const p1Difficulty = (m.p1.difficulty && ['easy', 'normal', 'hard'].includes(m.p1.difficulty)) 
+						? m.p1.difficulty as AIDifficulty 
+						: 'normal';
+					gameEngine.setPlayerAI(1, true, p1Difficulty);
+					console.log(`🎮 Tournament: Set AI Player 1 with difficulty: ${p1Difficulty}`);
+				}
+				if (m.p2?.tpt === 'ai') {
+					const p2Difficulty = (m.p2.difficulty && ['easy', 'normal', 'hard'].includes(m.p2.difficulty)) 
+						? m.p2.difficulty as AIDifficulty 
+						: 'normal';
+					gameEngine.setPlayerAI(2, true, p2Difficulty);
+					console.log(`🎮 Tournament: Set AI Player 2 with difficulty: ${p2Difficulty}`);
+				}
+				
 				activeGames.set(gameId, gameEngine);
 				registerTournamentGame(gameId, mId);
 			}

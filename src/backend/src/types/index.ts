@@ -50,6 +50,7 @@ export interface TournamentPlayer {
 	score?: number;
 	eliminated: boolean;
 	socketId?: string;
+	difficulty?: string;  // AI difficulty: 'easy' | 'normal' | 'hard' (only for AI players)
 	createdAt?: string;
 	updatedAt?: string;
 }

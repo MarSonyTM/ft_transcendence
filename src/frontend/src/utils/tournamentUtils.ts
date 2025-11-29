@@ -90,18 +90,23 @@ export async function resetTournament(create: boolean = true): Promise<void> {
         await renderTournamentContent(t);
 }
 
-export async function addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer | null> {
+export async function addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number, difficulty?: string): Promise<TournamentPlayer | null> {
     try {
         let id = '-';
         if (userId) id = userId.toString();
+		// Build request body - include difficulty only for AI players
+        const body: any = { 
+            name, 
+            tpt,
+            id
+        };
+        if (tpt === 'ai' && difficulty) {
+            body.difficulty = difficulty;
+        }
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}/player`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                name, 
-                tpt,
-                id
-            })
+            body: JSON.stringify(body)
         });
 
         const data = await resp.json();
