@@ -251,8 +251,7 @@ export class PongGame {
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
-            const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
+            const wsUrl = `${protocol}://${window.location.host}/game/${this.gameId}/ws`;
             
             console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
