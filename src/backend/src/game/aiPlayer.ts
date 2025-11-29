@@ -47,12 +47,16 @@ export class AIPongPlayer {
      * The game engine treats these identically to human keyboard input.
      */
     private currentKeys: { up: boolean; down: boolean } = { up: false, down: false };
-    private currentPaddlePos: number = 0; // Updated every frame
-    private readonly max: number;
-    private readonly maxPaddle: number;
-    private readonly center: number;
-    private readonly sides: string[];
-    private readonly side: string;
+    
+    // Current paddle position (updated every frame for accurate movement decisions)
+    private currentPaddlePos: number = 0;
+    
+    // Game boundaries and calculated values
+    private readonly max: number;           // Maximum position along paddle's movement axis
+    private readonly maxPaddle: number;     // Maximum valid paddle position (max - paddleHeight)
+    private readonly center: number;       // Center position (where paddle rests when ball is away)
+    private readonly sides: string[];      // Available sides based on game mode
+    private readonly side: string;         // Which side this AI controls (left/right/top/bottom)
 
     /**
      * Difficulty Settings
@@ -165,6 +169,19 @@ export class AIPongPlayer {
         return this.currentKeys;
     }
 
+    /**
+     * Decide Movement
+     * 
+     * Main decision-making function. Called every frame to determine which keys to press.
+     * Uses the last view (updated once per second) and extrapolates forward in time.
+     * 
+     * Algorithm:
+     * 1. Calculate how much time has passed since last view
+     * 2. Determine if ball is coming towards this paddle
+     * 3. If coming: predict where ball will be when it reaches paddle
+     * 4. If going away: return to center position
+     * 5. Move paddle towards the target
+     */
     private decideMovement(): void {
         // If no view exists yet (game just started), return to center
         if (!this.lastView) {
@@ -188,15 +205,20 @@ export class AIPongPlayer {
 
         let isComingTowards = false;
         if (this.side === 'left') {
+            // Left paddle: ball coming if moving left (negative X velocity) and hasn't passed paddle
             isComingTowards = ballVelX < 0 && ballPosTowardsPaddle > this.values.paddleWidth;
         } else if (this.side === 'right') {
+            // Right paddle: ball coming if moving right (positive X velocity) and hasn't passed paddle
             isComingTowards = ballVelX > 0 && ballPosTowardsPaddle < (this.values.maxX - this.values.paddleWidth);
         } else if (this.side === 'top') {
+            // Top paddle: ball coming if moving up (negative Y velocity) and hasn't passed paddle
             isComingTowards = ballVelY < 0 && ballPosTowardsPaddle > this.values.paddleWidth;
         } else if (this.side === 'bottom') {
+            // Bottom paddle: ball coming if moving down (positive Y velocity) and hasn't passed paddle
             isComingTowards = ballVelY > 0 && ballPosTowardsPaddle < (this.values.maxY - this.values.paddleWidth);
         }
 
+        // Calculate target position for the paddle
         let target: number;
 
         if (isComingTowards) {
