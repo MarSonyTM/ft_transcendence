@@ -589,7 +589,7 @@ async function initws(t: Tournament): Promise<void> {
                 const cmId = t.curM?.id;
                 if (cmId != null && cmId !== lastRenderedCurrentMatchId) {
                     lastRenderedCurrentMatchId = cmId;
-                    renderTournamentContent(t);
+                    renderTournamentPage(t);
                 }
             }
         },

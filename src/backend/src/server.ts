@@ -80,7 +80,8 @@ const start = async (): Promise<void> => {
                 
                 'http://frontend:8080',
                 'https://play.google.com',
-                'http://localhost:8443'
+                'http://localhost:8443',
+                'ws://localhost:8443'
             ];
             
             const isAllowed = allowedPatterns.some(pattern => {
@@ -231,7 +232,7 @@ const start = async (): Promise<void> => {
     // Start listening
     await server.listen({ port: PORT, host: HOST });
     console.log(`Backend server with WebSocket and SSR listening on http://${HOST}:${PORT}`);
-    console.log(`WebSocket endpoint: ws://${HOST}:${PORT}/game/:gameId/ws`);
+    console.log(`WebSocket endpoint: wss://${HOST}:${PORT}/game/:gameId/ws`);
     console.log(`Health check available at http://${HOST}:${PORT}/health`);
     console.log(`API docs available at http://${HOST}:${PORT}/api`);
     } catch (err) {
