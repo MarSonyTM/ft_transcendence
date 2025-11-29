@@ -1,8 +1,10 @@
 import { PongGame } from "../game/PongGame";
 import { GameRoom, getCurrentRoom } from "./roomState";
 import { disconnectRoomWebSocket, RoomWebSocketManager } from '../utils/roomWebSocket';
-import { authService } from "./auth";
 import { baby3D } from "../game/game3D";
+import { API_BASE } from "../config";
+
+const apiEndpoint = API_BASE;
 
 export async function setGameScreen(pongGame: PongGame) {
     pongGame.canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
@@ -62,7 +64,6 @@ export function endGame(pongGame: PongGame) {
         }
         
         try {
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${pongGame.gameId}/winner`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

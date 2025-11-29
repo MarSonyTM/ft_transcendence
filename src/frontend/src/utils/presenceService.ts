@@ -1,3 +1,5 @@
+import { API_BASE } from "../config";
+
 interface UserPresence {
     userId: number;
     username: string;
@@ -11,7 +13,7 @@ class PresenceService {
 
     // Helper to get API endpoint
     private getApiUrl(): string {
-        return window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+        return API_BASE;
     }
 
     startHeartbeat(): void {

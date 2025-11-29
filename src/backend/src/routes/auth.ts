@@ -762,7 +762,7 @@ async function userRoutes(
       });
 
       // Redirect to frontend with token
-      const frontendUrl = FRONTEND_URL || "http://localhost:5173";
+      const frontendUrl = FRONTEND_URL || "http://localhost:8443";
       reply.redirect(
         `${frontendUrl}auth/callback?token=${token}&success=true&email=${email}${
           needEmailVerification ? "&needEmailVerification=true" : ""
@@ -770,7 +770,7 @@ async function userRoutes(
       );
     } catch (error) {
       fastify.log.error(error);
-      const frontendUrl = FRONTEND_URL || "http://localhost:5173";
+      const frontendUrl = FRONTEND_URL || "http://localhost:8443";
       reply.redirect(
         `${frontendUrl}auth/callback?success=false&error=Authentication failed`
       );

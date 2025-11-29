@@ -1,4 +1,7 @@
 import { authService } from "../utils/auth";
+import { API_BASE } from "../config";
+
+const apiEndpoint = API_BASE;
 
 export default  async function renderAuthCallbackPage(): Promise<void> {
     const root = document.getElementById('app-root');
@@ -34,7 +37,6 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
 
         // Send the token to backend to set it as a cookie
         if (token) {
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
             try {
                 console.log('🔄 Setting token cookie via backend...');
                 const response = await fetch(`${apiEndpoint}/api/auth/set-token`, {
@@ -64,7 +66,7 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
         // Redirect to dashboard after short delay
         console.log("it logged in")
         setTimeout(() => {
-            history.pushState({ page: '' }, '', '/');
+            history.pushState({ page: 'landing' }, 'landing', '/landing');
             window.dispatchEvent(new PopStateEvent('popstate'));
         }, 2000);
     } else {
@@ -89,7 +91,6 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
         const retryBtn = document.getElementById('retryAuthBtn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => {
-                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
                 window.location.href = `${apiEndpoint}/api/auth/google`;
             });
         }

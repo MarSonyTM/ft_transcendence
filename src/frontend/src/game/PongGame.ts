@@ -4,6 +4,9 @@ import { getCurrentRoom } from '../utils/roomState';
 import { authService } from '../utils/auth';
 import { baby3D } from './game3D';
 import { RoomWebSocketManager } from '../utils/roomWebSocket';
+import { API_BASE } from '../config';
+
+const apiEndpoint = API_BASE;
 
 export class PongGame {
     gameId?: number = 0;
@@ -223,7 +226,7 @@ export class PongGame {
             const modeSelector = document.getElementById('gameModeSelect') as HTMLSelectElement;
             const selectedMode = modeSelector ? modeSelector.value : getCurrentGameMode();
             
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+           
             const response = await fetch(`${apiEndpoint}/api/game/new`, {
                 method: "POST",
                 credentials: 'include',
@@ -250,7 +253,7 @@ export class PongGame {
 
     async connectWebSocket(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const protocol = window.location.protocol === 'http:' ? 'wss:' : 'ws:';
             const wsEndpoint = window.__INITIAL_STATE__?.wsEndpoint || `${protocol}://${window.location.hostname}:3000`;
             const wsUrl = `${wsEndpoint}/game/${this.gameId}/ws`;
             
@@ -426,7 +429,6 @@ export class PongGame {
 
     async startServerGame(): Promise<void> {
         try {
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
             const response = await fetch(`${apiEndpoint}/api/game/${this.gameId}/start`, {
                 method: "POST",
                 credentials: 'include',
@@ -514,17 +516,6 @@ export class PongGame {
     }
 
     updateFPS(): void {
-        // const now = performance.now();
-        // this.frameCount++;
-        // const elapsed = now - this.fpsStartTime;
-        
-        // if (elapsed >= 1000) {
-        //     const fps = Math.round((this.frameCount * 1000) / elapsed);
-        //     const fpsCounter = document.getElementById('fpsCounter');
-        //     if (fpsCounter) fpsCounter.textContent = fps.toString();
-        //     this.fpsStartTime = now;
-        //     this.frameCount = 0;
-        // }
     }
 
     updatePlayerInfo(): void {
@@ -560,7 +551,6 @@ export class PongGame {
 
         if (this.gameId) {
             try {
-                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/pause`, {
                     method: "POST",
                     credentials: 'include',
@@ -609,7 +599,6 @@ export class PongGame {
 
         if (this.gameId) {
             try {
-                const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
                 await fetch(`${apiEndpoint}/api/game/${this.gameId}/end`, {
                     method: "POST",
                     credentials: 'include',

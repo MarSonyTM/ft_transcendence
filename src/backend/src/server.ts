@@ -80,8 +80,7 @@ const start = async (): Promise<void> => {
                 
                 'http://frontend:8080',
                 'https://play.google.com',
-                '10.18.178.53:5173',
-                'http://localhost:5173'
+                'http://localhost:8443'
             ];
             
             const isAllowed = allowedPatterns.some(pattern => {

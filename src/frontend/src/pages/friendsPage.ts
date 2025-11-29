@@ -1,6 +1,9 @@
 import { setCurrentPage } from '../utils/globalState';
 import { presenceService } from '../utils/presenceService';
 import { renderApp } from '../main';
+import { API_BASE } from '../config';
+
+const apiEndpoint = API_BASE;
 
 let refreshInterval: number | null = null;
 let isRefreshing = false;
@@ -9,7 +12,6 @@ let previousCounts = {
     requests: 0,
     invitations: 0
 };
-import { authService } from '../utils/auth';
 
 interface User {
     id: number;
@@ -167,7 +169,6 @@ function showNewBadge(type: 'request' | 'invitation'): void {
 
 async function loadFriends() {
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/list`, {
       credentials: 'include',
     });
@@ -198,7 +199,6 @@ async function loadFriends() {
 
 async function loadPendingRequests() {
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/requests/pending`, {
       credentials: 'include',
     });
@@ -233,7 +233,6 @@ async function searchUsers(query: string) {
   resultsContainer.innerHTML = '<p style="color: #9ca3af;">Searching...</p>';
 
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/search?q=${encodeURIComponent(query)}`, {
       credentials: 'include',
     });
@@ -253,7 +252,6 @@ async function searchUsers(query: string) {
 
 async function sendFriendRequest(friendId: number) {
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/request`, {
       method: 'POST',
       credentials: 'include',
@@ -282,7 +280,6 @@ async function sendFriendRequest(friendId: number) {
 
 async function acceptFriendRequest(friendId: number) {
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/accept/${friendId}`, {
       method: 'POST',
       credentials: 'include',
@@ -303,7 +300,6 @@ async function acceptFriendRequest(friendId: number) {
 
 async function rejectFriendRequest(friendId: number) {
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
     const response = await fetch(`${apiEndpoint}/api/friends/reject/${friendId}`, {
       method: 'POST',
       credentials: 'include',
@@ -327,7 +323,7 @@ async function removeFriend(friendId: number) {
   }
 
   try {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || '';
+
     const response = await fetch(`${apiEndpoint}/api/friends/${friendId}`, {
       method: 'DELETE',
       credentials: 'include',

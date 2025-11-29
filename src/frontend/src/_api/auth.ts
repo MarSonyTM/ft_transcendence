@@ -2,6 +2,8 @@ import { API_BASE } from '../config';
 import { authService } from '../utils/auth';
 import { presenceService } from '../utils/presenceService';
 
+const apiEndpoint = API_BASE|| 'http://localhost:3000';
+
 interface RegisterResult {
 	success: boolean;
 	username?: string;
@@ -10,7 +12,7 @@ interface RegisterResult {
 	error?: string;
 }
 export async function loginUser(username: string, password: string): Promise<{ success: boolean; username?: string; token?: string; emailVerified?: boolean; requires2FA?: boolean; userId?: number; error?: string }> {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
+    
     
     const res = await fetch(`${apiEndpoint}/api/auth/login`, {
 		credentials: 'include',
@@ -155,7 +157,6 @@ export async function createGuestUser(username?: string): Promise<{
     emailVerified?: boolean;
     error?: string;
     }> {
-    const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
   
     try {
         const res = await fetch(`${apiEndpoint}/api/auth/guest`, {
@@ -191,7 +192,6 @@ export async function createGuestUser(username?: string): Promise<{
 }
 
 export async function verifyEmail(verificationCode: string, email: string): Promise<{ success: boolean; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 	
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/verify-email`, {
@@ -226,7 +226,6 @@ export async function verifyEmail(verificationCode: string, email: string): Prom
 
 // Resend verification email
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 	
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/resend-verification`, {
@@ -260,7 +259,6 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
 
 // Verify 2FA code
 export async function verify2FA(verificationCode: string, userId: number): Promise<{ success: boolean; token?: string; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 	
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/verify-2fa`, {
@@ -297,7 +295,6 @@ export async function verify2FA(verificationCode: string, userId: number): Promi
 
 // Resend 2FA code
 export async function resend2FA(userId: number): Promise<{ success: boolean; message?: string; error?: string }> {
-	const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
 	
 	try {
 		const res = await fetch(`${apiEndpoint}/api/auth/resend-2fa`, {

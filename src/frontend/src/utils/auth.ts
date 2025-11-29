@@ -1,9 +1,6 @@
 import { publicPages, renderApp } from "../main";
 import { setCurrentPage } from "./globalState";
-
-const getApiUrl = () =>
-  window.__INITIAL_STATE__?.apiEndpoint || "http://localhost:3000";
-const API_URL = getApiUrl();
+import { API_BASE } from "../config";
 
 interface DecodedToken {
   id: string;
@@ -106,15 +103,13 @@ export class AuthService {
 
 
     const path = window.location.pathname;
-    // Don't auto-fetch profile on public pages, except when explicitly called from auth callback
-    // (Auth callback will call this after setting the token cookie)
     if (publicPages.includes(path) && !path.includes('/auth/callback')) {
 
       return null;
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
+      const response = await fetch(`${API_BASE}/api/users/profile`, {
       credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -162,7 +157,7 @@ export class AuthService {
   // Logout user
   async logout(): Promise<void> {
     try {
-      await fetch(`${API_URL}/api/auth/logout`, {
+      await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -178,7 +173,7 @@ export class AuthService {
   // Update user stats after game
   async updateGameStats(won: boolean): Promise<void> {
     try {
-      await fetch(`${API_URL}/api/users/stats`, {
+      await fetch(`${API_BASE}/api/users/stats`, {
         method: "POST",
         credentials: "include",
         headers: {
