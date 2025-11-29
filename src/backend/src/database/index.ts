@@ -1665,6 +1665,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 score INTEGER DEFAULT 0,
                 eliminated BOOLEAN DEFAULT FALSE,
                 socketId TEXT,
+                difficulty TEXT DEFAULT 'normal',
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
@@ -1672,6 +1673,16 @@ export class DatabaseManager extends BaseDatabaseManager {
             )
         `;
         this.db.exec(createTPlayerT);
+        
+        // Add difficulty column if it doesn't exist (for existing databases)
+        try {
+            this.db.exec(`ALTER TABLE t_players ADD COLUMN difficulty TEXT DEFAULT 'normal'`);
+        } catch (error: any) {
+            // Column already exists, ignore error
+            if (!error.message?.includes('duplicate column')) {
+                console.log('Note: difficulty column may already exist');
+            }
+        }
 
         const createTMatchT = `
             CREATE TABLE IF NOT EXISTS t_matches (

@@ -40,7 +40,7 @@ class TournamentManager {
 		}
 	}
 
-	async addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number): Promise<TournamentPlayer> {
+	async addPlayerToTournament(tournamentId: number, name: string, tpt: TPT, userId?: number, difficulty?: string): Promise<TournamentPlayer> {
 		try {
 			let t = db.getTournamentById(tournamentId);
 			if (!t) {
@@ -59,13 +59,25 @@ class TournamentManager {
 				console.error('Cannot join: duplicate name');
 				return null as any;
 			}
-			const player = db.createPlayer({
+			
+			// Prepare player data - include difficulty only for AI players
+			const playerData: any = {
 				tournamentId,
 				tpt,
 				name,
 				isReady: tpt === 'ai',
 				userId: userId || null
-			});
+			};
+			
+			// Add difficulty if provided and player is AI
+			if (tpt === 'ai' && difficulty) {
+				playerData.difficulty = difficulty;
+			} else if (tpt === 'ai') {
+				// Default to 'normal' if AI player but no difficulty specified
+				playerData.difficulty = 'normal';
+			}
+			
+			const player = db.createPlayer(playerData);
 			if (!player)
 				throw new Error('Failed to create player');
 			t = db.getTournamentById(tournamentId);
@@ -151,6 +163,9 @@ class TournamentManager {
 				return false;
 			}
 			if (match.p2 && !match.isBye) {
+				// Get difficulty from player data (default to 'normal' if not set)
+				const p2Difficulty = (match.p2.tpt === 'ai' && match.p2.difficulty) ? match.p2.difficulty : 'normal';
+				
 				const joinResult = gameRoomManager.joinRoom(
 					match.room.roomId,
 					match.p2.id.toString(),
@@ -158,7 +173,7 @@ class TournamentManager {
 					match.p2.tpt === 'ai',
 					match.p2.isReady,
 					match.p2.tpt === 'local',
-					'normal'
+					p2Difficulty
 				);
 				if (!joinResult.success) {
 					console.error('Failed to join player 2 to room:', joinResult.message);

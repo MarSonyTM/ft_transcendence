@@ -55,9 +55,18 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 	content.innerHTML = `
 		<p class="t-msg" style="text-align: center;">Create a new tournament</p>
 			<div class="t-setup">
-			<div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+			<div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; flex-direction: column; align-items: center;">
 				<button id="addLocalBtn" class="btn btn-add">${TPTmap.get('local')} Add Local Player</button>
-				<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
+				<div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; width: 100%; max-width: 300px;">
+					<label style="color: rgb(156 163 175); font-size: 0.85em; font-weight: 500;">AI Difficulty</label>
+					<select id="tournamentAIDifficulty" 
+						style="width: 100%; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-size: 0.9em; cursor: pointer;">
+						<option value="easy">Easy - Good for beginners</option>
+						<option value="normal" selected>Normal - Balanced challenge</option>
+						<option value="hard">Hard - Extremely challenging</option>
+					</select>
+					<button id="addAIBtn" class="btn btn-add">${TPTmap.get('ai')} Add AI Player</button>
+				</div>
 			</div>
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove" data-player-name="" data-player-type="" style="display: none">x</button></ul>
 			<div class="t-footer">
@@ -85,7 +94,9 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			alert('Maximum of 10 players reached');
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
-				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}</span>
+				// Show difficulty for AI players
+				const difficultyLabel = (p.tpt === 'ai' && p.difficulty) ? ` (${p.difficulty})` : '';
+				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}${difficultyLabel}</span>
 				<button class="btn btn-remove" data-player-name="${p.name}" data-player-type="${p.tpt}"
 				style="${p.tpt === 'host' ?  'display: none' : ''}">x</button></li>`;
 			}).join('');
@@ -111,8 +122,13 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		const x = getNextId(internalAIIds);
 		const alias = `AI_${x}`;
 		if (!alias) return;
-		console.log('[Tournament] Add AI player:', alias);
-		addPlayerToTournament(activeT.id!, alias, 'ai');
+		
+		// Get selected difficulty from dropdown
+		const difficultySelect = document.getElementById('tournamentAIDifficulty') as HTMLSelectElement;
+		const selectedDifficulty = difficultySelect?.value || 'normal';
+		
+		console.log('[Tournament] Add AI player:', alias, 'with difficulty:', selectedDifficulty);
+		addPlayerToTournament(activeT.id!, alias, 'ai', undefined, selectedDifficulty);
 		rerender();
 	});
 
