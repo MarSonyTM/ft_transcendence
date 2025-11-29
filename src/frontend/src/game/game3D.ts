@@ -87,6 +87,13 @@ export class baby3D {
     }
 
     async createScene(): Promise<Scene> {
+        
+        // Check WebGL support first
+        if (!this.checkWebGLSupport()) {
+            throw new Error('WebGL is not supported in this browser');
+        }
+        
+        // Wait a bit for DOM to be fully ready
         await new Promise(resolve => setTimeout(resolve, 100));
         
         let canvas = document.getElementById('renderCanvas') as HTMLCanvasElement | null;
@@ -199,6 +206,18 @@ export class baby3D {
         this.light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
         this.light.intensity = 0.85;
     }
+
+	private checkWebGLSupport(): boolean {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const supported = !!(window.WebGLRenderingContext && gl);
+            return supported;
+        } catch(e) {
+            console.error('❌ [3D] WebGL check failed:', e);
+            return false;
+        }
+	}
 
     private rebuild() {
         this.table?.dispose();
