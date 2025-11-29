@@ -24,11 +24,12 @@ import { authService } from './utils/auth';
 import { renderStartPage } from './pages/startPage';
 import { removePingPongBalls } from './utils/pingPongBalls';
 import { renderTwoFactorAuthPage } from './pages/twoAuth';
+import { renderVerifyEmailSecondPage } from './pages/verifyEmailSecond';
 
 // Store current room ID for join links
 let currentRoomId: string | null = null;
 
-export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '//auth/callback', '/verify-email', '/resend-verification', '/two-factor-auth'];
+export const publicPages = ['/ping-pong', '/login', '/register', '/auth/callback', '/verify-email', '/verify-email-second', '/resend-verification', '/two-factor-auth'];
 
 // Centralized routing handler
 async function handleRouting(): Promise<void> {
@@ -115,6 +116,9 @@ async function handleRouting(): Promise<void> {
         break;
     case '/verify-email':
       setCurrentPage('verifyEmail');
+      break;
+    case '/verify-email-second':
+      setCurrentPage('verifyEmailSecond');
       break;
     case '/leaderboard':
       setCurrentPage('leaderboard');
@@ -208,6 +212,9 @@ export async function renderApp(): Promise<void> {
       break;
     case 'verifyEmail':
       await renderVerifyEmailPage();
+      break;
+    case 'verifyEmailSecond':
+      await renderVerifyEmailSecondPage();
       break;
     case 'leaderboard':
       await renderLeaderboardPage();

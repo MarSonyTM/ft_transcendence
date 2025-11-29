@@ -227,7 +227,7 @@ export default function renderRegisterPage(): void {
 					authService.setPendingEmailVerification(email);
 				}
 				setTimeout(() => {
-					history.pushState({ page: 'verifyEmail' }, '', '/verify-email');
+					history.pushState({ page: 'verifyEmailSecond' }, '', '/verify-email-second');
 					window.dispatchEvent(new PopStateEvent('popstate'));
 				}, 1500);
 			} else {

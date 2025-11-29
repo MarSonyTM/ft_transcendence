@@ -92,7 +92,7 @@ export type AppPage =
     'landing' | 'login' | 'register' | 'gameSelect' | 'temp-login' | 'leaderboard' | 'friends' |
     'profile' | 'editProfile' | 'changeUsername' | 'changeEmail' | 'verifyEmail' | 'authCallback' |
     'game' | 'lobby' | 'join' | '2PGame' | '4PGame' | 'tournament' |
-    'pingPong' | 'twoFactorAuth' | 'stats';
+    'pingPong' | 'twoFactorAuth' | 'stats' | 'verifyEmailSecond';
 
 declare global {
     interface Window {
