@@ -303,7 +303,7 @@ class TournamentManager {
 				if (p2)
 					p2.isReady = p2.tpt === 'ai' ? true : false;
 				if (!p1)
-					return false;//throw new Error('Not enough players for assignment');
+					return false;
 				if (p1 && p2 && p2.tpt === 'host')
 					[p1, p2] = [p2, p1];
 				m.p1 = p1;
