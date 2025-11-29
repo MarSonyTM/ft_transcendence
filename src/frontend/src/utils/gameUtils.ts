@@ -31,7 +31,6 @@ export async function setGameScreen(pongGame: PongGame) {
 
 export function endGame(pongGame: PongGame) {
     pongGame.onGameEnd = async (winnerId: number) => {
-        console.log(`Game ended, winner is Player ${winnerId}`);
         
         // Show winner screen for all games (both room-based and regular)
         const room = getCurrentRoom();

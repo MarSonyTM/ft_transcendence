@@ -39,14 +39,11 @@ export class RoomWebSocketManager {
             try {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsHost = window.location.host;
-                const wsUrl = `${wsProtocol}//${wsHost}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;
-
-                console.log('🔌 Connecting to:', wsUrl);
+                const wsUrl = `${wsProtocol}//${wsHost}/room/${this.config.roomId}/ws?playerId=${this.config.playerId}`;;
           
                 this.opt.ws = new WebSocket(wsUrl);
 
                 this.opt.ws.onopen = () => {
-                    console.log('✅ WebSocket connected to room:', this.config.roomId);
                     this.opt.reconnectAttempts = 0;
                     this.startHeartbeat();
             
@@ -67,7 +64,6 @@ export class RoomWebSocketManager {
                 };
 
                 this.opt.ws.onclose = (event) => {
-                    console.log('🔌 WebSocket disconnected:', event.code, event.reason);
                     this.stopHeartbeat();
             
                     if (this.config.onDisconnect) {

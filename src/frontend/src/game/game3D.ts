@@ -512,7 +512,6 @@ export class baby3D {
         );
         
         cubeTexture.onLoadObservable.add(() => {
-            console.log('✅ [3D] Skybox textures loaded successfully!');
         });
         
         skyboxMaterial.reflectionTexture = cubeTexture;

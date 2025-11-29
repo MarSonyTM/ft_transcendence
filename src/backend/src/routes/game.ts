@@ -719,7 +719,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                 const difficulty = player.difficulty || 'Normal';
                                 const difficultyCapitalized = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
                                 playerName = `AI Bot (${difficultyCapitalized})`;
-                                console.log(`   🤖 AI Player detected at position ${positionId}`);
                             } else if (player.username) {
                                 // Real player - find by username
                                 const userByUsername = database.users.getAllUsers().find(
@@ -734,14 +733,12 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                                 const userById = database.users.getUserById(player.id);
                                 if (userById) {
                                     actualUserId = player.id;
-                                    console.log(`   ✅ Found user by ID ${player.id}`);
                                 }
                             } else if (player.id && typeof player.id === 'number') {
                                 // Try using player.id for real players
                                 const userById = database.users.getUserById(player.id);
                                 if (userById) {
                                     actualUserId = player.id;
-                                    console.log(`   ✅ Found user by ID ${player.id}`);
                                 }
                             }
                             
@@ -806,7 +803,6 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
                 };
             });
             
-            console.log(`✅ Final players data:`, JSON.stringify(playersData, null, 2));
             
             const winnerUser = database.users.getUserById(winnerId);
             

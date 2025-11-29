@@ -221,7 +221,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         },
         
         onPlayerMove: (movedPlayerId, position) => {
-            console.log(`Remote player ${movedPlayerId} moved to ${position}`);
             if (pongGame?.currentGameState) { 
                 updateRemotePlayerPosition(movedPlayerId, position);
             }
@@ -233,7 +232,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         },
         
         onGameEnd: async (data: any) => {
-            console.log('2-player game ended in room, winner:', data);
             const winner = room.players.find((p: any) => p.id === data.winnerId);
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;

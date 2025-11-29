@@ -59,7 +59,6 @@ export class TournamentWebSocketManager {
                 };
 
                 this.opt.ws.onclose = (event) => {
-                    console.log('WebSocket disconnected:', event.code, event.reason);
                     this.stopHeartbeat();
                     if (this.tconfig.onDisconnect)
                         this.tconfig.onDisconnect();

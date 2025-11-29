@@ -9,7 +9,6 @@ export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
     // POST /api/auth/presence/status - Update user status
     fastify.post('/api/auth/presence/status', async (request: FastifyRequest, reply: FastifyReply) => {
         try {
-            console.warn("UMM, ACTUALLY!!!!");
             const { status } = request.body as SetStatusRequest;
             
             // Get user from JWT token (assuming you have authentication middleware)
@@ -50,7 +49,6 @@ export async function registerPresenceStatusRoute(fastify: FastifyInstance) {
                     message: 'User presence not found'
                 });
             }
-            console.log(`✅ [PRESENCE] User ${username} (${userId}) status updated to: ${status}`);
 
             return reply.send({
                 success: true,

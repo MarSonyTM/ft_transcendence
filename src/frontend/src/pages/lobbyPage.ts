@@ -640,7 +640,6 @@ async function addAIOpponent(): Promise<void> {
   	// Get selected difficulty from the dropdown
   	const difficultySelect = document.getElementById('aiDifficulty') as HTMLSelectElement;
   	const selectedDifficulty = difficultySelect?.value || 'normal';
-  	console.log(`🤖 Adding AI with difficulty: ${selectedDifficulty}`);
 
   	const aiNumber = currentRoom.players.filter(p => p.isAI).length + 1;
   	const aiId = `ai-${Date.now()}`;
@@ -659,7 +658,7 @@ async function addAIOpponent(): Promise<void> {
 				isAI: true,
 				isReady: true,
 				isLocal: true,
-				difficulty: selectedDifficulty  // Include the selected difficulty
+				difficulty: selectedDifficulty
 			})
    		});
 

@@ -276,7 +276,6 @@ export class PongGame {
             };
             
             this.websocket.onclose = () => {
-                console.log('WebSocket disconnected');
                 this.updateWSStatus("Disconnected", false);
                 this.isActive = false;
                 
@@ -344,7 +343,6 @@ export class PongGame {
                 break;
                 
             case 'ballReset':
-                console.log('Ball reset:', message.message);
                 break;
                 
             case 'score':
