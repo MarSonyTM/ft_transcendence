@@ -1,173 +1,297 @@
+/**
+ * AIGameView Interface
+ * 
+ * Represents a snapshot of the game state that the AI "sees" when it updates its view.
+ * The AI only gets this information once per second (as per subject requirements),
+ * so it must use this data to predict where the ball will be.
+ */
 interface AIGameView {
-    ballPosX: number;
-    ballPosY: number;
-    ballVelX: number;  // pixels/second
-    ballVelY: number;  // pixels/second
-    paddlePos: number;
-    lastUpdate: number;
+    ballPosX: number;      // Ball's X position on the court
+    ballPosY: number;      // Ball's Y position on the court
+    ballVelX: number;      // Ball's velocity in X direction (pixels/second)
+    ballVelY: number;      // Ball's velocity in Y direction (pixels/second)
+    paddlePos: number;     // Current paddle position along its movement axis
+    lastUpdate: number;    // Timestamp (ms) when this view was captured
 }
 
+/**
+ * AI Difficulty Levels
+ * 
+ * Three difficulty levels that control how accurate and responsive the AI is:
+ * - easy: Large prediction errors, slow reactions, makes many mistakes
+ * - normal: Moderate errors, balanced difficulty
+ * - hard: Perfect prediction, very challenging
+ */
 export type AIDifficulty = 'easy' | 'normal' | 'hard';
 
+/**
+ * AIPongPlayer Class
+ * 
+ * Implements an AI opponent that simulates human keyboard input.
+ * Key constraints:
+ * - Must simulate keyboard input (not direct paddle control)
+ * - Can only update its view once per second (1000ms)
+ * - Must predict ball position and handle bounces
+ * - Uses physics-based trajectory prediction (NOT A* algorithm)
+ */
 export class AIPongPlayer {
+    // Last snapshot of the game state (updated once per second)
     private lastView: AIGameView | null = null;
+    
+    // Timestamp of when the view was last updated (used to enforce once-per-second constraint)
     private lastUpdateTime: number = 0;
+    
+    /**
+     * KEYBOARD SIMULATION - This is how the AI replicates human behavior.
+     * The AI sets these boolean flags, just like a human pressing keys.
+     * The game engine treats these identically to human keyboard input.
+     */
     private currentKeys: { up: boolean; down: boolean } = { up: false, down: false };
-    private currentPaddlePos: number = 0; // Updated every frame
-    private readonly max: number;
-    private readonly maxPaddle: number;
-    private readonly center: number;
-    private readonly sides: string[];
-    private readonly side: string;
+    
+    // Current paddle position (updated every frame for accurate movement decisions)
+    private currentPaddlePos: number = 0;
+    
+    // Game boundaries and calculated values
+    private readonly max: number;           // Maximum position along paddle's movement axis
+    private readonly maxPaddle: number;     // Maximum valid paddle position (max - paddleHeight)
+    private readonly center: number;       // Center position (where paddle rests when ball is away)
+    private readonly sides: string[];      // Available sides based on game mode
+    private readonly side: string;         // Which side this AI controls (left/right/top/bottom)
 
-    // Difficulty settings
+    /**
+     * Difficulty Settings
+     * Controls AI behavior and accuracy based on selected difficulty level
+     */
     private settings: {
-        updateInterval: number;     // How often AI updates its view (ms) - must be 1000ms
-        predictionError: number;    // Random error in prediction (pixels)
-        reactionDelay: number;      // Not used currently
-        centerOffset: number;       // Not used currently
+        updateInterval: number;     // How often AI updates its view (ms) - MUST be 1000ms per requirements
+        predictionError: number;    // Random error added to predictions (pixels) - larger = less accurate
+        reactionDelay: number;      // Reserved for future use
+        centerOffset: number;       // Reserved for future use
     };
     
+    /**
+     * Constructor
+     * 
+     * Initializes the AI player with game configuration and difficulty settings.
+     * 
+     * @param playerId - Which player this AI controls (1, 2, 3, or 4)
+     * @param difficulty - Difficulty level (easy/normal/hard)
+     * @param values - Game configuration (court size, paddle size, speeds, etc.)
+     */
     constructor(
         private playerId: number,
         difficulty: AIDifficulty = 'normal',
         private values: {
-            mode: string,
-            maxX: number,
-            maxY: number,
-            ballRadius: number,
-            paddleHeight: number,
-            paddleWidth: number,
-            defaultPaddlePos: number,
-            paddleSpeed: number
+            mode: string,              // Game mode: '2P' or '4P'
+            maxX: number,              // Court width
+            maxY: number,              // Court height
+            ballRadius: number,        // Ball radius
+            paddleHeight: number,      // Paddle length
+            paddleWidth: number,       // Paddle thickness
+            defaultPaddlePos: number,  // Default starting position
+            paddleSpeed: number        // Pixels per frame movement speed
         }
     ) {
+        // Determine which sides are valid based on game mode
         this.sides = values.mode === '2P' ? ['left', 'right'] : ['left', 'top', 'right', 'bottom'];
+        
+        // Calculate which side THIS AI is on (Player 1=left, Player 2=right/top, etc.)
         this.side = this.sides[(playerId - 1) % this.sides.length];
+        
+        // Set maximum boundary based on paddle orientation
+        // Vertical paddles (left/right) move along Y axis, horizontal (top/bottom) move along X axis
         this.max = this.side === 'left' || this.side === 'right' ? this.values.maxX : this.values.maxY;
+        
+        // Maximum valid paddle position (can't go past court edge)
         this.maxPaddle = this.max - values.paddleHeight;
+        
+        // Center position (where paddle should rest when ball is away)
         this.center = this.maxPaddle / 2;
          
-        // Initialize difficulty settings
+        // Initialize difficulty-specific settings
         this.settings = this.getDifficultySettings(difficulty);
         console.log(`🤖 AI Player ${playerId} created (${difficulty} difficulty)`);
         console.log(`   Settings: predictionError=${this.settings.predictionError}px, updateInterval=${this.settings.updateInterval}ms`);
     }
 
+    /**
+     * Get Difficulty Settings
+     * 
+     * Returns configuration for the specified difficulty level.
+     * All difficulties use 1000ms update interval (once per second) as required.
+     * 
+     * @param difficulty - The difficulty level
+     * @returns Settings object with update interval, prediction error, etc.
+     */
     private getDifficultySettings(difficulty: AIDifficulty) {
         switch (difficulty) {
             case 'easy':
                 return {
-                    updateInterval: 1000,    // Once per second (as required)
-                    predictionError: 100,     // Large random error (pixels) - makes AI miss often
-                    reactionDelay: 800,
-                    centerOffset: 80
+                    updateInterval: 1000,    // Once per second (as required by subject)
+                    predictionError: 100,     // Large random error (±100px) - makes AI miss often
+                    reactionDelay: 800,      // Reserved for future use
+                    centerOffset: 80          // Reserved for future use
                 };
             case 'normal':
                 return {
-                    updateInterval: 1000,    // Once per second (as required)
-                    predictionError: 20,     // Moderate random error (pixels)
-                    reactionDelay: 200,
-                    centerOffset: 20
+                    updateInterval: 1000,    // Once per second (as required by subject)
+                    predictionError: 20,     // Moderate random error (±20px) - balanced difficulty
+                    reactionDelay: 200,       // Reserved for future use
+                    centerOffset: 20         // Reserved for future use
                 };
             case 'hard':
                 return {
-                    updateInterval: 1000,    // Once per second (as required)
-                    predictionError: 0,      // No random error
-                    reactionDelay: 0,
-                    centerOffset: 0
+                    updateInterval: 1000,    // Once per second (as required by subject)
+                    predictionError: 0,      // No random error - perfect prediction
+                    reactionDelay: 0,        // Reserved for future use
+                    centerOffset: 0          // Reserved for future use
                 };
         }
     }
 
-    // This gets called every frame but only updates VIEW once per second
-    // However, DECISIONS are made every frame using the last view
+    /**
+     * Update AI View
+     * 
+     * Called every frame (60fps) by the game engine.
+     * 
+     * KEY CONSTRAINT: Only updates VIEW (ball position/velocity) once per second (1000ms).
+     * However, DECISIONS are made every frame using the last view and extrapolating forward.
+     * 
+     * This simulates the constraint that the AI can only "look" at the game once per second,
+     * but can still make decisions continuously based on what it last saw.
+     * 
+     * @param gameState - Current game state from the game engine
+     */
     updateAIView(gameState: any): void {
         const now = Date.now();
         
-        // Safety check
+        // Safety check - ensure game state is valid
         if (!gameState || gameState.ballPosX === undefined || gameState.ballPosY === undefined) {
             return;
         }
         
-        // Update paddle position every frame (it changes every frame)
+        // Update paddle position every frame (it changes every frame as we move)
         this.currentPaddlePos = gameState.paddlePos ?? this.center;
         
-        // Only update VIEW (ball position/velocity) once per second (as required)
+        // CRITICAL: Only update VIEW (ball position/velocity) once per second (as required)
+        // This enforces the "once per second" constraint from the subject requirements
         if (now - this.lastUpdateTime >= this.settings.updateInterval) {
+            // Capture a snapshot of the game state
             this.lastView = {
                 ballPosX: gameState.ballPosX,
                 ballPosY: gameState.ballPosY,
-                ballVelX: gameState.ballVelX || 0,
-                ballVelY: gameState.ballVelY || 0,
+                ballVelX: gameState.ballVelX || 0,  // Velocity in pixels/second
+                ballVelY: gameState.ballVelY || 0,  // Velocity in pixels/second
                 paddlePos: this.currentPaddlePos,
-                lastUpdate: now
+                lastUpdate: now  // Store timestamp for time calculations
             };
             this.lastUpdateTime = now;
         }
         
-        // Make decision every frame (using last view and extrapolating forward)
+        // Make decision every frame (using last view and extrapolating forward in time)
+        // This allows smooth movement even though view only updates once per second
         this.decideMovement();
     }
 
-    // Returns current key states
+    /**
+     * Get Key States
+     * 
+     * Returns the AI's "keyboard input" - boolean flags for up/down keys.
+     * The game engine calls this every frame and treats it exactly like human keyboard input.
+     * 
+     * This is the KEY to simulating human behavior - the AI doesn't directly control the paddle,
+     * it sets boolean flags that represent key presses, just like a human would.
+     * 
+     * @returns Object with up/down boolean flags
+     */
     getKeyStates(): { up: boolean; down: boolean } {
         return this.currentKeys;
     }
 
+    /**
+     * Decide Movement
+     * 
+     * Main decision-making function. Called every frame to determine which keys to press.
+     * Uses the last view (updated once per second) and extrapolates forward in time.
+     * 
+     * Algorithm:
+     * 1. Calculate how much time has passed since last view
+     * 2. Determine if ball is coming towards this paddle
+     * 3. If coming: predict where ball will be when it reaches paddle
+     * 4. If going away: return to center position
+     * 5. Move paddle towards the target
+     */
     private decideMovement(): void {
+        // If no view exists yet (game just started), return to center
         if (!this.lastView) {
-            // No view yet - return to center
             this.moveTowardsTarget(this.center);
             return;
         }
 
         // Calculate time elapsed since last view update (in seconds)
+        // This is used to extrapolate the ball's current position
         const timeSinceViewUpdate = (Date.now() - this.lastView.lastUpdate) / 1000;
 
         // Get ball position and velocity from last view
+        // Note: This data is from up to 1 second ago, so we need to extrapolate
         const ballX = this.lastView.ballPosX;
         const ballY = this.lastView.ballPosY;
         const ballVelX = this.lastView.ballVelX;  // pixels/second
         const ballVelY = this.lastView.ballVelY;  // pixels/second
 
         // Determine which axis this paddle moves on
+        // Vertical paddles (left/right) move along Y axis
+        // Horizontal paddles (top/bottom) move along X axis
         const isVerticalPaddle = this.side === 'left' || this.side === 'right';
         
-        // Get the relevant ball position and velocity for this paddle's axis
+        // Extract relevant position and velocity for this paddle's movement axis
+        // "On axis" = position/velocity along the axis the paddle moves on (Y for vertical, X for horizontal)
+        // "Towards paddle" = position/velocity along the axis towards the paddle (X for left/right, Y for top/bottom)
         const ballPosOnAxis = isVerticalPaddle ? ballY : ballX;
         const ballVelOnAxis = isVerticalPaddle ? ballVelY : ballVelX;
         const ballPosTowardsPaddle = isVerticalPaddle ? ballX : ballY;
         const ballVelTowardsPaddle = isVerticalPaddle ? ballVelX : ballVelY;
 
         // Determine if ball is coming towards this paddle
+        // Check velocity direction and ensure ball hasn't already passed the paddle
         let isComingTowards = false;
         if (this.side === 'left') {
+            // Left paddle: ball coming if moving left (negative X velocity) and hasn't passed paddle
             isComingTowards = ballVelX < 0 && ballPosTowardsPaddle > this.values.paddleWidth;
         } else if (this.side === 'right') {
+            // Right paddle: ball coming if moving right (positive X velocity) and hasn't passed paddle
             isComingTowards = ballVelX > 0 && ballPosTowardsPaddle < (this.values.maxX - this.values.paddleWidth);
         } else if (this.side === 'top') {
+            // Top paddle: ball coming if moving up (negative Y velocity) and hasn't passed paddle
             isComingTowards = ballVelY < 0 && ballPosTowardsPaddle > this.values.paddleWidth;
         } else if (this.side === 'bottom') {
+            // Bottom paddle: ball coming if moving down (positive Y velocity) and hasn't passed paddle
             isComingTowards = ballVelY > 0 && ballPosTowardsPaddle < (this.values.maxY - this.values.paddleWidth);
         }
 
+        // Calculate target position for the paddle
         let target: number;
 
         if (isComingTowards) {
-            // Easy mode: Only react when ball is close to paddle (makes it easier to beat)
+            // Ball is coming towards this paddle - predict where it will be
+            
+            // Easy mode: Only react when ball is close (makes it easier to beat)
             if (this.settings.predictionError >= 100) {
+                // Calculate where the paddle is positioned on the court
                 const paddleCourtPos = this.side === 'left' || this.side === 'top' ?
                     this.values.paddleWidth : 
                     (this.side === 'right' ? this.values.maxX - this.values.paddleWidth : this.values.maxY - this.values.paddleWidth);
+                
+                // Calculate distance from ball to paddle
                 const distanceToPaddle = Math.abs(paddleCourtPos - ballPosTowardsPaddle);
                 
-                // Only start moving when ball is within 100 pixels (slow reaction)
+                // Easy mode: Only start moving when ball is within 100 pixels (slow reaction)
+                // This makes the AI easier to beat by delaying its response
                 if (distanceToPaddle > 100) {
-                    // Ball too far - just return to center slowly
+                    // Ball too far - just return to center slowly (don't react yet)
                     target = this.center;
                 } else {
-                    // Ball is close - predict where it will be (but with errors)
+                    // Ball is close - predict where it will be (but with large errors)
                     target = this.predictBallPosition(
                         ballPosOnAxis,
                         ballVelOnAxis,
@@ -177,7 +301,7 @@ export class AIPongPlayer {
                     );
                 }
             } else if (this.settings.predictionError >= 80) {
-                // Medium easy mode (if we add more levels later)
+                // Medium easy mode (for potential future difficulty levels)
                 const paddleCourtPos = this.side === 'left' || this.side === 'top' ?
                     this.values.paddleWidth : 
                     (this.side === 'right' ? this.values.maxX - this.values.paddleWidth : this.values.maxY - this.values.paddleWidth);
@@ -195,7 +319,7 @@ export class AIPongPlayer {
                     );
                 }
             } else {
-                // Normal/Hard mode: Always predict
+                // Normal/Hard mode: Always predict (no delayed reaction)
                 target = this.predictBallPosition(
                     ballPosOnAxis,
                     ballVelOnAxis,
@@ -205,14 +329,36 @@ export class AIPongPlayer {
                 );
             }
         } else {
-            // Ball moving away - return to center
+            // Ball moving away from this paddle - return to center position
+            // This is a defensive strategy: be ready in the center for the next approach
             target = this.center;
         }
 
-        // Move towards target
+        // Move the paddle towards the calculated target position
         this.moveTowardsTarget(target);
     }
 
+    /**
+     * Predict Ball Position
+     * 
+     * Core prediction algorithm using physics equations (NOT A* pathfinding).
+     * 
+     * Algorithm:
+     * 1. Extrapolate ball's CURRENT position (since last view was timeSinceUpdate seconds ago)
+     * 2. Calculate time until ball reaches paddle
+     * 3. Predict where ball will be on paddle's axis after that time
+     * 4. Handle wall bounces during travel
+     * 5. Add difficulty-based random error
+     * 
+     * Uses physics: position = position + (velocity × time)
+     * 
+     * @param ballPosOnAxis - Ball position along paddle's movement axis (from last view)
+     * @param ballVelOnAxis - Ball velocity along paddle's movement axis
+     * @param ballPosTowardsPaddle - Ball position along axis towards paddle
+     * @param ballVelTowardsPaddle - Ball velocity along axis towards paddle
+     * @param timeSinceUpdate - Time elapsed since last view (seconds)
+     * @returns Predicted position where ball will be when it reaches paddle
+     */
     private predictBallPosition(
         ballPosOnAxis: number,
         ballVelOnAxis: number,
@@ -220,21 +366,24 @@ export class AIPongPlayer {
         ballVelTowardsPaddle: number,
         timeSinceUpdate: number
     ): number {
-        // First, extrapolate ball's CURRENT position (since last view was timeSinceUpdate seconds ago)
-        // The ball has moved since the last view update
+        // STEP 1: Extrapolate ball's CURRENT position
+        // The last view was timeSinceUpdate seconds ago, so the ball has moved since then
+        // Formula: currentPosition = lastPosition + (velocity × timeElapsed)
         let currentBallPosOnAxis = ballPosOnAxis + (ballVelOnAxis * timeSinceUpdate);
         let currentBallPosTowardsPaddle = ballPosTowardsPaddle + (ballVelTowardsPaddle * timeSinceUpdate);
 
         // Handle bounces that may have occurred since last view
+        // If the ball bounced off a wall, we need to account for that
         currentBallPosOnAxis = this.calculateBounces(currentBallPosOnAxis, ballVelOnAxis, timeSinceUpdate);
         
-        // Calculate where the paddle is on the court
+        // STEP 2: Calculate where the paddle is positioned on the court
         const paddleCourtPos = this.side === 'left' || this.side === 'top' ?
             this.values.paddleWidth : 
             (this.side === 'right' ? this.values.maxX - this.values.paddleWidth : this.values.maxY - this.values.paddleWidth);
 
-        // Calculate time until ball reaches paddle (in seconds) from CURRENT position
-        // Avoid division by zero
+        // STEP 3: Calculate time until ball reaches paddle
+        // Formula: time = distance / velocity
+        // Avoid division by zero if ball is moving very slowly
         if (Math.abs(ballVelTowardsPaddle) < 0.1) {
             // Ball moving very slowly or stopped - just track current position
             return this.clampTarget(currentBallPosOnAxis);
@@ -243,45 +392,74 @@ export class AIPongPlayer {
         const distanceToPaddle = Math.abs(paddleCourtPos - currentBallPosTowardsPaddle);
         const timeToReach = distanceToPaddle / Math.abs(ballVelTowardsPaddle);
 
-        // Predict where ball will be on our axis after timeToReach seconds from CURRENT position
+        // STEP 4: Predict where ball will be on our axis after timeToReach seconds
+        // Formula: predictedPosition = currentPosition + (velocity × timeToReach)
         let predictedPos = currentBallPosOnAxis + (ballVelOnAxis * timeToReach);
 
-        // Handle wall bounces during timeToReach
+        // STEP 5: Handle wall bounces during timeToReach
+        // The ball might bounce off walls while traveling to the paddle
         predictedPos = this.calculateBounces(predictedPos, ballVelOnAxis, timeToReach);
 
-        // Add difficulty-based error
+        // STEP 6: Add difficulty-based error to make AI less perfect
+        // This simulates human inaccuracy and makes the game more fair
         if (this.settings.predictionError > 0) {
+            // Add random error: ±(predictionError/2) pixels
             const error = (Math.random() - 0.5) * this.settings.predictionError;
             predictedPos += error;
             
             // Easy mode: Add even more randomness - sometimes just guess randomly
+            // This makes easy mode much easier to beat
             if (this.settings.predictionError >= 100 && Math.random() < 0.22) {
-                // 22% chance to just use a random position instead of prediction
+                // 22% chance to completely ignore prediction and use random position
                 predictedPos = Math.random() * this.max;
             }
         }
 
+        // Clamp to valid range and return
         return this.clampTarget(predictedPos);
     }
 
+    /**
+     * Calculate Bounces
+     * 
+     * Handles wall bounces using geometric reflection (NOT A* pathfinding).
+     * 
+     * When the ball hits a wall, it bounces (reflects). This function simulates that
+     * by reflecting the predicted position if it goes out of bounds.
+     * 
+     * Algorithm:
+     * - If position < 0: bounced off top/left wall → reflect: pos = -pos
+     * - If position > max: bounced off bottom/right wall → reflect: pos = 2×max - pos
+     * - Handles multiple bounces iteratively
+     * 
+     * This is a physics-based calculation, not pathfinding.
+     * 
+     * @param predictedPos - Predicted position (may be out of bounds)
+     * @param velocity - Ball velocity (used for safety checks)
+     * @param totalTime - Total time being simulated
+     * @returns Position after accounting for all bounces
+     */
     private calculateBounces(predictedPos: number, velocity: number, totalTime: number): number {
-        // Simple bounce calculation using reflection
-        // If predicted position is out of bounds, reflect it
+        // Start with the predicted position
         let pos = predictedPos;
         
-        // Handle bounces by reflecting the position
+        // Handle bounces by reflecting the position when it goes out of bounds
+        // This loop handles multiple bounces (ball can bounce several times)
         while (pos < 0 || pos > this.max) {
             if (pos < 0) {
-                // Bounce off top/left wall
+                // Bounce off top/left wall: reflect the position
+                // Example: if pos = -10, after bounce pos = 10
                 pos = -pos;
             } else if (pos > this.max) {
-                // Bounce off bottom/right wall
+                // Bounce off bottom/right wall: reflect the position
+                // Example: if max = 400 and pos = 450, after bounce pos = 2×400 - 450 = 350
                 pos = 2 * this.max - pos;
             }
             
             // Safety check to prevent infinite loops
+            // If position is way out of bounds, something went wrong
             if (pos < -this.max * 2 || pos > this.max * 3) {
-                // Something went wrong, clamp to bounds
+                // Clamp to valid bounds and break
                 pos = Math.max(0, Math.min(this.max, pos));
                 break;
             }
@@ -290,35 +468,62 @@ export class AIPongPlayer {
         return pos;
     }
 
+    /**
+     * Clamp Target
+     * 
+     * Ensures the target position is within valid bounds and centers the paddle on the target.
+     * 
+     * @param target - Target ball position
+     * @returns Valid paddle position (centered on target, clamped to bounds)
+     */
     private clampTarget(target: number): number {
-        // Clamp to valid paddle range and center paddle on target
+        // Center the paddle on the target position
+        // We want the center of the paddle to align with the ball, not the top edge
         const centeredTarget = target - (this.values.paddleHeight / 2);
+        
+        // Clamp to valid paddle range (0 to maxPaddle)
         return Math.max(0, Math.min(this.maxPaddle, centeredTarget));
     }
 
+    /**
+     * Move Towards Target
+     * 
+     * Sets keyboard input (up/down keys) to move paddle towards target position.
+     * This is where the AI simulates human keyboard input.
+     * 
+     * Uses a "deadzone" - if paddle is close enough to target, stop moving.
+     * This prevents jittery movement and makes the AI feel more human-like.
+     * 
+     * @param target - Target paddle position to move towards
+     */
     private moveTowardsTarget(target: number): void {
-        // Use current paddle position (updated every frame)
+        // Get current paddle position (updated every frame)
         const paddle = this.currentPaddlePos;
 
         // Calculate deadzone based on difficulty
+        // Deadzone = how close is "close enough" before stopping movement
+        // Larger deadzone = less precise, smaller = more precise
         let deadzone: number;
         if (this.settings.predictionError >= 100) {
             // Easy mode: Large deadzone (50px) - AI is imprecise and lazy
+            // Stops moving when within 50px of target
             deadzone = 50;
         } else if (this.settings.predictionError >= 80) {
             // Medium easy mode: Moderate deadzone
             deadzone = 35;
         } else if (this.settings.predictionError > 0) {
-            // Normal mode: Moderate deadzone
+            // Normal mode: Deadzone proportional to prediction error
             deadzone = Math.max(5, this.settings.predictionError / 4);
         } else {
-            // Hard mode: Small deadzone for precision
+            // Hard mode: Small deadzone (2px) for precision
+            // Very precise movement, stops only when very close
             deadzone = 2;
         }
 
         const distance = Math.abs(paddle - target);
 
-        // Easy mode: Sometimes don't move at all (15% chance) to make it easier
+        // Easy mode: Sometimes don't move at all (15% chance)
+        // This simulates "lazy" behavior and makes the AI easier to beat
         if (this.settings.predictionError >= 100 && Math.random() < 0.15) {
             this.currentKeys.up = false;
             this.currentKeys.down = false;
@@ -332,11 +537,16 @@ export class AIPongPlayer {
             return;
         }
 
+        // Set keyboard input based on target position
         if (distance > deadzone) {
+            // Target is far enough away - move towards it
+            // If target is above paddle, press UP (move up)
+            // If target is below paddle, press DOWN (move down)
             this.currentKeys.up = target < paddle;
             this.currentKeys.down = target > paddle;
         } else {
-            // Close enough - stop moving
+            // Close enough to target - stop moving
+            // This prevents jittery movement when already at target
             this.currentKeys.up = false;
             this.currentKeys.down = false;
         }
