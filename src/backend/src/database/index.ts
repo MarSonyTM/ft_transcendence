@@ -204,7 +204,7 @@ class UserDatabaseManager {
         // SQLite binding compatibility: convert undefined -> null, booleans -> 1/0
         const email = userData.email ?? null;
         const username = userData.username ?? null;
-        const avatar = userData.avatar ?? 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg';
+        const avatar = userData.avatar ?? '/seahorse.jpg';
         const googleId = userData.googleId ?? null;
         const gamesWon = userData.gamesWon ?? 0;
         const gamesLost = userData.gamesLost ?? 0;
@@ -287,7 +287,7 @@ class UserDatabaseManager {
         
         if (userData.avatar !== undefined) {
             fields.push('avatar = ?');
-            values.push(userData.avatar || 'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg');
+            values.push(userData.avatar || '/seahorse.jpg');
         }
 
         if (userData.twoFactorEnabled !== undefined) {
@@ -1919,7 +1919,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 1,                // emailVerified (true)
                 0,                // gamesWon
                 0,                 // gamesLost
-                'https://raw.githubusercontent.com/Schmitzi/webserv/refs/heads/main/local/images/seahorse.jpg'            );
+                '/seahorse.jpg');
 
             console.log(`Seed user created with ID: ${result.lastInsertRowid}`);
         } catch (error) {
