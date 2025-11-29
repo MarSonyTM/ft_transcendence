@@ -51,6 +51,20 @@ export async function createUserNav(): Promise<string> {
                     backdrop-filter: blur(10px);
                     box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1);
                 ">
+                    <button id="navHomeBtn" class="user-menu-item" style="
+                        width: 100%;
+                        text-align: left;
+                        padding: 0.8em 1.2em;
+                        background: transparent;
+                        border: none;
+                        color: #00ffff;
+                        cursor: pointer;
+                        font-size: 0.95em;
+                        transition: background 0.2s ease;
+                        border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+                    ">
+                        🏠 Home
+                    </button>
                     <button id="navProfileBtn" class="user-menu-item" style="
                         width: 100%;
                         text-align: left;
@@ -134,6 +148,7 @@ export async function createUserNav(): Promise<string> {
 export function attachUserNavListeners(): void {
     const menuBtn = document.getElementById('userMenuBtn');
     const dropdown = document.getElementById('userMenuDropdown');
+    const homeBtn = document.getElementById('navHomeBtn');
     const profileBtn = document.getElementById('navProfileBtn');
     const editProfileBtn = document.getElementById('navEditProfileBtn');
     const leaderboardBtn = document.getElementById('navLeaderboardBtn');
@@ -155,6 +170,16 @@ export function attachUserNavListeners(): void {
             dropdown.classList.remove('show');
         }
     });
+
+    // Home button
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+            dropdown.classList.remove('show');
+            history.pushState({ page: 'landing' }, '', '/landing');
+            setCurrentPage('landing');
+            renderApp();
+        });
+    }
 
     // Profile button
     if (profileBtn) {

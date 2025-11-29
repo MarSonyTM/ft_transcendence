@@ -35,7 +35,7 @@ export class TournamentWebSocketManager {
         return new Promise((resolve, reject) => {
             try {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsHost = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
+                const wsHost = window.location.host;
                 const wsUrl = `${wsProtocol}//${wsHost}/api/tournament/${this.tconfig.tournamentId}/ws?playerId=${this.tconfig.playerId}`;
                 console.log('Connecting to tournament WebSocket:', wsUrl);
                 this.opt.ws = new WebSocket(wsUrl);
