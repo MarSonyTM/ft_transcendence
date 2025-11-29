@@ -123,7 +123,6 @@ export class AuthService {
         } else if (response.status === 403) {
           this.neededEmailVerification = true;
           const data1 = await response.json();
-          console.log('Redirecting to verify email:', data1.redirectUrl);
           window.location.href = data1.redirectUrl;
         }
         throw new Error("Failed to fetch user profile");

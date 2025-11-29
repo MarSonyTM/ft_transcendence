@@ -579,7 +579,6 @@ async function userRoutes(
         { expiresIn: "1w" } // Token expiration (1 week)
       );
 
-      // ✅ Set cookie - try both approaches
       reply.setCookie('token', token, {
         httpOnly: true,
         secure: true,
@@ -589,8 +588,6 @@ async function userRoutes(
         maxAge: 604800,
       });
 
-      // ✅ Debug: Log response headers before sending
-      console.log("🍪 Setting cookie for:", res.username);
       reply.code(201).send({
         success: true,
         message: "User logged in successfully",
@@ -624,8 +621,7 @@ async function userRoutes(
       reply.clearCookie("token", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "none",
-        partitioned: true,
+        sameSite: "lax",
         path: "/",
       });
 
