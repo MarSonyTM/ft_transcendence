@@ -5,7 +5,6 @@ import { activeGames } from './game';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { AIDifficulty } from '../game/aiPlayer';
-import { AIDifficulty } from '../game/aiPlayer';
 import { registerTournamentGame } from '../websocket/websocketHandler';
 import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 import { sanitizeString, sanitizeAlias, sanitizeId } from '../utils/sanitization';
