@@ -38,10 +38,7 @@ export async function render2PlayerGame(pong?: PongGame): Promise<void> {
     await presenceService.setInGame();
     
     root.innerHTML = `
-        <!-- Fixed Debug Panel - Top Left -->
-        
-
-        <div class="neon-grid" style="padding: 0; ">
+        <div class="neon-grid" style="padding-top: 0;">
             <div class="grid-anim"></div>
             <div class="glass-card" style="max-width: 1200px; width: 100%;">
 

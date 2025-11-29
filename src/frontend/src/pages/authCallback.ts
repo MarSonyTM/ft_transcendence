@@ -86,7 +86,6 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
                 });
                 
                 if (response.ok) {
-                    console.log('✅ Token cookie set by backend');
                     // Now fetch user profile with the cookie set
                     const userProfile = await authService.fetchUserProfile();
                     

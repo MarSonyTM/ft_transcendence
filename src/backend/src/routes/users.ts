@@ -27,7 +27,7 @@ export interface CreateUserInput {
 const userIdSchema = {
     type: 'object',
     properties: {
-        id: { type: 'string', pattern: '^[0-9]+$' } // Ensure id is numeric string
+        id: { type: 'string', pattern: '^[0-9]+$' } 
     },
     required: ['id']
 };
@@ -35,7 +35,7 @@ const userIdSchema = {
 const usernameSchema = {
     type: 'object',
     properties: {
-        username: { type: 'string', minLength: 3, maxLength: 50 } // Basic length check
+        username: { type: 'string', minLength: 3, maxLength: 50 } 
     },
     required: ['username']
 };
@@ -45,9 +45,9 @@ const updateUserSchema = {
     properties: {
         firstName: { type: 'string', minLength: 1, maxLength: 100 },
         lastName: { type: 'string', minLength: 1, maxLength: 100 },
-        email: { type: 'string', format: 'email' }, // Use email format validation
+        email: { type: 'string', format: 'email' },
         username: { type: 'string', minLength: 3, maxLength: 50 },
-        avatar: { type: 'string', maxLength: 500 }, // Limit length to prevent oversized inputs
+        avatar: { type: 'string', maxLength: 500 },
         twoFactorEnabled: { type: 'boolean' }
     },
     additionalProperties: false // Prevent extra fields
@@ -64,7 +64,7 @@ const emailChangeSchema = {
 const verifyEmailSchema = {
     type: 'object',
     properties: {
-        verificationCode: { type: 'string', pattern: '^[0-9]{6}$' } // Exactly 6 digits
+        verificationCode: { type: 'string', pattern: '^[0-9]{6}$' } 
     },
     required: ['verificationCode']
 };
@@ -201,10 +201,10 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
             
             const updateData = request.body as Partial<CreateUserInput>;
-            // Sanitize strings: trim and basic escape (adjust as needed)
+    
             if (updateData.firstName) updateData.firstName = updateData.firstName.trim();
             if (updateData.lastName) updateData.lastName = updateData.lastName.trim();
-            if (updateData.username) updateData.username = updateData.username.trim().toLowerCase(); // Example normalization
+            if (updateData.username) updateData.username = updateData.username.trim().toLowerCase();
             if (updateData.email) updateData.email = updateData.email.trim().toLowerCase();
             
             const updatedUser = database.users.updateUser(userId, updateData);
@@ -317,7 +317,6 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             const userId = (request as any).user.id;
             const updateData = request.body as Partial<CreateUserInput>;
 
-            // ✅ SANITIZE ALL INPUTS (XSS Protection)
             if (updateData.firstName) updateData.firstName = sanitizeName(updateData.firstName);
             if (updateData.lastName) updateData.lastName = sanitizeName(updateData.lastName);
             if (updateData.username) {
@@ -346,7 +345,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
 
             console.log('Update data received:', updateData);
             
-            const updatedUser = await database.users.updateUser(userId, updateData);
+            const updatedUser = database.users.updateUser(userId, updateData);
             
             if (!updatedUser) {
                 reply.code(404).send({
@@ -583,7 +582,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             }
 
             // Get current user
-            const currentUser = await database.users.getUserById(userId);
+            const currentUser = database.users.getUserById(userId);
             if (!currentUser) {
                 reply.code(404).send({
                     success: false,
@@ -600,7 +599,7 @@ async function userRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             );
 
             // Update username directly (since we've verified it's available)
-            const updatedUser = await database.users.updateUser(userId, {
+            const updatedUser = database.users.updateUser(userId, {
                 username: sanitizedUsername
             });
 

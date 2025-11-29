@@ -1,8 +1,3 @@
-/**
- * Comprehensive JSON Schema validation for ft_transcendence
- * Implements subject requirement IV.4: Form Validation
- */
-
 // ===== USER SCHEMAS =====
 
 export const userIdSchema = {

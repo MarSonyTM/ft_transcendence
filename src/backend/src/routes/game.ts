@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { database, Game, Player } from '../database/index';
-import { createGameEngine } from '../game/gameEngine';
+import { database } from '../database/index';
 import type { BaseGameEngine } from '../game/gameEngine';
 import { JWT_SECRET } from '../config/index';
 import jwt from 'jsonwebtoken';
@@ -26,10 +25,8 @@ function getUserIdFromRequest(request: any): number | null {
     }
 }
 
-// Store active game engines (MUST be exported for room.ts)
 export const activeGames = new Map<number, BaseGameEngine>();
 
-// Plugin function that registers all game routes
 async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
     
     // Get all games
@@ -40,7 +37,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
             return {
                 success: true,
                 count: games.length,
-                data: games  // ✅ Use games as-is, don't overwrite players field
+                data: games 
             };
         } catch (error) {
             fastify.log.error(error);
@@ -254,7 +251,7 @@ async function gameRoutes(fastify: FastifyInstance, options: FastifyPluginOption
     fastify.post('/new', async (request, reply) => {
         try {
             const gameData = request.body as CreateGameInput;
-            console.warn("!!!!!!!!!!HERE")
+            
             // Get authenticated user ID from JWT token
             const userId = getUserIdFromRequest(request);
             

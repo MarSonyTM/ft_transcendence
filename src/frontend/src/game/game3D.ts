@@ -405,9 +405,6 @@ export class baby3D {
                 this.ballVelY = 0;
             }
 
-            // Client-side prediction: Continuously move ball by velocity each frame
-            // This maintains constant speed (proper Pong physics)
-            // deltaTime is normalized (1.0 = 16.67ms at 60fps), so multiply velocity by deltaTime
             this.predictedBallX += this.ballVelX * deltaTime;
             this.predictedBallY += this.ballVelY * deltaTime;
 

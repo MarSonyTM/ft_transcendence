@@ -56,7 +56,7 @@ export async function renderChangeEmailPage(): Promise<void> {
         return;
     }
 
-    let verificationStep = 'email'; // 'email' or 'verification'
+    let verificationStep = 'email';
     let pendingEmail = '';
 
     const renderEmailStep = async () => {
