@@ -180,8 +180,8 @@ export async function renderVerifyEmailPage(): Promise<void> {
                 
                 // Redirect to landing page after successful verification
                 setTimeout(() => {
-                    history.pushState({ page: 'landing' }, '', '/');
-                    setCurrentPage('landing');
+                    history.pushState({ page: 'login' }, '', '/login');
+                    setCurrentPage('login');
                     renderApp();
                 }, 1500);
             } else {

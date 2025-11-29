@@ -7,7 +7,6 @@ import { BaseGameEngine } from '../game/gameEngine';
 import { registerTournamentGame } from '../websocket/websocketHandler';
 import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 import { sanitizeString, sanitizeAlias, sanitizeId } from '../utils/sanitization';
-import { tournamentIdSchema } from '../utils/validationSchemas';
 
 // Validation schemas for tournament routes
 const resetTournamentBodySchema = {
@@ -504,6 +503,23 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			return reply.status(500).send({ success: false, message: 'Failed to list archives' });
 		}
 	});
+
+	// fastify.post('/api/tournament/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {//TODO archive
+	// 	try {
+	// 		const { tournamentId } = request.params as { tournamentId: string };
+	// 		const tId = +(tournamentId);
+	// 		if (isNaN(tId) || tId <= 0)
+	// 			return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
+
+	// 		if (!tournamentManager.archiveTournament(tId))
+	// 			return reply.status(400).send({ success: false, message: 'Archive not updated' });
+
+	// 		return reply.send({ success: true });
+	// 	} catch (error) {
+	// 		fastify.log.error(error);
+	// 		return reply.status(500).send({ success: false, message: 'Failed to update archive' });
+	// 	}
+	// });
 
 	// -------------------------------------- MATCHES -------------------------------------- //
 	// Get current match (next in queue) for a tournament

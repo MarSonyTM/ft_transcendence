@@ -425,7 +425,7 @@ class TournamentManager {
 	async endTournament(tournamentId: number): Promise<boolean> {
 		try {
 			this.computeChampionIfPossible(tournamentId);
-			const t = db.updateTournament(tournamentId, {
+			const t = db.updateTournament(tournamentId, {//TODO check if is archived?
 				status: 'archived',
 				endedAt: new Date().toISOString()
 			});
