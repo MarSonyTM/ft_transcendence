@@ -416,7 +416,7 @@ class TournamentManager {
 	async endTournament(tournamentId: number): Promise<boolean> {
 		try {
 			this.computeChampionIfPossible(tournamentId);
-			const t = db.updateTournament(tournamentId, {//TODO check if is archived?
+			const t = db.updateTournament(tournamentId, {
 				status: 'archived',
 				endedAt: new Date().toISOString()
 			});
@@ -469,9 +469,7 @@ class TournamentManager {
 						while (t.curM && t.curM.status === 'completed')
 							t.curM = t.matchQueue.shift() || null;
 					}
-				} //else
-					// return null;
-					// throw new Error('insertPlayersIntoNextRound failed');
+				} 
 			}
 			if (t && t.curM && t.curM.id) {
 				if (this.allPlayersReadyForMatch(t.curM.id) && t.curM.status !== 'completed')

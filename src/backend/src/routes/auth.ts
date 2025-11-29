@@ -54,9 +54,7 @@ function validateEmail(email: string): boolean {
 }
 
 async function userRoutes(
-  fastify: FastifyInstance,
-  options: FastifyPluginOptions
-) {
+  fastify: FastifyInstance) {
   fastify.post("/create", async (request, reply) => {
     try {
       const userData = request.body as CreateUserInput;
@@ -176,11 +174,9 @@ async function userRoutes(
       if (email) {
         user = await database.users.getUserByEmail(email);
       } else {
-        // Try to find user by looking up the verification record first
-        const verification =
-          database.emailVerifications.getVerificationByCode(verificationCode);
+        const verification = database.emailVerifications.getVerificationByCode(verificationCode);
         if (verification) {
-          user = await database.users.getUserById(verification.userId);
+          user = database.users.getUserById(verification.userId);
         }
       }
 

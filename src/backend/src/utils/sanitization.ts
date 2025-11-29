@@ -1,16 +1,5 @@
 import validator from 'validator';
 
-/**
- * Security utility module for input sanitization and XSS protection
- * Implements ft_transcendence subject requirement IV.4: XSS Protection
- */
-
-/**
- * Sanitize string input to prevent XSS attacks
- * - Trims whitespace
- * - Escapes HTML entities
- * - Removes potentially dangerous characters
- */
 export function sanitizeString(input: string | undefined | null): string {
     if (!input) return '';
     
@@ -23,12 +12,6 @@ export function sanitizeString(input: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Sanitize username input
- * - Allows alphanumeric, underscores, hyphens
- * - Length: 3-50 characters
- * - Converts to lowercase
- */
 export function sanitizeUsername(username: string | undefined | null): string {
     if (!username) return '';
     
@@ -43,12 +26,6 @@ export function sanitizeUsername(username: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Sanitize email input
- * - Normalizes email format
- * - Converts to lowercase
- * - Validates format
- */
 export function sanitizeEmail(email: string | undefined | null): string {
     if (!email) return '';
     
@@ -62,12 +39,6 @@ export function sanitizeEmail(email: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Sanitize name fields (firstName, lastName)
- * - Allows letters, spaces, hyphens, apostrophes
- * - Length: 1-100 characters
- * - Capitalizes first letter
- */
 export function sanitizeName(name: string | undefined | null): string {
     if (!name) return '';
     
@@ -87,11 +58,6 @@ export function sanitizeName(name: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Sanitize tournament alias
- * - Similar to username but allows more characters
- * - Length: 1-50 characters
- */
 export function sanitizeAlias(alias: string | undefined | null): string {
     if (!alias) return '';
     
@@ -109,11 +75,6 @@ export function sanitizeAlias(alias: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Sanitize URL/avatar path
- * - Validates URL format
- * - Ensures safe protocols (http, https, data)
- */
 export function sanitizeUrl(url: string | undefined | null): string {
     if (!url) return '';
     
@@ -137,10 +98,6 @@ export function sanitizeUrl(url: string | undefined | null): string {
     return sanitized;
 }
 
-/**
- * Validate and sanitize numeric ID
- * - Ensures it's a positive integer
- */
 export function sanitizeId(id: string | number | undefined | null): number {
     if (id === undefined || id === null) return 0;
     
@@ -153,19 +110,11 @@ export function sanitizeId(id: string | number | undefined | null): number {
     return numId;
 }
 
-/**
- * Validate email format
- */
 export function validateEmail(email: string): boolean {
     if (!email) return false;
     return validator.isEmail(email);
 }
 
-/**
- * Validate username format
- * - Length: 3-50 characters
- * - Alphanumeric, underscores, hyphens only
- */
 export function validateUsername(username: string): boolean {
     if (!username) return false;
     
@@ -173,11 +122,6 @@ export function validateUsername(username: string): boolean {
     return usernameRegex.test(username);
 }
 
-/**
- * Validate password strength
- * - Minimum 8 characters
- * - At least one letter and one number
- */
 export function validatePassword(password: string): boolean {
     if (!password || password.length < 8) return false;
     
@@ -188,10 +132,6 @@ export function validatePassword(password: string): boolean {
     return hasLetter && hasNumber;
 }
 
-/**
- * Sanitize object with multiple fields
- * Applies appropriate sanitization based on field name
- */
 export function sanitizeUserInput(data: any): any {
     const sanitized: any = {};
     

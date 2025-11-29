@@ -236,9 +236,7 @@ async function initRoomBasedGame(room: any): Promise<void> {
 
 // Setup keyboard controls for room-based game
 function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void {
-    // Clean up any existing handlers first!
     if (keyboardCleanup) {
-        console.log('🧹 Cleaning up old keyboard handlers');
         keyboardCleanup();
     }
 
@@ -246,9 +244,7 @@ function setupKeyboardControls(ws: RoomWebSocketManager, playerId: string): void
     const hasLocal = pongGame && pongGame.hasLocal;
     const gameMode = getCurrentGameMode();
     
-    // DEBUG: Check what's in the room
     const room = getCurrentRoom();
-    const user = authService.getCurrentUser();
     
     // Verify this player is in the room
     if (room) {

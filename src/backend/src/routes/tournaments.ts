@@ -8,7 +8,6 @@ import { AIDifficulty } from '../game/aiPlayer';
 import { registerTournamentGame } from '../websocket/websocketHandler';
 import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 import { sanitizeString, sanitizeAlias, sanitizeId } from '../utils/sanitization';
-import { tournamentIdSchema } from '../utils/validationSchemas';
 
 // Validation schemas for tournament routes
 const createTournamentBodySchema = {
@@ -170,7 +169,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { name, id, ok } = request.body as { name: string, id: string, ok: string };
 			
-			// ✅ SANITIZE ALL INPUTS (XSS Protection)
 			const sanitizedName = sanitizeAlias(name);
 			const sanitizedId = sanitizeId(id);
 			
@@ -197,7 +195,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
 			
-			// ✅ SANITIZE AND VALIDATE ID
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -222,7 +219,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {	
 			const { tournamentId } = request.params as { tournamentId: string };
 			
-			// ✅ SANITIZE AND VALIDATE ID
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -256,7 +252,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const { playerId } = request.body as { playerId: string };
 			let pId = +playerId;
 			
-			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
 			pId = sanitizeId(playerId);
 			
@@ -287,7 +282,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
 			
-			// ✅ SANITIZE AND VALIDATE ID
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -314,7 +308,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
 			
-			// ✅ SANITIZE AND VALIDATE ID
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -337,7 +330,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
 			
-			// ✅ SANITIZE AND VALIDATE ID
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -364,7 +356,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const { tournamentId } = request.params as { tournamentId: string };
 			const { name, tpt, id, difficulty } = request.body as { name: string; tpt: TPT, id: string, difficulty?: string };
 			
-			// ✅ SANITIZE ALL INPUTS (XSS Protection)
 			const sanitizedName = sanitizeAlias(name);
 			const sanitizedTpt = sanitizeString(tpt) as TPT;
 			const tId = sanitizeId(tournamentId);
@@ -421,7 +412,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const { tournamentId, matchId, playerId } = request.params as { tournamentId: string; matchId: string; playerId: string };
 			let pId = +playerId;
 			
-			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
 			pId = sanitizeId(playerId);
@@ -463,8 +453,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			
-			// ✅ SANITIZE AND VALIDATE ID
+
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -480,7 +469,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		}
 	});
 
-	// List all archives //TODO
+	// List all archives
 	fastify.get('/api/tournament/archives', async (_request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const archives = tournamentManager.getAllTournaments();
@@ -494,23 +483,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		}
 	});
 
-	// fastify.post('/api/tournament/:tournamentId/archive', async (request: FastifyRequest, reply: FastifyReply) => {//TODO archive
-	// 	try {
-	// 		const { tournamentId } = request.params as { tournamentId: string };
-	// 		const tId = +(tournamentId);
-	// 		if (isNaN(tId) || tId <= 0)
-	// 			return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
-
-	// 		if (!tournamentManager.archiveTournament(tId))
-	// 			return reply.status(400).send({ success: false, message: 'Archive not updated' });
-
-	// 		return reply.send({ success: true });
-	// 	} catch (error) {
-	// 		fastify.log.error(error);
-	// 		return reply.status(500).send({ success: false, message: 'Failed to update archive' });
-	// 	}
-	// });
-
 	// -------------------------------------- MATCHES -------------------------------------- //
 	// Get current match (next in queue) for a tournament
 	fastify.get('/api/tournament/:tournamentId/match/current', {
@@ -520,8 +492,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId } = request.params as { tournamentId: string };
-			
-			// ✅ SANITIZE AND VALIDATE ID
+
 			const tId = sanitizeId(tournamentId);
 			if (tId <= 0)
 				return reply.status(400).send({ success: false, message: 'Invalid tournament id' });
@@ -545,8 +516,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (request: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
-			
-			// ✅ SANITIZE AND VALIDATE IDS
+
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
 			
@@ -578,7 +548,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 		try {
 			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
 			
-			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
 			
@@ -604,8 +573,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 	}, async (req: FastifyRequest, reply: FastifyReply) => {
 		try {
 			const { tournamentId, matchId } = req.params as { tournamentId: string; matchId: string };
-			
-			// ✅ SANITIZE AND VALIDATE IDS
+
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
 			
@@ -734,7 +702,6 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const { tournamentId, matchId } = request.params as { tournamentId: string; matchId: string };
 			const { winnerId } = request.body as { winnerId?: number };
 			
-			// ✅ SANITIZE AND VALIDATE IDS
 			const tId = sanitizeId(tournamentId);
 			const mId = sanitizeId(matchId);
 			
@@ -742,7 +709,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				return reply.status(400).send({ success: false, message: 'Invalid id(s)' });
 			
 			if (winnerId) {
-				// ✅ SANITIZE WINNER ID
+
 				const sanitizedWinnerId = sanitizeId(winnerId);
 				if (sanitizedWinnerId <= 0)
 					return reply.status(400).send({ success: false, message: 'Invalid winner id' });

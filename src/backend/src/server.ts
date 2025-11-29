@@ -34,8 +34,6 @@ const server: FastifyInstance = fastify({
     }
 });
 
-
-
 server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, payload, done) => {
     try {
         const text = (payload || '').toString();
@@ -110,7 +108,6 @@ const start = async (): Promise<void> => {
     });
     console.log('✅ WebSocket support registered');
     
-    // ✅ SECURITY HEADERS (XSS Protection, CSP, etc.)
     server.addHook('onSend', async (request, reply) => {
         // Content Security Policy - Prevents XSS attacks
         reply.header('Content-Security-Policy', 
@@ -138,17 +135,17 @@ const start = async (): Promise<void> => {
         // Permissions-Policy - Restricts browser features
         reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
     });
-    console.log('✅ Security headers configured');
+    console.log('Security headers configured');
     
     // Register WebSocket routes BEFORE authGuard
     await server.register(webSocketRoutes);
     await server.register(roomWebSocketRoutes);
     await server.register(tournamentWebSocketRoutes);
-    console.log('✅ WebSocket routes registered');
+    console.log('WebSocket routes registered');
     
     // NOW add the auth guard (it won't affect already-registered routes)
     server.addHook('onRequest', authGuard);
-    console.log('✅ Authentication middleware registered');
+    console.log('Authentication middleware registered');
     
     // Register all other API routes AFTER authGuard
     await server.register(userRoutes, { prefix: '/api/users' });

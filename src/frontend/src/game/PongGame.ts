@@ -127,7 +127,7 @@ export class PongGame {
 
     public notifyStateListeners(): void {
         for (const l of this.stateListeners) {
-            try { l(this.gameState, this); } catch (e) { /* swallow listener errors */ }
+            try { l(this.gameState, this); } catch (e) { }
         }
     }
 
@@ -150,24 +150,19 @@ export class PongGame {
             
             // If gameId was already set externally (from gamePage), use it
             if (this.gameId) {
-                console.log(`✅ [PONGGAME] Using pre-set game ID: ${this.gameId}`);
             }
             // If there's a room with a gameId, use it
             if (room && room.gameId) {
                 this.gameId = room.gameId;
-                console.log(`✅ [PONGGAME] Using room's shared game ID: ${this.gameId}`);
             }
             // Create a new game if there's NO room AND no gameId set
             else if (!room) {
-                console.log(`🆕 [PONGGAME] No room found - creating standalone game`);
                 await this.createGame();
-                console.log(`✅ [PONGGAME] Created new standalone game ID: ${this.gameId}`);
             }
             // Room exists but no gameId yet - wait for host to start
             else {
-                console.warn(`⏳ [PONGGAME] Room exists but no gameId - game not started yet`);
                 this.updateStatus("Waiting for host to start game...");
-                return; // Don't initialize yet
+                return; 
             }
             
             if (this.gameId) {
@@ -187,7 +182,6 @@ export class PongGame {
     }
 
     private async init3DGame() {
-        console.log('🎨 [PONGGAME] Initializing 3D renderer...');
         
         try {
             // Make sure DOM is ready
@@ -209,15 +203,11 @@ export class PongGame {
             }
             
             // Create the scene
-            console.log('🎨 [PONGGAME] Creating BabylonJS scene...');
             await this.babylonGame.createScene();
-            console.log('✅ [PONGGAME] 3D scene created successfully');
             
         } catch (error) {
             console.error('❌ [PONGGAME] Failed to initialize 3D game:', error);
             console.warn('⚠️ [PONGGAME] Falling back to 2D-only mode');
-            // Don't throw - just continue without 3D
-            // The 2D canvas will still work
         }
     }
 
@@ -256,7 +246,6 @@ export class PongGame {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/game/${this.gameId}/ws`;
             
-            console.log('Connecting to WebSocket:', wsUrl);
             this.websocket = new WebSocket(wsUrl);
             
             this.websocket.onopen = () => {
@@ -304,7 +293,6 @@ export class PongGame {
     handleWebSocketMessage(message: WebSocketMessage): void {
         switch (message.type) {
             case 'connected':
-                console.log('WebSocket connection confirmed');
                 break;
                 
             case 'gameState':
@@ -475,7 +463,7 @@ export class PongGame {
     sendPlayerMove(position: number): void {
         if (getCurrentRoom()) return;
         if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            if (this.playerId === undefined) this.playerId = 1;// TODO: why default to 1? // Default to player 1 if unset
+            if (this.playerId === undefined) this.playerId = 1;
             this.websocket.send(JSON.stringify({
                 type: 'move',
                 playerId: this.playerId,
@@ -558,7 +546,6 @@ export class PongGame {
                 });
                 this.updateStatus("Game paused");
             } catch (error) {
-                // Ignore errors
             }
         }
 
@@ -606,7 +593,6 @@ export class PongGame {
                 });
                 this.updateStatus("Game ended - Click Start for new game");
             } catch (error) {
-                // Ignore errors
             }
             
             this.gameId = undefined;

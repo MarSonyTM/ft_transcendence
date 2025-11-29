@@ -1,4 +1,3 @@
-// src/frontend/src/pages/changeUsernamePage.ts
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';

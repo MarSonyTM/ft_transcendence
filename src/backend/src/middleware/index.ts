@@ -50,9 +50,8 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
         return;
     }
 
-    // Special handling for /api/users/stats: GET is public, POST requires auth
     if (url === '/api/users/stats' && request.method === 'GET') {
-        return; // Allow public GET for leaderboard
+        return;
     }
 
     // Check prefix matches for public route patterns
@@ -72,8 +71,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     if (publicPrefixes.some(prefix => url.startsWith(prefix))) {
         return;
     }
-
-    // All other routes require authentication
+    
     const token = request.cookies.token;
     if (!token) {
         reply.code(401).send({ 

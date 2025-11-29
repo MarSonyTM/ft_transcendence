@@ -1,4 +1,3 @@
-// src/frontend/src/pages/editProfilePage.ts
 import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { authService } from '../utils/auth';
@@ -266,7 +265,6 @@ export async function renderEditProfilePage(): Promise<void> {
                     firstName: formData.get('firstName') as string,
                     lastName: formData.get('lastName') as string,
                     email: formData.get('email') as string || undefined,
-                    // Only update avatar if a new value is provided, otherwise keep existing
                     avatar: avatarValue,
                     twoFactorEnabled: twoFactorCheckbox?.checked || false
                 };

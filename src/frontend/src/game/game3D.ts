@@ -24,13 +24,6 @@ interface PaddleMeshes {
     bottom?: Mesh;
 }
 
-// interface BorderMeshes {
-//     north?: Mesh;
-//     south?: Mesh;
-//     east?: Mesh;
-//     west?: Mesh;
-// }
-
 export class baby3D {
     private engine!: Engine;
     private scene!: Scene;
@@ -38,22 +31,18 @@ export class baby3D {
     private light!: HemisphericLight;
     private table!: GroundMesh;
     private ball!: Mesh;
-    // private borders: BorderMeshes = {};
     private paddles: PaddleMeshes = {};
     private skybox!: AbstractMesh;
     private mode: string;
     private initialized: boolean = false;
     private lastBallX?: number;
     private lastBallY?: number;
-    // private halfX: number;
-    // private halfY: number;
     private hasBallState: boolean = false;
 
     // Interpolation state for smooth movement
-    // Ball: Use velocity-based prediction for constant speed (Pong physics)
-    private serverBallX: number = 200;  // Authoritative position from server
+    private serverBallX: number = 200;
     private serverBallY: number = 200;
-    private predictedBallX: number = 200;  // Client-predicted position (for display)
+    private predictedBallX: number = 200; 
     private predictedBallY: number = 200;
     private ballVelX: number = 0;
     private ballVelY: number = 0;
@@ -78,8 +67,6 @@ export class baby3D {
 
     constructor(private game?: PongGame) {
         this.mode = (game?.gameState.mode === '4P') ? '4P' : '2P';
-        // this.predictedBallX = 200;
-        // this.predictedBallY = this.mode === '4P' ? 200 : 100;
         this.values = {
             min: 0,
             tableX: 400,
@@ -90,8 +77,6 @@ export class baby3D {
             ballDiameter: 10,
             lift: 2
         };
-        // this.halfX = this.values.tableX / 2;
-        // this.halfY = this.values.tableY / 2;
         if (this.game) this.attachGame(this.game);
     }
 
@@ -102,9 +87,6 @@ export class baby3D {
             if (this.initialized && mode !== this.mode) {
                 this.mode = mode;
                 this.rebuild();
-                // this.setupTable();
-                // this.setupBall();
-                // this.setupPaddles();
             }
         });
     }
@@ -204,12 +186,6 @@ export class baby3D {
         this.lastServerUpdateTime = performance.now();
         this.lastUpdateTime = performance.now();
 
-        //TODO or: 
-        // this.setupCameraLight(canvas);
-        // this.mode = this.game?.gameState.mode === '4P' ? '4P' : '2P';
-        // this.setupTable();
-        // this.setupBall();
-        // this.setupPaddles();
         this.initialized = true;
 
         // Start render loop with error handling
@@ -440,9 +416,6 @@ export class baby3D {
                 this.ballVelY = 0;
             }
 
-            // Client-side prediction: Continuously move ball by velocity each frame
-            // This maintains constant speed (proper Pong physics)
-            // deltaTime is normalized (1.0 = 16.67ms at 60fps), so multiply velocity by deltaTime
             this.predictedBallX += this.ballVelX * deltaTime;
             this.predictedBallY += this.ballVelY * deltaTime;
 
