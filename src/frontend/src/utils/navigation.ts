@@ -172,8 +172,8 @@ export function attachUserNavListeners(): void {
     });
 
     // Home button
-    if (profileBtn) {
-        profileBtn.addEventListener('click', () => {
+    if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
             dropdown.classList.remove('show');
             history.pushState({ page: 'landing' }, '', '/landing');
             setCurrentPage('landing');
