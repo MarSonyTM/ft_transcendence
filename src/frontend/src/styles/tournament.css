@@ -1,0 +1,204 @@
+/* BASE STYLES */
+.t-section {
+	margin-top: 2rem;
+	margin-bottom: 3rem;
+	text-align: center;
+	align-content: center;
+	justify-content: center;
+	width: 95vw;
+}
+
+.t-content {
+  background-color: rgba(25, 35, 50, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 2.5rem 3rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.1rem;
+  color: rgb(229 231 235);
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.t-setup {
+	display: flex;
+	flex-direction: column;
+	gap: 2rem;
+	align-items: center;
+}
+
+.t-alias-form {
+	display: flex;
+	gap: .5rem;
+}
+
+.t-alias-input {
+	flex: 1;
+	padding: .4rem .5rem;
+}
+
+.t-alias-list {
+	list-style: none;
+	margin: 1rem auto;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	text-align: left;
+	gap: 0.75rem;
+	max-width: 700px;
+	width: 100%;
+}
+
+.t-alias-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	background: rgba(2, 11, 24, 0.6);
+	padding: 1rem 1.5rem;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	transition: all 0.2s ease;
+}
+
+.t-alias-item:hover {
+	background: rgba(2, 11, 24, 0.8);
+	border-color: rgba(0, 255, 255, 0.3);
+	transform: translateX(4px);
+}
+
+.t-alias-name {
+	flex: 1;
+	text-align: left;
+	font-size: 1.1rem;
+	font-weight: 500;
+	color: rgb(229 231 235);
+}
+
+.t-actions {
+	display: flex;
+	gap: 1rem;
+	flex-wrap: wrap;
+	justify-content: center;
+	margin-top: 2rem;
+	width: 100%;
+}
+
+.t-msg {
+	margin-top: 0;
+	margin-bottom: 1.5rem;
+	font-size: 1.3em;
+	font-weight: 600;
+	color: rgb(229 231 235);
+	text-align: center;
+}
+
+.empty {
+	opacity: .6;
+	font-style: italic;
+}
+
+/* LIVE GAME CONTAINER */
+.t-game-container {
+	display: none;
+	margin: 1rem auto;
+	border: 2px solid #10b981;
+	border-radius: 8px;
+	background: rgba(16, 185, 129, 0.1);
+	width: 100%;
+	min-width: 700px;
+}
+
+.t-game-title {
+	text-align: center;
+	color: #10b981;
+	margin-bottom: 1rem;
+}
+
+.t-game-controls {
+	text-align: center;
+	margin-top: 1rem;
+}
+
+/* Ensure the embedded 3D canvas has a visible height inside the tournament container */
+.t-game-container .threeD-wrapper {
+	height: 420px; /* Fallback fixed height for visibility */
+	max-height: 70vh; /* Prevent overflow on small screens */
+}
+
+@media (max-width: 768px) {
+	.t-game-container {
+		min-width: 0;
+	}
+	.t-game-container .threeD-wrapper {
+		height: 56vh;
+	}
+}
+
+/* FLEX UTILITIES */
+.t-flex {
+	display: flex;
+	justify-content: center;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+
+.t-flex-1 {
+	flex: 1;
+}
+
+.t-info-text {
+	margin: 0.2rem 0;
+}
+
+.t-info-bold {
+	margin: 0.4rem 0;
+	font-weight: bold;
+}
+
+.t-section-details {
+	margin: 0.5rem;
+	border-top: 1px solid #666;
+	padding: 0.5rem;
+}
+
+.t-section-details summary {
+	cursor: pointer;
+}
+
+.t-match-controls {
+	margin: 0.75rem 0;
+	padding: 0.75rem;
+	background: rgba(59, 130, 246, 0.1);
+	border: 1px solid #3b82f6;
+	border-radius: 8px;
+}
+
+.t-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+}
+
+.t-header-actions {
+	display: flex;
+	gap: .5rem;
+}
+
+.t-footer {
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	margin-top: 2rem;
+	padding-top: 2rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.t-footer .t-actions {
+	margin-top: 0;
+}
+

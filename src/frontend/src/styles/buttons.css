@@ -1,0 +1,247 @@
+/* BUTTONS */
+.btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: background-color 150ms;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-neon {
+  position: relative;
+  padding: 0.9em 1.6em;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: #e5e7eb;
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05), 0 8px 20px rgba(0,0,0,0.35);
+}
+
+.btn-neon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(59,130,246,0.35), 0 0 0 1px rgba(59,130,246,0.25) inset;
+  background: rgba(59,130,246,0.12);
+}
+
+.btn-neon.primary { color: #0b1020; background: #4ade80; }
+.btn-neon.accent  { background: rgba(59,130,246,0.14); border-color: rgba(59,130,246,0.35); }
+
+.glass-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 2; /* keep content above border and grid */
+}
+
+/* Glass buttons */
+.btn-glass {
+  padding: 0.9em 1.6em;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #e5e7eb;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.06);
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.btn-glass:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.1) inset;
+}
+
+.btn-glass.primary { color: #0b1020; background: linear-gradient(180deg, #4ade80, #22c55e); border-color: rgba(34,197,94,0.6); }
+.btn-glass.accent  { background: linear-gradient(180deg, rgba(59,130,246,0.25), rgba(59,130,246,0.14)); border-color: rgba(59,130,246,0.35); }
+
+
+.btn-login,
+.btn-register {
+  font-weight: bold;
+  margin: 8px 0;
+  font-size: 2em;
+}
+
+.btn-play {
+  font-weight: bold;
+  margin: 8px 0;
+  font-size: 2em;
+  background: #4ade80;
+  color: #222;
+}
+
+.btn-profile {
+  font-weight: bold;
+  margin: 8px 0;
+  font-size: 2em;
+  background: #079fdb;
+  color: #ffffff;
+}
+
+.btn-game-mode {
+  font-weight: bold;
+  padding: 1em 2em;
+  font-size: 2em;
+  background: #4ade80;
+  color: #222;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button:disabled {
+  background-color: rgb(75 85 99);
+  color: rgb(209 213 219);
+  cursor: not-allowed;
+}
+
+.btn-back {
+  margin-top: 2em;
+  font-size: 1.2em;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5em 1.5em;
+  cursor: pointer;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btn-start {
+  background-color: rgb(10 170 50);
+  color: rgb(255 255 255);
+}
+.btn-start:hover {
+  background-color: rgb(20 200 40);
+  color: rgb(255 255 255);
+}
+.btn-start:disabled {
+  background-color: rgb(75 85 99);
+  color: rgb(209 213 219);
+  cursor: not-allowed;
+}
+
+.btn-end {
+  background-color: rgb(75 85 99);
+  color: rgb(209 213 219);
+}
+.btn-end:hover {
+  background-color: rgb(200, 30, 15);
+}
+
+.btn-pause {
+  background-color: rgb(75 85 99);
+  color: rgb(209 213 219);
+}
+.btn-pause:hover {
+  background-color: rgb(230, 219, 26);
+  color: rgb(0, 0, 0);
+}
+
+.btn-reconnect {
+  background-color: rgb(75 85 99);
+  color: rgb(209 213 219);
+}
+.btn-reconnect:hover {
+  background-color: rgb(37 99 235);
+  color: rgb(255 255 255);
+}
+
+.btn-t-back {
+  background-color: rgb(55, 55, 60);
+  color: rgb(255 255 255);
+}
+.btn-t-back:hover {
+  background-color: rgb(90, 90, 95);
+  color: rgb(255 255 255);
+}
+
+.btn-reset {
+  background-color: rgb(55, 55, 60);
+  color: rgb(255 255 255);
+}
+.btn-reset:hover {
+  background-color: rgb(210 0 0);
+  color: rgb(255 255 255);
+}
+
+.btn-add {
+  background-color: rgb(0, 100, 110);
+  color: rgb(255 255 255);
+}
+.btn-add:hover {
+  background-color: rgb(0, 140, 150);
+  color: rgb(255 255 255);
+}
+
+.btn-tournaments {
+	background-color: rgb(75 85 99);
+	color: rgb(209 213 219);
+}
+.btn-tournaments:hover {
+	background-color: rgb(0, 136, 160);
+	color: rgb(255 255 255);
+}
+
+.btn-submit {
+	background-color: rgb(22 163 74);
+	color: rgb(255 255 255);
+}
+.btn-submit:hover {
+	background-color: rgb(21 128 61);
+}
+
+.btn-archive {
+	background-color: rgb(55, 55, 60);
+  color: rgb(255, 255, 255);
+}
+.btn-archive:hover {
+  background-color: rgb(90, 90, 95);
+  color: rgb(255, 255, 255);
+}
+
+.btn-close-archive {
+	background-color: rgb(68, 68, 73);
+	color: rgb(255, 255, 255);
+}
+.btn-close-archive:hover {
+	background-color: rgb(85, 85, 90);
+  color: rgb(255, 255, 255);
+}
+
+.btn-remove-alias {
+	background-color: rgb(51, 51, 51);
+	color: rgb(221, 221, 221);
+}
+.btn-remove-alias:hover {
+	background-color: rgb(68, 68, 73);
+  color: rgb(255, 255, 255);
+}
+
+.btn-ready {
+  background-color: rgb(0, 120, 155);
+  color: rgb(255, 255, 255);
+}
+
+.btn-gameview {
+  margin-bottom: 1rem;
+  background-color: rgb(22, 22, 22);
+  color: rgb(255, 255, 255);
+}
+.btn-gameview:hover {
+  background-color: rgb(40, 40, 40);
+  color: rgb(255, 255, 255);
+}
+
+.btn-ready.clicked,
+.btn-ready[aria-pressed="true"] {
+  background-color: rgb(42, 70, 80);
+  color: rgb(200, 200, 200);
+}

@@ -1,0 +1,16 @@
+/* IMPORT ALL STYLES */
+@import './buttons.css';
+@import './canvas.css';
+@import './components.css';
+@import './effects.css';
+@import './game.css';
+@import './layout.css';
+@import './profile.css';
+@import './tournament.css';
+@import './t_archive.css';
+@import './t_matches.css';
+
+/* Tailwind Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

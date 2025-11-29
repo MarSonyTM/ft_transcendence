@@ -1,0 +1,39 @@
+/* PROFILE PAGE */
+.profile-container {
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  min-height: 80vh; 
+  padding: 2em;
+}
+
+.profile-card {
+  background: rgb(55 65 81);
+  border-radius: 12px;
+  padding: 2em;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  min-width: 350px;
+  margin-bottom: 2em;
+}
+
+.username-section {
+  text-align: center;
+  margin-bottom: 2em;
+  padding-bottom: 1.5em;
+  border-bottom: 2px solid rgb(75 85 99);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.stat-box {
+  background: rgb(75 85 99);
+  padding: 1.25em;
+  border-radius: 8px;
+  text-align: center;
+}

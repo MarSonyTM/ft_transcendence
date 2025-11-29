@@ -15,6 +15,8 @@ coverage/
 # Env
 .env
 .env.*
+src/backend/.env
+src/database/database.db
 
 # Docker
 *.pid
@@ -29,3 +31,17 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+src/frontend/package-lock.json
+
+# Backend and Frontend node_modules
+src/backend/node_modules/
+src/frontend/node_modules/
+
+# Database
+*.db-shm
+*.db-wal
+*.db
+src/database/database.db
+
+.git_rescue_new_20251106
