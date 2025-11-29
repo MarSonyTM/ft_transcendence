@@ -490,9 +490,6 @@ function updateReadyUI(t: Tournament, opts: { p1Btn?: HTMLButtonElement, p2Btn?:
         }
         else {
             startBtn.disabled = true;
-            // if (ws)
-            //     ws.sendReady(false);
-            // t.curM.status = 'pending';
         }
     }
     updateMatchInTournament(t.curM);
@@ -560,7 +557,6 @@ async function initws(t: Tournament): Promise<void> {
         playerId: wsPlayerId!.toString(),
         
         onConnect: () => {
-            console.log('✅ Tournament WebSocket connected');
             ws?.requestState();
             setupKeyboardControls(ws, wsPlayerId!.toString(), t.curM?.pong);
         },
@@ -675,12 +671,11 @@ async function initws(t: Tournament): Promise<void> {
                         const baby = new baby3D(t.curM.pong);
                         await baby.createScene();
                         t.curM.pong.babylonGame = baby;
-                        console.log('✅ 3D renderer created for tournament');
                         
                         // Start render loop
                         if (t.curM.pong.startRenderLoop) {
                             t.curM.pong.startRenderLoop();
-                            console.log('✅ Render loop started');
+
                         }
                     } catch (e) {
                         console.error('❌ Failed to start 3D renderer:', e);
@@ -692,14 +687,12 @@ async function initws(t: Tournament): Promise<void> {
             if (t.curM.pong) {
                 t.curM.pong.isActive = true;
                 presenceService.setInGame();
-                console.log('✅ Game is now active and ready');
             } else {
                 console.error('❌ No pong instance found when game started!');
             }
         },
 
         onGameEnd: async (data) => {
-            console.log('🏁 Game ended:', data);
             if (!t || !data.matchId || isProcessingMatchEnd) return;
             
             isProcessingMatchEnd = true;
@@ -782,7 +775,6 @@ async function showMatch(t: Tournament): Promise<void> {
 }
 
 function cleanupActiveGame(): void {
-    console.log('🧹 Cleaning up tournament game...');
     const t = getCurrentTournament();
     if (!t ||!t.curM)
         return;

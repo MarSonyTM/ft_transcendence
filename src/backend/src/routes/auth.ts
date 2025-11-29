@@ -61,13 +61,11 @@ async function userRoutes(
     try {
       const userData = request.body as CreateUserInput;
       
-      // ✅ SANITIZE ALL INPUTS (XSS Protection)
       if (userData.email) userData.email = sanitizeEmail(userData.email);
       if (userData.username) userData.username = sanitizeUsername(userData.username);
       if (userData.firstName) userData.firstName = sanitizeName(userData.firstName);
       if (userData.lastName) userData.lastName = sanitizeName(userData.lastName);
       
-      // ✅ VALIDATE INPUTS
       if (!userData.email || !validateEmailFormat(userData.email)) {
         reply.code(400).send({
           success: false,
@@ -108,7 +106,6 @@ async function userRoutes(
         return;
       }
       
-      // ✅ HASH PASSWORD (Already secure)
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
       userData.password = hashedPassword;
@@ -391,8 +388,9 @@ async function userRoutes(
       // Set cookie
       reply.setCookie('token', token, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        partitioned: true,
         path: "/",
         maxAge: 604800,
       });
@@ -494,7 +492,6 @@ async function userRoutes(
       console.log(request.body);
       const userData = request.body as LoginInput;
       
-      // ✅ SANITIZE INPUTS (XSS Protection)
       const username = userData.username ? sanitizeUsername(userData.username) : "";
       const password = userData.password || "";
 
@@ -585,8 +582,9 @@ async function userRoutes(
       // ✅ Set cookie - try both approaches
       reply.setCookie('token', token, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        partitioned: true,
         path: "/",
         maxAge: 604800,
       });
@@ -626,7 +624,8 @@ async function userRoutes(
       reply.clearCookie("token", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: "none",
+        partitioned: true,
         path: "/",
       });
 
@@ -755,8 +754,9 @@ async function userRoutes(
 
       reply.setCookie("token", token, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        partitioned: true,
         path: "/",
         maxAge: 7 * 24 * 60 * 60, // 1 week
       });
@@ -875,8 +875,9 @@ async function userRoutes(
 
       reply.setCookie("token", jwtToken, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        partitioned: true,
         path: "/",
         maxAge: 7 * 24 * 60 * 60, // 1 week
       });
@@ -916,8 +917,9 @@ async function userRoutes(
         // Set the cookie
         reply.setCookie("token", token, {
           httpOnly: true,
-          secure: false,
-          sameSite: "lax",
+          secure: true,
+          sameSite: "none",
+          partitioned: true,
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 1 week
         });
@@ -989,8 +991,9 @@ async function userRoutes(
 
       reply.setCookie("token", token, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
+        partitioned: true,
         path: "/",
         maxAge: 24 * 60 * 60, // 24 hours
       });

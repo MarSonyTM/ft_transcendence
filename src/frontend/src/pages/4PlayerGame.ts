@@ -236,7 +236,6 @@ async function initRoomBasedGame(room: any): Promise<void> {
         },
         
         onGameEnd: async (data: any) => {
-            console.log('4-player game ended in room, winner:', data);
             const winner = room.players.find((p: any) => p.id === data.winnerId);
             const winnerName = winner ? winner.username : `Player ${data.winnerId}`;
             const winnerId = winner ? winner.id : data.winnerId;
