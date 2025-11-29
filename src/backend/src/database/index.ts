@@ -1655,7 +1655,7 @@ export class DatabaseManager extends BaseDatabaseManager {
                 score INTEGER DEFAULT 0,
                 eliminated BOOLEAN DEFAULT FALSE,
                 socketId TEXT,
-				difficulty TEXT DEFAULT 'normal',
+                difficulty TEXT DEFAULT 'normal',
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (tournamentId) REFERENCES tournaments(id) ON DELETE CASCADE,
@@ -1663,8 +1663,8 @@ export class DatabaseManager extends BaseDatabaseManager {
             )
         `;
         this.db.exec(createTPlayerT);
-
-		// Add difficulty column if it doesn't exist (for existing databases)
+        
+        // Add difficulty column if it doesn't exist (for existing databases)
         try {
             this.db.exec(`ALTER TABLE t_players ADD COLUMN difficulty TEXT DEFAULT 'normal'`);
         } catch (error: any) {

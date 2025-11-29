@@ -5,6 +5,7 @@ import { activeGames } from './game';
 import { database } from '../database/index';
 import { BaseGameEngine } from '../game/gameEngine';
 import { AIDifficulty } from '../game/aiPlayer';
+import { AIDifficulty } from '../game/aiPlayer';
 import { registerTournamentGame } from '../websocket/websocketHandler';
 import { broadcastGameStartToMatch, broadcastTournamentState } from '../websocket/tournamentHandler';
 import { sanitizeString, sanitizeAlias, sanitizeId } from '../utils/sanitization';
@@ -54,7 +55,7 @@ const addPlayerBodySchema = {
 	properties: {
 		name: { 
 			type: 'string', 
-			minLength: 1, 
+			minLength: 1,
 			maxLength: 50 
 		},
 		tpt: { 
@@ -397,7 +398,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 			const sanitizedName = sanitizeAlias(name);
 			const sanitizedTpt = sanitizeString(tpt) as TPT;
 			const tId = sanitizeId(tournamentId);
-
+			
 			// Sanitize and validate difficulty (only for AI players)
 			let sanitizedDifficulty: string | undefined = undefined;
 			if (difficulty && sanitizedTpt === 'ai') {
@@ -661,6 +662,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 				};
 
 				gameEngine = new BaseGameEngine(initialGameState);
+				
 				// Set AI players with their stored difficulty (default to 'normal' if not set)
 				if (m.p1?.tpt === 'ai') {
 					const p1Difficulty = (m.p1.difficulty && ['easy', 'normal', 'hard'].includes(m.p1.difficulty)) 
@@ -676,7 +678,7 @@ async function tournamentRoutes(fastify: FastifyInstance, _options: FastifyPlugi
 					gameEngine.setPlayerAI(2, true, p2Difficulty);
 					console.log(`🎮 Tournament: Set AI Player 2 with difficulty: ${p2Difficulty}`);
 				}
-				
+
 				activeGames.set(gameId, gameEngine);
 				registerTournamentGame(gameId, mId);
 			}

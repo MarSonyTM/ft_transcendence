@@ -59,6 +59,7 @@ class TournamentManager {
 				console.error('Cannot join: duplicate name');
 				return null as any;
 			}
+			
 			// Prepare player data - include difficulty only for AI players
 			const playerData: any = {
 				tournamentId,
@@ -188,6 +189,7 @@ class TournamentManager {
 			if (match.p2 && !match.isBye) {
 				// Get difficulty from player data (default to 'normal' if not set)
 				const p2Difficulty = (match.p2.tpt === 'ai' && match.p2.difficulty) ? match.p2.difficulty : 'normal';
+				
 				const joinResult = gameRoomManager.joinRoom(
 					match.room.roomId,
 					match.p2.id.toString(),

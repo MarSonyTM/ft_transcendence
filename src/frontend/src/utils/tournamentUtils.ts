@@ -94,7 +94,8 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
     try {
         let id = '-';
         if (userId) id = userId.toString();
-		// Build request body - include difficulty only for AI players
+        
+        // Build request body - include difficulty only for AI players
         const body: any = { 
             name, 
             tpt,
@@ -103,6 +104,7 @@ export async function addPlayerToTournament(tournamentId: number, name: string, 
         if (tpt === 'ai' && difficulty) {
             body.difficulty = difficulty;
         }
+        
         const resp = await fetch(`${getApiEndpoint()}/api/tournament/${tournamentId}/player`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
