@@ -216,6 +216,9 @@ export async function renderApp(): Promise<void> {
     case 'verifyEmailSecond':
       await renderVerifyEmailSecondPage();
       break;
+    case 'verifyEmailSecond':
+      await renderVerifyEmailSecondPage();
+      break;
     case 'leaderboard':
       await renderLeaderboardPage();
       break;

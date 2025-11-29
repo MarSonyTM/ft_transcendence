@@ -177,20 +177,11 @@ export async function renderVerifyEmailPage(): Promise<void> {
                 authService.setNeededEmailVerification(false);
 
                 const response = await authService.fetchUserProfile();
-                
-                if (!response) {
-                    setTimeout(() => {
-                        history.pushState({ page: 'login' }, 'login', '/login');
-                        setCurrentPage('login');
-                        renderApp();
-                    }, 1500);
-                } else {
-                    setTimeout(() => {
-                        history.pushState({ page: 'landing' }, 'landing', '/landing');
-                        setCurrentPage('landing');
-                        renderApp();
-                    }, 1500);
-                }
+                setTimeout(() => {
+                    history.pushState({ page: 'landing' }, 'landing', '/landing');
+                    setCurrentPage('landing');
+                    renderApp();
+                }, 1500);
             } else {
                 setError(result.error || 'Verification failed');
             }
