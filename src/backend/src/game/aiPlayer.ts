@@ -47,16 +47,12 @@ export class AIPongPlayer {
      * The game engine treats these identically to human keyboard input.
      */
     private currentKeys: { up: boolean; down: boolean } = { up: false, down: false };
-    
-    // Current paddle position (updated every frame for accurate movement decisions)
-    private currentPaddlePos: number = 0;
-    
-    // Game boundaries and calculated values
-    private readonly max: number;           // Maximum position along paddle's movement axis
-    private readonly maxPaddle: number;     // Maximum valid paddle position (max - paddleHeight)
-    private readonly center: number;       // Center position (where paddle rests when ball is away)
-    private readonly sides: string[];      // Available sides based on game mode
-    private readonly side: string;         // Which side this AI controls (left/right/top/bottom)
+    private currentPaddlePos: number = 0; // Updated every frame
+    private readonly max: number;
+    private readonly maxPaddle: number;
+    private readonly center: number;
+    private readonly sides: string[];
+    private readonly side: string;
 
     /**
      * Difficulty Settings
