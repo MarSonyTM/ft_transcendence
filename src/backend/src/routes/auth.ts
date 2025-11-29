@@ -192,6 +192,19 @@ async function userRoutes(
         return;
       }
 
+      // Check if email is already verified
+      if (user.emailVerified) {
+        reply.code(200).send({
+          success: true,
+          message: "Email is already verified",
+          data: {
+            ...user,
+            password: undefined,
+          },
+        });
+        return;
+      }
+
       // Verify the code
       const verification = database.emailVerifications.verifyEmail(
         verificationCode,
@@ -739,6 +752,34 @@ async function userRoutes(
         );
       }
 
+      // Check if user has 2FA enabled
+      if (user.twoFactorEnabled) {
+        // Generate 2FA code
+        const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+        // Create verification request
+        const verification =
+          database.twoFactorVerifications.createVerificationRequest(
+            user.id,
+            verificationCode
+          );
+
+        // Send 2FA email
+        const emailSent = await sendVerificationEmail(
+          user.email,
+          verificationCode,
+          user.username,
+          true // is2FA flag
+        );
+
+        // Redirect to frontend with 2FA requirement
+        const frontendUrl = FRONTEND_URL || "httpsgit sta://localhost:8443";
+        reply.redirect(
+          `${frontendUrl}auth/callback?success=false&requires2FA=true&userId=${user.id}&email=${encodeURIComponent(email || '')}&username=${encodeURIComponent(user.username)}`
+        );
+        return;
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { id: user.id, email: user.email || "", username: user.username || "" },
@@ -857,6 +898,41 @@ async function userRoutes(
           gamesWon: 0,
           gamesLost: 0,
         });
+      }
+
+      // Check if user has 2FA enabled
+      if (user.twoFactorEnabled) {
+        // Generate 2FA code
+        const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+        // Create verification request
+        const verification =
+          database.twoFactorVerifications.createVerificationRequest(
+            user.id,
+            verificationCode
+          );
+
+        // Send 2FA email
+        const emailSent = await sendVerificationEmail(
+          user.email,
+          verificationCode,
+          user.username,
+          true // is2FA flag
+        );
+
+        // Return response indicating 2FA is required
+        reply.code(200).send({
+          success: false,
+          requires2FA: true,
+          message: "2FA code sent to your email",
+          data: {
+            userId: user.id,
+            email: user.email,
+            username: user.username,
+            emailVerified: user.emailVerified,
+          },
+        });
+        return;
       }
 
       // Generate JWT token
