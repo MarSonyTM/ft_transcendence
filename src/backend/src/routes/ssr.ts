@@ -34,7 +34,7 @@ async function ssrRoutes(fastify: FastifyInstance, options: FastifyPluginOptions
         // Get the host from the request headers
         const host = request.headers.host || `0.0.0.0:${process.env.PORT || 3000}`;
         const protocol = request.headers['x-forwarded-proto'] || (request.protocol === 'https' ? 'https' : 'http');
-        const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
+        const wsProtocol = protocol === 'https' ? 'ws' : 'ws';
       
         const initialState = {
             gameState,

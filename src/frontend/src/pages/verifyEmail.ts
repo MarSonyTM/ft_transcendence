@@ -176,14 +176,21 @@ export async function renderVerifyEmailPage(): Promise<void> {
                 authService.setPendingEmailVerification(null);
                 authService.setNeededEmailVerification(false);
 
-                await authService.fetchUserProfile();
+                const response = await authService.fetchUserProfile();
                 
-                // Redirect to landing page after successful verification
-                setTimeout(() => {
-                    history.pushState({ page: 'login' }, '', '/login');
-                    setCurrentPage('login');
-                    renderApp();
-                }, 1500);
+                if (!response) {
+                    setTimeout(() => {
+                        history.pushState({ page: 'login' }, 'login', '/login');
+                        setCurrentPage('login');
+                        renderApp();
+                    }, 1500);
+                } else {
+                    setTimeout(() => {
+                        history.pushState({ page: 'landing' }, 'landing', '/landing');
+                        setCurrentPage('landing');
+                        renderApp();
+                    }, 1500);
+                }
             } else {
                 setError(result.error || 'Verification failed');
             }

@@ -2,6 +2,9 @@ import { setCurrentPage, setCurrentUser } from '../utils/globalState';
 import { renderApp } from '../main';
 import { loginUser } from '../_api/auth';
 import { authService } from '../utils/auth';
+import { API_BASE } from '../config';
+
+const apiEndpoint = API_BASE;
 
 export function renderLoginPage(): void {
     const root = document.getElementById('app-root');
@@ -207,7 +210,6 @@ export function renderLoginPage(): void {
             // Ensure clicking the Google button doesn't submit the form
             e.preventDefault();
             // Use the dynamic API endpoint for Google OAuth
-            const apiEndpoint = window.__INITIAL_STATE__?.apiEndpoint || 'http://localhost:3000';
             window.location.href = `${apiEndpoint}/api/auth/google`;
         });
     }

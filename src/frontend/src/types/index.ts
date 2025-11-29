@@ -1,9 +1,10 @@
 import { Player as SharedPlayer, GameState as SharedGameState, WebSocketMessage as SharedWebSocketMessage } from "../../../shared/gameTypes";
 import { GameRoom } from "../utils/roomState";
 import { PongGame } from '../game/PongGame';
+import { API_BASE } from "../config";
 
 export function getApiEndpoint(): string {
-	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
+	return (API_BASE);
 }
 
 /* TOURNAMENT TYPES */

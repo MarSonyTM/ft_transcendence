@@ -2,6 +2,7 @@ import { setCurrentPage } from '../utils/globalState';
 import { renderApp } from '../main';
 import { createUserNav, attachUserNavListeners } from '../utils/navigation';
 import { authService } from '../utils/auth';
+import { API_BASE } from '../config';
 
 interface LeaderboardUser {
     username: string;
@@ -30,7 +31,7 @@ interface Player {
 }
 
 function getApiEndpoint(): string {
-	return (window.__INITIAL_STATE__?.apiEndpoint || '').replace(/\/$/, '');
+	return (API_BASE);
 }
 
 async function fetchAllGames(): Promise<GameResult[]> {
