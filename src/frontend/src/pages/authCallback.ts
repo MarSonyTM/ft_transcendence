@@ -14,10 +14,51 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
     const email = urlParams.get('email');
     const token = urlParams.get('token');
     const needEmailVerification = urlParams.get('needEmailVerification');
+    const requires2FA = urlParams.get('requires2FA');
+    const userId = urlParams.get('userId');
+    const username = urlParams.get('username');
+
+    // Handle 2FA requirement from Google OAuth
+    if (requires2FA === 'true' && userId && username) {
+        // Store 2FA pending state
+        authService.setPending2FAVerification({
+            userId: parseInt(userId),
+            username: username
+        });
+
+        root.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+                <h2 style="color: #f59e0b; margin-bottom: 1em;">Two-Factor Authentication Required</h2>
+                <p style="color: #666; margin-bottom: 2em;">Redirecting to 2FA verification...</p>
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #f59e0b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+
+        // Redirect to 2FA verification page
+        setTimeout(() => {
+            history.pushState({ page: 'twoFactorAuth' }, '', '/two-factor-auth');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        }, 1500);
+        return;
+    }
 
     if (success === 'true') {
-        authService.setPendingEmailVerification(email || '');
-        authService.setNeededEmailVerification(true);
+        // Only set email verification flags if actually needed
+        const needsVerification = needEmailVerification === 'true';
+        if (needsVerification && email) {
+            authService.setPendingEmailVerification(email);
+            authService.setNeededEmailVerification(true);
+        } else {
+            // Clear any existing verification flags
+            authService.setPendingEmailVerification(null);
+            authService.setNeededEmailVerification(false);
+        }
         
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
@@ -47,7 +88,13 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
                 if (response.ok) {
                     console.log('✅ Token cookie set by backend');
                     // Now fetch user profile with the cookie set
-                    await authService.fetchUserProfile();
+                    const userProfile = await authService.fetchUserProfile();
+                    
+                    // After fetching profile, verify the email status matches
+                    // If email is verified, clear the verification flag
+                    if (userProfile && userProfile.emailVerified) {
+                        authService.setNeededEmailVerification(false);
+                    }
                 } else {
                     console.error('❌ Failed to set token cookie:', response.status);
                     const errorData = await response.json().catch(() => ({}));
