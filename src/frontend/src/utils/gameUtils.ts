@@ -203,7 +203,6 @@ export async function setEffectiveRoom(): Promise<GameRoom | null> {
                     return null;
                 // Exit early if we found a gameId
                 if (effectiveRoom.gameId) {
-                    console.log('✅ Found gameId:', effectiveRoom.gameId);
                     return effectiveRoom;
                 }
             }

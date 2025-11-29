@@ -104,7 +104,10 @@ export async function setupGameButtons(pongGame: PongGame): Promise<void> {
     let effectiveRoom = await setEffectiveRoom();
 
     if (!effectiveRoom || !effectiveRoom.gameId) {
-        console.error('❌ No shared gameId available yet; not creating a standalone game.');
+        console.warn('No game found, returning to home.');
+        history.pushState({ page: 'landing' }, '', '/landing');
+        setCurrentPage('landing');
+        renderApp();
         return;
     }
     
