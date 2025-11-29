@@ -17,9 +17,7 @@ export default  async function renderAuthCallbackPage(): Promise<void> {
 
     if (success === 'true') {
         authService.setPendingEmailVerification(email || '');
-        if (needEmailVerification === 'true') {
-            authService.setNeededEmailVerification(true);
-        }
+        authService.setNeededEmailVerification(true);
         
         root.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">

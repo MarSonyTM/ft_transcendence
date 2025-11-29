@@ -3,7 +3,7 @@ import { renderApp } from '../main';
 import { verifyEmail, resendVerificationEmail } from '../_api/auth';
 import { authService } from '../utils/auth';
 
-export async function renderVerifyEmailPage(): Promise<void> {
+export async function renderVerifyEmailSecondPage(): Promise<void> {
     const root = document.getElementById('app-root');
     if (!root) return;
 
@@ -178,8 +178,8 @@ export async function renderVerifyEmailPage(): Promise<void> {
 
                 const response = await authService.fetchUserProfile();
                 setTimeout(() => {
-                    history.pushState({ page: 'landing' }, 'landing', '/landing');
-                    setCurrentPage('landing');
+                    history.pushState({ page: 'login' }, 'login', '/login');
+                    setCurrentPage('login');
                     renderApp();
                 }, 1500);
             } else {
