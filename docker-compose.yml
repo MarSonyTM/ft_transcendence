@@ -25,7 +25,8 @@ services:
     build: ./src/frontend/.
     container_name: frontend
     ports:
-      - "0.0.0.0:443:443"  # HTTPS
+      - "8080:80"
+      - "8443:443"
     networks:
       - transcendence
     restart: unless-stopped
