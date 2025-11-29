@@ -676,6 +676,8 @@ class TournamentManager {
 				return false;
 			if (!t.curM.isBye && this.allPlayersReadyForMatch(matchId))
 				t.curM.status = 'ready';
+			else if (!t.curM.isBye && !this.allPlayersReadyForMatch(matchId))
+				t.curM.status = 'pending';
 
 			t.curM = db.updateMatch({ id: matchId, status: t.curM.status });
 			if (!t.curM)
