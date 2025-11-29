@@ -37,7 +37,7 @@ export class RoomWebSocketManager {
     connect(): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
-                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsProtocol = window.location.protocol === 'https:' ? 'ws:' : 'ws:';
                 const wsHost = window.location.protocol === 'https:' 
                     ? window.location.host 
                     : 'localhost:3000';
