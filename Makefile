@@ -1,5 +1,3 @@
-DB_FILE ?= ./src/database/database.db
-
 all: up
 
 setup:

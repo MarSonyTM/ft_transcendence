@@ -66,15 +66,19 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 						<button id="alias-ok">OK</button>
 					</div>
 				</div>
+			
+				<div id="ai-select" class="modal hidden">
+					<div class="modal-content">
+						<label>AI Difficulty</label>
+						<select id="tournamentAIDifficulty">
+							<option value="easy">Easy - Good for beginners</option>
+							<option value="normal" selected>Normal - Balanced challenge</option>
+							<option value="hard">Hard - Extremely challenging</option>
+						</select>
+						<button id="ai-ok">OK</button>
+					</div>
+				</div>
 			</span>
-			<div id="ai-select" style="display: none">
-				<select id="tournamentAIDifficulty">
-					<label>AI Difficulty</label>
-					<option value="easy">Easy - Good for beginners</option>
-					<option value="normal" selected>Normal - Balanced challenge</option>
-					<option value="hard">Hard - Extremely challenging</option>
-				</select>
-			</div>
 			<ul id="playersList" class="t-alias-list"><button class="btn btn-remove-alias" style="display: none">x</button></ul>
 			<div class="t-footer">
 				<div class="t-actions">
@@ -101,7 +105,6 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 			showTournamentMaxPlayerMessage();
 		} else {
 			listEl.innerHTML = activeT.players.map((p: any) => {
-				// Show difficulty for AI players
 				const difficultyLabel = (p.tpt === 'ai' && p.difficulty) ? ` (${p.difficulty})` : '';
 				return `<li class="t-alias-item"><span class="t-alias-name">${p.name} ${TPTmap.get(p.tpt as TPT)}${difficultyLabel}</span>
 				<button class="btn btn-remove-alias" data-player-name="${p.name}" data-player-type="${p.tpt}"
@@ -148,6 +151,31 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		});
 	}
 
+	function askAIDifficulty(): Promise<string> {
+		return new Promise(resolve => {
+			const modal = document.getElementById('ai-select') as HTMLElement;
+			const select = document.getElementById('tournamentAIDifficulty') as HTMLSelectElement;
+			const ok = document.getElementById('ai-ok') as HTMLButtonElement;
+
+			modal.classList.remove('hidden');
+			select.focus();
+
+			const finish = () => {
+				modal.classList.add('hidden');
+				resolve(select.value || "normal");
+			};
+
+			ok.onclick = finish;
+			select.onkeydown = e => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					finish();
+				}
+			};
+		});
+	}
+
+
 	document.getElementById('addLocalBtn')?.addEventListener('click', async () => {
 		if (!activeT) return;
 		const x = getNextId(internalLocalIds);
@@ -161,22 +189,7 @@ export async function renderSetup(content: HTMLElement): Promise<void> {
 		if (!activeT) return;
 		const x = getNextId(internalAIIds);
 		const alias = `AI_${x}`;
-		// const alias = await askAlias(x, 'ai');
-		if (!alias) return;
-		const aiSelect = document.getElementById('ai-select') as HTMLElement;
-		const selected = document.getElementById('tournamentAIDifficulty') as HTMLSelectElement;
-		if (!aiSelect || !selected) return;
-		let selectedDifficulty;
-		aiSelect.style = "display: ''";
-		selected.onclick = () => {
-			selected.style = "display: ''";
-			selected.onclick = () => {
-				let retSelected = selected.value ?? `normal`;
-				selectedDifficulty = retSelected;
-				aiSelect.style = "display: none";
-			}
-		}
-		console.log('[Tournament] Add AI player:', alias, 'with difficulty:', selectedDifficulty);
+		const selectedDifficulty = await askAIDifficulty();
 		await addPlayerToTournament(activeT!.id!, alias, 'ai', undefined, selectedDifficulty);
 		await rerender();
 	});
