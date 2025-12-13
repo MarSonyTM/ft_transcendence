@@ -13,6 +13,7 @@ import {
 let currentUserId: string | null = null;
 let pollInterval: number | null = null;
 let lobbyWebSocket: any = null;
+let chatMessages: Array<{ playerId: string; username: string; message: string; timestamp?: number }> = [];
 
 export async function renderLobbyPage(roomIdParam?: string): Promise<void> {
 	const root = document.getElementById('app-root');
@@ -353,6 +354,22 @@ function initLobbyWebSocket(roomId: string, playerId: string): void {
       		}
     	},
     
+    	onChat: (chatData) => {
+      		// Add new chat message to the array
+      		chatMessages.push({
+        		playerId: chatData.playerId,
+        		username: chatData.username,
+        		message: chatData.message,
+        		timestamp: chatData.timestamp || Date.now()
+      		});
+      		// Keep only last 50 messages
+      		if (chatMessages.length > 50) {
+        		chatMessages = chatMessages.slice(-50);
+      		}
+      		// Update chat display
+      		updateChatDisplay();
+    	},
+    
     	onError: (error) => {
       		console.error('❌ Lobby WebSocket error:', error);
     	}
@@ -393,6 +410,12 @@ function renderLobby(root: HTMLElement): void {
 	const preservedValue = existingInput ? existingInput.value : '';
 	const wasFocused = existingInput && document.activeElement === existingInput;
 	const cursorPosition = existingInput ? existingInput.selectionStart : 0;
+  
+	// Preserve chat input state
+	const existingChatInput = document.getElementById('chatInput') as HTMLInputElement;
+	const preservedChatValue = existingChatInput ? existingChatInput.value : '';
+	const wasChatFocused = existingChatInput && document.activeElement === existingChatInput;
+	const chatCursorPosition = existingChatInput ? existingChatInput.selectionStart : 0;
   
 	const players = currentRoom.players;
 	const maxPlayers = currentRoom.maxPlayers;
@@ -527,6 +550,58 @@ function renderLobby(root: HTMLElement): void {
 		    </div>
 		  </div>
 		  
+		  <!-- Chat Section -->
+		  <div style="margin-top: 2em; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1.5em;">
+		    <h3 style="color: rgb(156 163 175); font-size: 0.9em; margin: 0 0 0.8em 0; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em;">💬 Room Chat</h3>
+		    
+		    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 1em; display: flex; flex-direction: column; gap: 0.75em; max-height: 300px;">
+		      <!-- Chat Messages Display -->
+		      <div id="chatMessages" style="flex: 1; overflow-y: auto; min-height: 150px; max-height: 200px; display: flex; flex-direction: column; gap: 0.5em; padding: 0.5em; background: rgba(0, 0, 0, 0.2); border-radius: 6px;">
+		        ${chatMessages.length === 0 ? `
+		          <div style="color: rgb(156 163 175); font-size: 0.85em; text-align: center; padding: 1em; font-style: italic;">
+		            No messages yet. Start the conversation!
+		          </div>
+		        ` : chatMessages.map(msg => {
+		          const isCurrentUser = msg.playerId === currentUserId;
+		          const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+		          // Escape HTML to prevent XSS
+		          const escapedMessage = msg.message.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+		          const escapedUsername = msg.username.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+		          return `
+		            <div style="display: flex; flex-direction: column; gap: 0.2em; padding: 0.5em; background: ${isCurrentUser ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-radius: 6px; border-left: 3px solid ${isCurrentUser ? 'rgba(59, 130, 246, 0.5)' : 'rgba(156, 163, 175, 0.3)'};">
+		              <div style="display: flex; justify-content: space-between; align-items: center;">
+		                <span style="color: ${isCurrentUser ? 'rgba(59, 130, 246, 0.9)' : 'rgb(229 231 235)'}; font-weight: 500; font-size: 0.85em;">
+		                  ${isCurrentUser ? 'You' : escapedUsername}
+		                </span>
+		                ${time ? `<span style="color: rgb(156 163 175); font-size: 0.75em;">${time}</span>` : ''}
+		              </div>
+		              <div style="color: rgb(229 231 235); font-size: 0.9em; word-wrap: break-word;">${escapedMessage}</div>
+		            </div>
+		          `;
+		        }).join('')}
+		      </div>
+		      
+		      <!-- Chat Input -->
+		      <div style="display: flex; gap: 0.5em;">
+		        <input 
+		          id="chatInput" 
+		          type="text"
+		          placeholder="Type a message..."
+		          maxlength="200"
+		          autocomplete="off"
+		          value="${preservedChatValue}"
+		          style="flex: 1; padding: 0.65em; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.05); color: rgb(229 231 235); font-size: 0.9em; transition: border-color 0.2s;"
+		          onfocus="this.style.borderColor='rgba(59, 130, 246, 0.5)'; this.style.boxShadow='0 0 10px rgba(59, 130, 246, 0.1)';"
+		          onblur="this.style.borderColor='rgba(255, 255, 255, 0.15)'; this.style.boxShadow='none';">
+		        <button id="sendChatBtn" style="flex: 0 0 auto; font-size: 0.85em; padding: 0.65em 1.2em; border-radius: 8px; font-weight: 500; background: rgba(59, 130, 246, 0.2); color: rgb(229 231 235); border: 1px solid rgba(59, 130, 246, 0.5); cursor: pointer; transition: all 0.2s;"
+		          onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'; this.style.borderColor='rgba(59, 130, 246, 0.7)';"
+		          onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.5)';">
+		          Send
+		        </button>
+		      </div>
+		    </div>
+		  </div>
+		  
 		</div>
 	  </div>
 	`;
@@ -549,7 +624,34 @@ function renderLobby(root: HTMLElement): void {
 	  }
 	}
   
+	// Restore chat input state
+	if (preservedChatValue || wasChatFocused) {
+	  const newChatInput = document.getElementById('chatInput') as HTMLInputElement;
+	  if (newChatInput) {
+		if (preservedChatValue) {
+		  newChatInput.value = preservedChatValue;
+		}
+		if (wasChatFocused) {
+		  setTimeout(() => {
+			newChatInput.focus();
+			// Restore cursor position
+			if (chatCursorPosition !== null) {
+			  newChatInput.setSelectionRange(chatCursorPosition, chatCursorPosition);
+			}
+		  }, 0);
+		}
+	  }
+	}
+  
 	attachEventListeners(canAddMore, canStart, isHost, currentPlayer);
+  
+	// Scroll chat to bottom after initial render
+	setTimeout(() => {
+		const chatMessagesDiv = document.getElementById('chatMessages');
+		if (chatMessagesDiv) {
+			chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+		}
+	}, 100);
   }
 
 function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: boolean, currentPlayer?: Player): void {
@@ -602,6 +704,20 @@ function attachEventListeners(canAddMore: boolean, canStart: boolean, isHost: bo
   		if (leaveBtn) {
     		leaveBtn.addEventListener('click', () => leaveRoom());
   		}
+
+  	// Chat event listeners
+  	const chatInput = document.getElementById('chatInput') as HTMLInputElement;
+  	const sendChatBtn = document.getElementById('sendChatBtn');
+  
+  	if (chatInput && sendChatBtn) {
+    	sendChatBtn.addEventListener('click', () => sendChatMessage());
+    
+    	chatInput.addEventListener('keypress', (e) => {
+      		if (e.key === 'Enter') {
+        		sendChatMessage();
+      		}
+    	});
+  	}
 	}
 
 async function toggleReady(): Promise<void> {
@@ -768,6 +884,80 @@ async function leaveRoom(): Promise<void> {
   }
 }
 
+function sendChatMessage(): void {
+  	const chatInput = document.getElementById('chatInput') as HTMLInputElement;
+  	if (!chatInput || !lobbyWebSocket) return;
+  
+  	const message = chatInput.value.trim();
+  	if (!message) return;
+  
+  	// Get current user's username
+  	const currentRoom = getCurrentRoom();
+  	const currentPlayer = currentRoom?.players.find(p => p.id === currentUserId);
+  	const username = currentPlayer?.username || 'Guest';
+  
+  	// Send chat message via WebSocket
+  	lobbyWebSocket.sendChat(username, message);
+  
+  	// Clear input
+  	chatInput.value = '';
+}
+
+function updateChatDisplay(): void {
+  	const chatMessagesDiv = document.getElementById('chatMessages');
+  	if (!chatMessagesDiv) return;
+  
+  	// Preserve chat input value and focus state before updating
+  	const chatInput = document.getElementById('chatInput') as HTMLInputElement;
+  	const preservedChatValue = chatInput ? chatInput.value : '';
+  	const wasChatFocused = chatInput && document.activeElement === chatInput;
+  	const chatCursorPosition = chatInput ? chatInput.selectionStart : 0;
+  
+  	const currentRoom = getCurrentRoom();
+  	const currentPlayer = currentRoom?.players.find(p => p.id === currentUserId);
+  
+  	chatMessagesDiv.innerHTML = chatMessages.length === 0 ? `
+    	<div style="color: rgb(156 163 175); font-size: 0.85em; text-align: center; padding: 1em; font-style: italic;">
+      		No messages yet. Start the conversation!
+    	</div>
+  	` : chatMessages.map(msg => {
+    	const isCurrentUser = msg.playerId === currentUserId;
+    	const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    	// Escape HTML to prevent XSS
+    	const escapedMessage = msg.message.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    	const escapedUsername = msg.username.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    	return `
+      		<div style="display: flex; flex-direction: column; gap: 0.2em; padding: 0.5em; background: ${isCurrentUser ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)'}; border-radius: 6px; border-left: 3px solid ${isCurrentUser ? 'rgba(59, 130, 246, 0.5)' : 'rgba(156, 163, 175, 0.3)'};">
+        		<div style="display: flex; justify-content: space-between; align-items: center;">
+          			<span style="color: ${isCurrentUser ? 'rgba(59, 130, 246, 0.9)' : 'rgb(229 231 235)'}; font-weight: 500; font-size: 0.85em;">
+            			${isCurrentUser ? 'You' : escapedUsername}
+          			</span>
+          			${time ? `<span style="color: rgb(156 163 175); font-size: 0.75em;">${time}</span>` : ''}
+        		</div>
+        		<div style="color: rgb(229 231 235); font-size: 0.9em; word-wrap: break-word;">${escapedMessage}</div>
+      		</div>
+    	`;
+  	}).join('');
+  
+  	// Scroll to bottom
+  	chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+  
+  	// Restore chat input state if it was focused
+  	if (chatInput && (preservedChatValue || wasChatFocused)) {
+    	if (preservedChatValue) {
+      		chatInput.value = preservedChatValue;
+    	}
+    	if (wasChatFocused) {
+      		setTimeout(() => {
+        		chatInput.focus();
+        		if (chatCursorPosition !== null) {
+          			chatInput.setSelectionRange(chatCursorPosition, chatCursorPosition);
+        		}
+      		}, 0);
+    	}
+  	}
+}
+
 export function cleanupLobby(): void {
   	stopRoomPolling();
   	if (lobbyWebSocket) {
@@ -775,6 +965,7 @@ export function cleanupLobby(): void {
     	lobbyWebSocket = null;
   	}
   	clearRoomState();
+  	chatMessages = []; // Clear chat messages on cleanup
 }
 
 export type { Player, GameRoom };
