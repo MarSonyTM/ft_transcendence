@@ -1,0 +1,44 @@
+services:
+  backend:
+    container_name: backend
+    build: ./src/backend/.
+    ports:
+      - "3000:3000"
+    volumes:
+      - transcendence_db:/app/database
+      - ./src/backend/.env:/app/.env
+    environment:
+      - NODE_ENV=production
+      - FORCE_COLOR=1
+      - DATABASE_PATH=/app/database/database.db
+    restart: unless-stopped
+    networks:
+      - transcendence
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('https://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  frontend:
+    build: ./src/frontend/.
+    container_name: frontend
+    ports:
+      - "8080:80"
+      - "8443:443"
+    networks:
+      - transcendence
+    restart: unless-stopped
+
+volumes:
+  transcendence_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: src/database/
+
+networks:
+  transcendence:
+    driver: bridge

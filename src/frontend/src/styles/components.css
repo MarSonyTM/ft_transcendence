@@ -1,0 +1,25 @@
+/* COMPONENTS */
+.controls-container {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-bottom: 1.5rem;
+	justify-content: center;
+}
+
+.login-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1em;
+	min-width: 250px;
+}
+
+.input-field {
+	padding: 0.5em;
+	font-size: 1.2em;
+}
+
+.loginError {
+  color: red;
+  margin-top: 0.5em;
+}

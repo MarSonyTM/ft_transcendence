@@ -1,0 +1,120 @@
+/* GAME */
+.game-status {
+  background-color: rgb(31 41 55);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.875rem;
+}
+.game-status > div {
+	margin-bottom: 0.5rem;
+}
+
+.game-status > div:last-child {
+	margin-bottom: 0;
+}
+
+.status-text {
+	color: rgb(250 204 21);
+}
+
+.ws-status {
+	color: rgb(248 113 113);
+}
+
+.fps-text {
+	color: rgb(74 222 128);
+}
+
+.select-title {
+  font-weight: bold;
+  text-align: center;
+  font-size: 3em;
+  margin-bottom: 1em;
+}
+.game-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.player-info {
+  text-align: center;
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.player-names {
+	margin-bottom: 0.5rem;
+}
+
+.player1-name {
+	color: rgb(248 113 113);
+}
+
+.player2-name {
+	color: rgb(96 165 250);
+}
+
+.player3-name {
+	color: rgb(243, 255, 17);
+}
+
+.player4-name {
+	color: rgb(27, 231, 27);
+}
+
+.vs-text {
+	color: rgb(156 163 175);
+	margin: 0 0.5rem;
+}
+
+.score-container {
+	text-align: center;
+	font-size: 1.875rem;
+	font-weight: 700;
+}
+
+.left-score {
+  color: rgb(248 113 113);
+}
+
+.right-score {
+  color: rgb(96 165 250);
+}
+
+.score-separator {
+	color: rgb(156 163 175);
+	margin: 0 1rem;
+}
+
+.controls-info {
+	text-align: center;
+	font-size: 0.875rem;
+	color: rgb(156 163 175);
+}
+
+.controls-info p {
+	margin-bottom: 0.25rem;
+}
+
+.controls-info p:last-child {
+	margin-bottom: 0;
+}
+
+.connected {
+	color: rgb(74 222 128);
+}
+
+.disconnected {
+	color: rgb(248 113 113);
+}
+
+.controls-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem; /* gap-3 */
+  margin-bottom: 1.5rem; /* mb-6 */
+  justify-content: center;
+}

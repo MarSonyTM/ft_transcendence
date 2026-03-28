@@ -1,0 +1,521 @@
+/* ARCHIVE */
+.t-archive-modal {
+	position: fixed;
+	inset: 0;
+	display: none;
+	z-index: 9999;
+}
+
+.t-archive-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.75);
+	backdrop-filter: blur(8px);
+}
+
+.t-archive-dialog {
+  position: relative;
+  width: min(1400px, 95vw);
+  height: min(90vh, 900px);
+  margin: 3vh auto;
+  background: rgba(25, 35, 50, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.t-archive-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.t-archive-header h3 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+}
+
+.t-archive-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  overflow: visible;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.t-archive-list {
+  overflow-y: auto;
+  background: rgba(15, 25, 40, 0.6);
+  padding: 0.75rem;
+}
+
+.t-archive-detail {
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: rgba(15, 25, 40, 0.6);
+  padding: 1.5rem 2rem;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.t-archive-ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.t-archive-item {
+	padding: .5rem;
+	border-bottom: 1px solid #333;
+}
+
+.t-archive-row {
+	width: 100%;
+	gap: .4rem;
+	align-items: center;
+	background: rgba(59, 130, 246, 0.1);
+	border: 1px solid rgba(59, 130, 246, 0.3);
+	padding: 0.6rem 0.75rem;
+	border-radius: 8px;
+	cursor: pointer;
+	font-size: 0.85rem;
+	font-weight: 500;
+	text-align: center;
+	color: rgb(229 231 235);
+	transition: all 0.2s ease;
+}
+
+.t-archive-row:hover {
+	background: rgba(59, 130, 246, 0.2);
+	border-color: rgba(59, 130, 246, 0.5);
+	transform: translateX(4px);
+}
+
+.t-arch-status.completed {
+	color: #4ade80;
+	font-weight: 600;
+}
+
+.t-arch-status.in_progress {
+	color: #fbbf24;
+	font-weight: 600;
+}
+
+.t-arch-status.idle {
+	color: #60a5fa;
+	font-weight: 600;
+}
+
+.t-archive-detail-inner h4 {
+	margin: .2rem 0 .6rem;
+	font-size: 1.8rem;
+	font-weight: 600;
+	background: linear-gradient(90deg, #60a5fa, #a78bfa);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+
+.t-archive-players,
+.t-archive-history {
+	margin: .4rem 0 .6rem;
+	padding-left: 1.2rem;
+}
+
+.t-archive-empty,
+.t-archive-loading,
+.t-archive-error,
+.t-archive-hint {
+	font-size: 1rem;
+	opacity: .7;
+	color: rgb(156 163 175);
+	text-align: center;
+	padding: 2rem;
+}
+
+/* Tournament Detail Layout */
+.t-archive-detail-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+}
+
+.t-detail-header {
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+}
+
+.t-detail-header h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 2rem;
+    font-weight: 600;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.t-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0;
+    font-size: 1rem;
+    color: rgb(229 231 235);
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.status-completed { background: #28a745; color: white; }
+.status-active { background: #ffc107; color: black; }
+.status-pending { background: #6c757d; color: white; }
+
+.t-champion {
+    font-size: 0.9rem;
+}
+
+/* Two-Column Layout */
+.t-detail-content {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 2rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Left Panel: Match List */
+.t-matches-panel {
+    display: flex;
+    flex-direction: column;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    overflow: hidden;
+}
+
+.t-matches-panel h5 {
+    margin: 0 0 1.25rem 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: rgb(229 231 235);
+    text-align: center;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.t-matches-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.t-match-item {
+    padding: 1rem 0.875rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.t-match-item:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.t-match-item.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
+}
+
+.t-match-players {
+    font-weight: 600;
+    margin: 0;
+	text-align: center;
+	color: rgb(229 231 235);
+	font-size: 0.9rem;
+}
+
+.t-match-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #888);
+}
+
+/* Right Panel: Match Details */
+.t-match-detail-panel {
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 2rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.t-match-detail-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: rgb(156 163 175);
+    font-size: 1.1rem;
+}
+
+.t-match-detail-content h5 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.3rem;
+}
+
+/* Player Grid (1x2) */
+.t-players-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.t-player-card {
+    padding: 1.5rem;
+    background: var(--card-bg, #252525);
+    border-radius: 8px;
+    border: 3px solid transparent;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.t-player-card.winner {
+    border-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.t-player-card.loser {
+    border-color: #dc3545;
+    opacity: 0.7;
+}
+
+.t-player-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.t-player-stats {
+    color: var(--text-secondary, #888);
+    font-size: 0.9rem;
+}
+
+.t-winner-badge {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: #28a745;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.t-loser-badge {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: #e5293b;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Match Timeline */
+.t-match-timeline {
+    background: var(--card-bg, #252525);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.t-timeline-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.t-timeline-item:last-child {
+    border-bottom: none;
+}
+
+.t-timeline-label {
+    font-weight: 600;
+    color: var(--text-secondary, #aaa);
+}
+
+/* Bracket Visualization */
+.t-bracket-section {
+    margin-top: 1.5rem;
+}
+
+.t-bracket-section h6 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: rgb(229 231 235);
+}
+
+.t-bracket-container {
+    display: flex;
+    gap: 3rem;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 2.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.t-bracket-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.t-bracket-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.t-bracket-container::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 4px;
+}
+
+.t-bracket-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.7);
+}
+
+.t-bracket-round {
+    display: flex;
+    flex-direction: column;
+    min-width: 240px;
+    gap: 1.5rem;
+    flex: 0 0 auto;
+}
+
+.t-round-label {
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #60a5fa;
+    font-size: 1.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 1rem 1.5rem;
+    background: rgba(96, 165, 250, 0.15);
+    border-radius: 10px;
+    border: 2px solid rgba(96, 165, 250, 0.4);
+}
+
+.t-round-matches {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+    flex: 1;
+    justify-content: flex-start;
+}
+
+.t-bracket-match {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 220px;
+}
+
+.t-bracket-match:hover {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    transform: translateY(-3px);
+}
+
+.t-bracket-player {
+    padding: 1.25rem 1.5rem;
+    font-size: 1.1rem;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    color: rgb(229 231 235);
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.t-bracket-player:last-child {
+    border-bottom: none;
+}
+
+.t-bracket-player.won {
+    background: rgba(16, 185, 129, 0.25);
+    font-weight: 700;
+    color: #10b981;
+    border-left: 4px solid #10b981;
+    font-size: 1.15rem;
+}
+
+.t-bracket-player.lost {
+    opacity: 0.5;
+    color: rgb(156 163 175);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .t-detail-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .t-matches-panel {
+        max-height: 300px;
+    }
+    
+    .t-players-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bye-match {
+    opacity: 0.6;
+    border-style: dashed !important;
+}
