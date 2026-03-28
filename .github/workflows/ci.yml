@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '24.14.0'
           cache: 'npm'
-          cache-dependency-path: src/${{ matrix.service }}/package-lock.json
+          cache-dependency-path: src/
     
       - name: Install and test
         run: |
