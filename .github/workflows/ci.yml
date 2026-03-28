@@ -6,6 +6,9 @@ on:
   push:
     branches: [ MAIN, DEV, PRE, PROD ]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
@@ -19,9 +22,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20.19.5'
+          node-version: '24.14.0'
           cache: 'npm'
-          # cache-dependency-path: src/${{ matrix.service }}/package-lock.json
+          cache-dependency-path: src/${{ matrix.service }}/package-lock.json
     
       - name: Install and test
         run: |
